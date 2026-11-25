@@ -543,7 +543,7 @@ describe("PartOfSpeechSettings", () => {
     expect(screen.getByRole("tab", { name: "短语" })).toBeVisible();
   });
 
-  it("切到短语：列表查询带上 kind，并隐藏词形变化 Tab", async () => {
+  it("切到短语：列表查询带上 kind，并保留词形变化入口", async () => {
     renderSettings();
     expect(mock.queries.at(-1)).toMatchObject({ kind: "word" });
     expect(section("词形变化")).not.toBeNull();
@@ -552,8 +552,7 @@ describe("PartOfSpeechSettings", () => {
     await waitFor(() =>
       expect(mock.queries.at(-1)).toMatchObject({ kind: "phrase", page: 1 })
     );
-    // 短语没有词形变化，那个 Tab 不该留在页面上。
-    expect(section("词形变化")).toBeNull();
+    expect(section("词形变化")).not.toBeNull();
 
     fireEvent.click(screen.getByRole("tab", { name: "单词" }));
     await waitFor(() =>

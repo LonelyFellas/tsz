@@ -7,7 +7,7 @@ import {
 } from "@testing-library/react";
 import { App as FeedbackApp } from "@tsz/ui/admin/overlays";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { FormTypeConfig } from "@tsz/types";
+import type { AdminWordKind, FormTypeConfig } from "@tsz/types";
 import { beforeEach, expect, it, vi } from "vitest";
 import { expectDisplayNamesNotDerived } from "./displayName.test.helper";
 import { useAuthStore } from "@/lib/auth";
@@ -37,6 +37,34 @@ vi.mock("../dataSource", () => ({
           sort_order: 10,
           sub_parts_extensible: true,
           sub_pos_required: true,
+          sub_parts: []
+        },
+        {
+          id: "pos-phrase-verb",
+          kind: "phrase",
+          code: "phrase_verb",
+          name_zh: "动词性成分",
+          name_en: "Verbal constituent",
+          abbreviation: "vp.",
+          short_name_zh: "动词性成分",
+          full_name_en: "verbal constituent",
+          sort_order: 10,
+          sub_parts_extensible: true,
+          sub_pos_required: false,
+          sub_parts: []
+        },
+        {
+          id: "pos-phrase-verbal",
+          kind: "phrase",
+          code: "phrase_verbal",
+          name_zh: "动词短语",
+          name_en: "Verbal phrase",
+          abbreviation: "vph.",
+          short_name_zh: "动词短语",
+          full_name_en: "verbal phrase",
+          sort_order: 10,
+          sub_parts_extensible: true,
+          sub_pos_required: false,
           sub_parts: []
         }
       ],
@@ -87,14 +115,14 @@ beforeEach(() => {
   mock.items = [{ ...base }];
   vi.clearAllMocks();
 });
-function setup() {
+function setup(kind: AdminWordKind = "word") {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
   });
   return render(
     <QueryClientProvider client={client}>
       <FeedbackApp message={{ duration: 0.1 }}>
-        <FormTypeSettings />
+        <FormTypeSettings kind={kind} />
       </FeedbackApp>
     </QueryClientProvider>
   );
@@ -156,6 +184,59 @@ it("新增沿用五名称字段，派生编码与排序并刷新列表", async (
   );
   expect(screen.getAllByText("自定义词形").length).toBeGreaterThan(0);
 });
+it("短语词形使用短语分页参数，并仅允许选择短语词性", async () => {
+  setup("phrase");
+  const addButton = screen.getByRole("button", { name: "新增词形变化" });
+  await waitFor(() => expect(addButton).toBeEnabled());
+  expect(mock.list).toHaveBeenCalledWith({
+    kind: "phrase",
+    page: 1,
+    page_size: 10
+  });
+
+  fireEvent.click(addButton);
+  const dialog = await screen.findByRole("dialog");
+  fireEvent.mouseDown(within(dialog).getByLabelText("所属基本词性"));
+  expect(await screen.findByText("动词性成分", { exact: true })).toBeVisible();
+  expect(screen.queryByText("动词", { exact: true })).toBeNull();
+});
+
+it("两个短语词性可分别创建同名词形，生成的编码不同", async () => {
+  mock.create.mockResolvedValue(base);
+  setup("phrase");
+  const addButton = screen.getByRole("button", { name: "新增词形变化" });
+  await waitFor(() => expect(addButton).toBeEnabled());
+
+  for (const parentName of ["动词性成分", "动词短语"]) {
+    fireEvent.click(addButton);
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.mouseDown(within(dialog).getByLabelText("所属基本词性"));
+    fireEvent.click(await screen.findByText(parentName, { exact: true }));
+    for (const [label, value] of Object.entries({
+      正式中文: "过去式",
+      简洁显示: "过去式",
+      正式英文: "Past tense",
+      英文全称: "past tense",
+      英文缩写: "past"
+    })) {
+      fireEvent.change(within(dialog).getByLabelText(label), {
+        target: { value }
+      });
+    }
+    fireEvent.click(within(dialog).getByText(/^新\s*建$/));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  }
+
+  const inputs = mock.create.mock.calls.map(([input]) => input);
+  expect(inputs.map((input) => input.part_of_speech_id)).toEqual([
+    "pos-phrase-verb",
+    "pos-phrase-verbal"
+  ]);
+  const codes = inputs.map((input) => input.code);
+  expect(codes[0]).not.toBe(codes[1]);
+  for (const code of codes) expect(code).toMatch(/^[a-z][a-z0-9_]{0,31}$/);
+});
+
 it("序号列显示真实排序值，而不是行内位置", async () => {
   setup();
   await waitFor(() =>
@@ -416,7 +497,7 @@ it("四语切换保留词形草稿、默认模板、归属与 revision，在途�
     <QueryClientProvider client={client}>
       <InterfaceI18nProvider locale={locale}>
         <FeedbackApp>
-          <FormTypeSettings />
+          <FormTypeSettings kind="word" />
         </FeedbackApp>
       </InterfaceI18nProvider>
     </QueryClientProvider>

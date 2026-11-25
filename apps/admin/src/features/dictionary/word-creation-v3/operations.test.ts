@@ -2061,15 +2061,28 @@ describe("fillFormTypeTemplate", () => {
     ).toBe(content);
   });
 
-  it("短语的词性不铺：短语没有词形变化", () => {
+  it("短语按自己的词性目录铺默认词形", () => {
     let seq = 540;
-    const content = onlyBase("noun");
-    const phraseItems = catalogItems.map((item) =>
-      item.code === "noun" ? { ...item, kind: "phrase" as const } : item
+    const phrase = {
+      ...byCode("noun"),
+      code: "phrase_noun",
+      kind: "phrase" as const,
+      allowed_form_types: ["phrase_noun_plural", "phrase_noun_variant"],
+      default_form_types: ["phrase_noun_plural"]
+    };
+    const added = addPartOfSpeech({ pos: [] }, phrase, () =>
+      uuidFromInt(seq++)
     );
-    expect(
-      fillFormTypeTemplate(content, phraseItems, () => uuidFromInt(seq++))
-    ).toBe(content);
+    if (!added.ok) throw new Error("setup failed");
+    const filled = fillFormTypeTemplate(
+      added.value,
+      [...catalogItems, phrase],
+      () => uuidFromInt(seq++)
+    );
+    expect(filled.pos[0]!.forms.map((form) => form.form_type)).toEqual([
+      "base",
+      "phrase_noun_plural"
+    ]);
   });
 
   it("草稿里的词性不在目录里就不铺", () => {

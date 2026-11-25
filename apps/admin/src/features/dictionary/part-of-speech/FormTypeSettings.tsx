@@ -15,7 +15,11 @@ import { App, Modal, Tooltip } from "@tsz/ui/admin/overlays";
 import { Form, Select, Switch } from "@tsz/ui/admin/forms";
 import { FullNameEnCell } from "./FullNameEnCell";
 import { type TableColumnsType } from "@tsz/ui/admin/table";
-import type { CreatePartOfSpeechInput, FormTypeConfig } from "@tsz/types";
+import type {
+  AdminWordKind,
+  CreatePartOfSpeechInput,
+  FormTypeConfig
+} from "@tsz/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { useEffect, useRef, useState } from "react";
@@ -32,16 +36,26 @@ type Values = Omit<CreatePartOfSpeechInput, "code"> & {
   is_default?: boolean;
 };
 
-/**
- * 词形编码全局唯一，而不同基本词性下允许重名（形容词与副词各有「比较级」），
- * 所以派生编码要带上父词性前缀。父编码本身可长达 32 字，截到 8 字给英文全称留位置。
- */
-function deriveFormTypeCode(parentCode: string, fullNameEn: string): string {
-  const parent = slugifyCode(parentCode).slice(0, 8);
-  return slugifyCode(`${parent} ${fullNameEn}`);
+function deriveFormTypeCode(
+  kind: AdminWordKind,
+  parentCode: string,
+  fullNameEn: string
+): string {
+  if (kind === "word") {
+    const parent = slugifyCode(parentCode).slice(0, 8);
+    return slugifyCode(`${parent} ${fullNameEn}`);
+  }
+  // 短语词性共享 phrase_ 前缀。用完整归属和名称计算 FNV-1a，区分跨词性的同名词形。
+  const key = `${parentCode}:${fullNameEn.trim().toLowerCase()}`;
+  let hash = 0xcbf29ce484222325n;
+  for (const byte of new TextEncoder().encode(key)) {
+    hash = BigInt.asUintN(64, (hash ^ BigInt(byte)) * 0x100000001b3n);
+  }
+  const name = slugifyCode(fullNameEn).slice(0, 8);
+  return `phrase_${name}_${hash.toString(16).padStart(16, "0")}`;
 }
 
-export function FormTypeSettings() {
+export function FormTypeSettings({ kind }: { kind: AdminWordKind }) {
   const { t } = useContentTranslation();
   const canEdit = usePermission("lexicon_settings.edit_forms");
   const canDelete = usePermission("lexicon_settings.delete");
@@ -58,9 +72,8 @@ export function FormTypeSettings() {
     page: number;
     page_size: number;
   }>({ page: 1, page_size: 10 });
-  // 短语没有词形变化，后端也只接受挂在单词词性下：候选只列单词侧。
   const parts = (catalog.data?.items ?? []).filter(
-    (item) => item.kind === "word"
+    (item) => item.kind === kind
   );
   // 后端列表按 sort_order 全局排序，新建预填也取全局最大值 + 10，
   // 否则新词形默认会插到别的词性中间；管理员可以改。放进 ref 而不是 effect 依赖：
@@ -72,8 +85,8 @@ export function FormTypeSettings() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<FormTypeConfig>();
   const list = useQuery({
-    queryKey: [...partOfSpeechKeys.all, "form-types", query],
-    queryFn: () => partOfSpeechDataSource.listFormTypes(query),
+    queryKey: [...partOfSpeechKeys.all, "form-types", kind, query],
+    queryFn: () => partOfSpeechDataSource.listFormTypes({ ...query, kind }),
     enabled: ready
   });
   const refresh = () =>
@@ -104,7 +117,7 @@ export function FormTypeSettings() {
       return partOfSpeechDataSource.createFormType({
         ...values,
         part_of_speech_id: partId,
-        code: deriveFormTypeCode(parent?.code ?? "", values.full_name_en)
+        code: deriveFormTypeCode(kind, parent?.code ?? "", values.full_name_en)
       });
     },
     onSuccess: async () => {
@@ -274,7 +287,7 @@ export function FormTypeSettings() {
             <Button
               type="primary"
               icon={<PlusIcon />}
-              disabled={!canEdit || !ready}
+              disabled={!canEdit || !ready || parts.length === 0}
               onClick={() => {
                 setEditing(undefined);
                 setOpen(true);
