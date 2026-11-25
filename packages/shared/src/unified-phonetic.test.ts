@@ -95,6 +95,21 @@ describe("语雀统一音标规则", () => {
   });
 
   it.each([
+    ["spies", "spaɪz", "sbaɪz"],
+    ["spout", "spaʊt", "sbaʊt"],
+    ["style", "staɪl", "sdaɪl"],
+    ["stout", "staʊt", "sdaʊt"],
+    ["sky", "skaɪ", "sgaɪ"],
+    ["scout", "skaʊt", "sgaʊt"]
+  ])("%s 的词首清音转换覆盖 a 开头的双元音", (word, input, actual) => {
+    for (const dialect of ["uk", "us"] as const) {
+      expect(
+        convertDictionaryToUnified(input, word, dialect, "citation")
+      ).toMatchObject({ ok: true, value: actual });
+    }
+  });
+
+  it.each([
     ["workspace", "ˈwɜːkspeɪs", "uk", "en-GB", "ˈwɜːksbeɪs", "ˈwɜːkspeɪs"],
     ["workspace", "ˈwɜːrkspeɪs", "us", "en-US", "ˈwərksbeɪs", "ˈwɝkspeɪs"],
     ["chairing", "ˈtʃerɪŋ", "us", "en-US", "ˈtʃɛərɪŋ", "ˈtʃɛɹɪŋ"]

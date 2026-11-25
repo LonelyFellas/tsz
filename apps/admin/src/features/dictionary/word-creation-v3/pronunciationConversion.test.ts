@@ -100,6 +100,27 @@ it("复数的实际发音展开成音节辅音，英美 Azure 输入继续使用
   });
 });
 
+it("全部转换将 spies 的清音转换应用到实际发音", () => {
+  const result = planPronunciationConversion(
+    { ...pronunciation, dict_phonetic: "spaɪz" },
+    "spies",
+    "common"
+  );
+  expect(result).toMatchObject({
+    ok: true,
+    plan: {
+      patch: {
+        actual_pron: "sbaɪz",
+        actual_pron_rich: { version: 2, text: "sbaɪz", annotations: [] },
+        synthesis: {
+          uk: { ipa: "spaɪz", ups: "S P AI Z" },
+          us: { ipa: "spaɪz", ups: "S P AI Z" }
+        }
+      }
+    }
+  });
+});
+
 it("美式卷舌字典音标在后台转换计划中生成实际发音和 Azure IPA", () => {
   const result = planPronunciationConversion(
     { ...pronunciation, dict_phonetic: "ˈbɜːrd" },
