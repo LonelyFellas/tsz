@@ -856,7 +856,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "3f1b811f706a5433f63a36d260833b7605fa1fdf6108887a2e0131f96798ec66"
+      "1f46fa194e033b89474ac10793e78fe07bb0f6b50bc301b0abb5d5e08cf50565"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -2011,6 +2011,14 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
 
 it("词形配置契约包含增删改、必填revision与统一目录名称", () => {
   expect(specPaths["/admin/settings/form-types"]).toEqual(["get", "post"]);
+  expect(
+    snapshot.operationQueryParameters["get /admin/settings/form-types"]
+  ).toContainEqual({
+    name: "kind",
+    in: "query",
+    required: false,
+    schema: { $ref: "#/components/schemas/EntryKind" }
+  });
   expect(specPaths["/admin/settings/form-types/{id}"]).toEqual([
     "delete",
     "patch"

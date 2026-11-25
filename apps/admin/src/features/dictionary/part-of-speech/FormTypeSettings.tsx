@@ -15,7 +15,11 @@ import { App, Modal, Tooltip } from "@tsz/ui/admin/overlays";
 import { Form, Select, Switch } from "@tsz/ui/admin/forms";
 import { FullNameEnCell } from "./FullNameEnCell";
 import { type TableColumnsType } from "@tsz/ui/admin/table";
-import type { CreatePartOfSpeechInput, FormTypeConfig } from "@tsz/types";
+import type {
+  AdminWordKind,
+  CreatePartOfSpeechInput,
+  FormTypeConfig
+} from "@tsz/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { useEffect, useRef, useState } from "react";
@@ -41,7 +45,7 @@ function deriveFormTypeCode(parentCode: string, fullNameEn: string): string {
   return slugifyCode(`${parent} ${fullNameEn}`);
 }
 
-export function FormTypeSettings() {
+export function FormTypeSettings({ kind }: { kind: AdminWordKind }) {
   const { t } = useContentTranslation();
   const canEdit = usePermission("lexicon_settings.edit_forms");
   const canDelete = usePermission("lexicon_settings.delete");
@@ -58,9 +62,8 @@ export function FormTypeSettings() {
     page: number;
     page_size: number;
   }>({ page: 1, page_size: 10 });
-  // 短语没有词形变化，后端也只接受挂在单词词性下：候选只列单词侧。
   const parts = (catalog.data?.items ?? []).filter(
-    (item) => item.kind === "word"
+    (item) => item.kind === kind
   );
   // 后端列表按 sort_order 全局排序，新建预填也取全局最大值 + 10，
   // 否则新词形默认会插到别的词性中间；管理员可以改。放进 ref 而不是 effect 依赖：
@@ -72,8 +75,8 @@ export function FormTypeSettings() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<FormTypeConfig>();
   const list = useQuery({
-    queryKey: [...partOfSpeechKeys.all, "form-types", query],
-    queryFn: () => partOfSpeechDataSource.listFormTypes(query),
+    queryKey: [...partOfSpeechKeys.all, "form-types", kind, query],
+    queryFn: () => partOfSpeechDataSource.listFormTypes({ ...query, kind }),
     enabled: ready
   });
   const refresh = () =>
@@ -274,7 +277,7 @@ export function FormTypeSettings() {
             <Button
               type="primary"
               icon={<PlusIcon />}
-              disabled={!canEdit || !ready}
+              disabled={!canEdit || !ready || parts.length === 0}
               onClick={() => {
                 setEditing(undefined);
                 setOpen(true);

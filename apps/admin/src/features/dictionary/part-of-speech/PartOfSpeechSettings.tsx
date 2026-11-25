@@ -126,7 +126,6 @@ export function PartOfSpeechSettings() {
   const [activeTab, setActiveTab] = useState<
     "basic" | "detailed" | "forms" | "sharing"
   >("basic");
-  // 单词与短语共用这一套配置界面，只是各看各的一侧；短语没有词形变化。
   const [kind, setKind] = useState<AdminWordKind>("word");
   const [selectedPartId, setSelectedPartId] = useState("");
   const subPanelRef = useRef<SubPartOfSpeechPanelHandle>(null);
@@ -150,11 +149,8 @@ export function PartOfSpeechSettings() {
     setKind(next);
     setPage(1);
     setSelectedPartId("");
-    // 短语没有词形变化，停在那个 Tab 上会看到一片和当前分页无关的内容。
     setActiveTab((current) =>
-      next === "phrase" && (current === "forms" || current === "sharing")
-        ? "basic"
-        : current
+      next === "phrase" && current === "sharing" ? "basic" : current
     );
   };
   // 空串表示「全部」：面板并排展示所有词性的细分词性；新增时在弹窗里选所属词性。
@@ -318,19 +314,17 @@ export function PartOfSpeechSettings() {
         options={[
           { value: "basic", label: t("basic_parts") },
           { value: "detailed", label: t("sub_parts") },
-          ...(kind === "phrase"
-            ? []
-            : [
-                { value: "forms", label: t("form_types") },
-                { value: "sharing", label: t("sharing_title") }
-              ])
+          { value: "forms", label: t("form_types") },
+          ...(kind === "word"
+            ? [{ value: "sharing", label: t("sharing_title") }]
+            : [])
         ]}
       />
 
       {activeTab === "sharing" && kind === "word" ? (
         <FormSharingSettings />
-      ) : activeTab === "forms" && kind === "word" ? (
-        <FormTypeSettings />
+      ) : activeTab === "forms" ? (
+        <FormTypeSettings key={kind} kind={kind} />
       ) : activeTab === "basic" ? (
         <>
           <Card className="admin-filter-card" size="small">
