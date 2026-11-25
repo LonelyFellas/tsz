@@ -1,6 +1,7 @@
 import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
 import { regionalVariants } from "@tsz/shared";
 import { AdminTable as Table } from "@/components/AdminTable";
+import { useColumnSettings } from "@/components/useColumnSettings";
 import { PencilIcon } from "lucide-react";
 import {
   V3FormCopyHandle,
@@ -21,10 +22,7 @@ import type {
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import { pronunciationPlaybackSource, synthesisForLocale } from "@tsz/shared";
 import { useFormTypeLabel } from "../../part-of-speech/FormTypeLabels";
-import {
-  PronunciationPreviewControls,
-  PronunciationPreviewVoiceList
-} from "../../word-creation/PronunciationPreview";
+import { PronunciationPreviewVoiceList } from "../../word-creation/PronunciationPreview";
 import type { V3DialectSeparatedFormRow } from "./V3ConcreteFormRow";
 import { v3FormIssueMessages } from "../presentationErrors";
 
@@ -70,29 +68,52 @@ type OverviewReading = V3DialectSeparatedFormRow & {
   spellingDialect: "common" | "uk" | "us";
 };
 
-function PronunciationCell({
+function ActualPronunciation({ reading }: { reading: OverviewReading }) {
+  const { t } = useLexiconEditorTranslation();
+  const { dialect, pronunciation } = reading;
+  if (!pronunciation) {
+    return (
+      <Typography.Text type="secondary">
+        {t("blank_label", {
+          label: dialect === "uk" ? t("dialect_uk") : t("dialect_us")
+        })}
+      </Typography.Text>
+    );
+  }
+  const actualPron = pronunciation.actual_pron_rich ?? {
+    version: 2 as const,
+    text: pronunciation.actual_pron,
+    annotations: []
+  };
+  const text = actualPron.text.trim();
+  if (!text)
+    return <Typography.Text type="secondary">{t("blank")}</Typography.Text>;
+  return (
+    <span
+      className={`v3-overview-phonetic tsz-phonetics${text.startsWith("/") ? "" : " has-slashes"}`}
+      title={actualPron.text}
+    >
+      <RichTextReadOnly value={actualPron} />
+    </span>
+  );
+}
+
+function VoiceSettingsCell({
   reading,
-  settings
+  column
 }: {
   reading: OverviewReading;
-  settings?: "voice" | "rate" | "volume";
+  column: "voice" | "rate" | "volume";
 }) {
   const { t } = useLexiconEditorTranslation();
-  const { dialect, pronunciation: row, pronunciationIndex } = reading;
+  const { dialect, pronunciation: row, pronunciationIndex, variant } = reading;
   if (!row) {
     return (
       <div className="v3-overview-reading">
-        <Typography.Text type="secondary">
-          {settings
-            ? "—"
-            : t("blank_label", {
-                label: dialect === "uk" ? t("dialect_uk") : t("dialect_us")
-              })}
-        </Typography.Text>
+        <Typography.Text type="secondary">—</Typography.Text>
       </div>
     );
   }
-  const variant = reading.variant;
   const locale = dialect === "uk" ? "en-GB" : "en-US";
   const {
     content,
@@ -113,64 +134,29 @@ function PronunciationCell({
     source === "spelling" || (!source && row.synthesis?.use_spelling)
       ? "word"
       : "azure";
-  const actualPron = row.actual_pron_rich ?? {
-    version: 2 as const,
-    text: row.actual_pron,
-    annotations: []
-  };
-  const addSlashes =
-    actualPron.text.trim() && !actualPron.text.trim().startsWith("/");
   return (
-    <div
-      className={`v3-overview-reading${settings ? " v3-overview-settings" : ""}`}
-    >
-      {settings ? (
-        <PronunciationPreviewVoiceList
-          recommendationArea={recommendationArea}
-          dialect={dialect}
-          voiceProfile={profile}
-          content={content}
-          source={source}
-          audioAssets={row.audio_assets}
-          audioAssetId={assetId}
-          column={settings}
-        />
-      ) : (
-        <div className="v3-overview-pronunciation">
-          <PronunciationPreviewControls
-            recommendationArea={recommendationArea}
-            pronunciationId={row.id}
-            dialect={dialect}
-            content={content}
-            voiceProfile={profile}
-            spelling={variant.spelling}
-            audioAssetId={assetId}
-            disabled={!content && !assetId}
-            disabledReason={
-              source === "none"
-                ? t("creation_accent_not_configured")
-                : content || !row.synthesis
-                  ? t("audio_missing")
-                  : t("synthesis_source_required")
-            }
-            ariaLabelPrefix={t("reading_index", {
-              index: pronunciationIndex + 1,
-              details: dialect === "uk" ? t("dialect_uk") : t("dialect_us")
-            })}
-            playbackOnly
-          />
-          {actualPron.text.trim() ? (
-            <span
-              className={`v3-overview-phonetic tsz-phonetics${addSlashes ? " has-slashes" : ""}`}
-              title={actualPron.text}
-            >
-              <RichTextReadOnly value={actualPron} />
-            </span>
-          ) : (
-            <Typography.Text type="secondary">{t("blank")}</Typography.Text>
-          )}
-        </div>
-      )}
+    <div className="v3-overview-settings">
+      <PronunciationPreviewVoiceList
+        recommendationArea={recommendationArea}
+        dialect={dialect}
+        voiceProfile={profile}
+        content={content}
+        source={source}
+        audioAssets={row.audio_assets}
+        audioAssetId={assetId}
+        column={column}
+        playback={
+          column === "voice"
+            ? {
+                pronunciationId: row.id,
+                label: t("reading_index", {
+                  index: pronunciationIndex + 1,
+                  details: dialect === "uk" ? t("dialect_uk") : t("dialect_us")
+                })
+              }
+            : undefined
+        }
+      />
     </div>
   );
 }
@@ -210,6 +196,13 @@ export function V3FormContentOverview({
   };
   const label = useFormTypeLabel();
   const copy = useV3FormCopy();
+  const { columns } = useColumnSettings(
+    formOverviewTableId,
+    formOverviewColumnSettings
+  );
+  const copyPhoneticsInReading = columns.some(
+    ({ key, visible }) => key === "style" && visible
+  );
   const readings = rows.flatMap((row): OverviewReading[] => {
     const regions = row.form.regional_variants;
     const uk = regionalVariants(regions, "uk");
@@ -444,15 +437,22 @@ export function V3FormContentOverview({
           {
             title: overviewColumnLabels.style,
             key: "style",
-            width: 112,
+            width: 148,
             onCell: (row) => copy?.cell(row.form.id, "phonetics") ?? {},
-            render: (_, { pronunciation }) => (
-              <div className="v3-overview-reading">
-                {pronunciation?.style ? (
-                  t(`reading_${pronunciation.style}`)
+            render: (_, row) => (
+              <div
+                className={`v3-overview-reading${copy ? " v3-overview-copy-source" : ""}`}
+              >
+                {copy && row.formRowSpan > 0 && (
+                  <V3FormCopyHandle formId={row.form.id} kind="phonetics" />
+                )}
+                {row.pronunciation?.style ? (
+                  <span title={t(`reading_${row.pronunciation.style}`)}>
+                    {t(`reading_${row.pronunciation.style}`)}
+                  </span>
                 ) : (
                   <Typography.Text type="secondary">
-                    {pronunciation ? t("blank") : "—"}
+                    {row.pronunciation ? t("blank") : "—"}
                   </Typography.Text>
                 )}
               </div>
@@ -466,14 +466,16 @@ export function V3FormContentOverview({
               </Space>
             ),
             key: "pronunciation",
-            width: 240,
+            width: 204,
             onCell: (row) => copy?.cell(row.form.id, "phonetics") ?? {},
             render: (_, row) => (
-              <div className="v3-form-copy-content">
-                <PronunciationCell reading={row} />
-                {row.formRowSpan > 0 && (
+              <div
+                className={`v3-overview-reading${copy && !copyPhoneticsInReading ? " v3-overview-copy-source" : ""}`}
+              >
+                {copy && !copyPhoneticsInReading && row.formRowSpan > 0 && (
                   <V3FormCopyHandle formId={row.form.id} kind="phonetics" />
                 )}
+                <ActualPronunciation reading={row} />
               </div>
             )
           },
@@ -483,11 +485,13 @@ export function V3FormContentOverview({
             width: 208,
             onCell: (row) => copy?.cell(row.form.id, "voices") ?? {},
             render: (_, row) => (
-              <div className="v3-form-copy-content">
-                <PronunciationCell reading={row} settings="voice" />
-                {row.formRowSpan > 0 && (
+              <div
+                className={`v3-overview-voice${copy ? " v3-overview-copy-source" : ""}`}
+              >
+                {copy && row.formRowSpan > 0 && (
                   <V3FormCopyHandle formId={row.form.id} kind="voices" />
                 )}
+                <VoiceSettingsCell reading={row} column="voice" />
               </div>
             )
           },
@@ -499,7 +503,7 @@ export function V3FormContentOverview({
             className: "v3-overview-numeric-cell",
             onCell: (row) => copy?.cell(row.form.id, "voices") ?? {},
             render: (_, row) => (
-              <PronunciationCell reading={row} settings="rate" />
+              <VoiceSettingsCell reading={row} column="rate" />
             )
           },
           {
@@ -510,7 +514,7 @@ export function V3FormContentOverview({
             className: "v3-overview-numeric-cell",
             onCell: (row) => copy?.cell(row.form.id, "voices") ?? {},
             render: (_, row) => (
-              <PronunciationCell reading={row} settings="volume" />
+              <VoiceSettingsCell reading={row} column="volume" />
             )
           }
         ]}

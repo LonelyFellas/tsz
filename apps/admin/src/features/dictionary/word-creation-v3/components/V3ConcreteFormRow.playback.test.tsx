@@ -168,7 +168,9 @@ it("总览选择词形拼写后，无独立语音配置或正式音频也可播�
       </PronunciationPreviewProvider>
     </App>
   );
-  const play = screen.getByLabelText("读法 1英式 播放语音");
+  const play = await screen.findByRole("button", {
+    name: "读法 1英式 · Sonia Test 播放语音"
+  });
   await waitFor(() => expect(play).toBeEnabled());
   fireEvent.click(play);
   await waitFor(() =>
@@ -233,8 +235,15 @@ it("总览明确显示停配侧且不借用旧读法音色，另一侧仍独立"
       </PronunciationPreviewProvider>
     </App>
   );
-  expect(await screen.findByText("本侧暂不配置")).toBeVisible();
-  expect(screen.getByLabelText("读法 1英式 播放语音")).toBeDisabled();
+  expect(await screen.findByText("无配音")).toBeVisible();
+  expect(
+    screen.queryByRole("button", { name: /读法 1英式.*播放语音/ })
+  ).toBeNull();
+  expect(
+    await screen.findByRole("button", {
+      name: "读法 1美式 · American 播放语音"
+    })
+  ).toBeEnabled();
   expect(screen.queryByText("British")).not.toBeInTheDocument();
   expect(preview.synthesize).not.toHaveBeenCalled();
 });
@@ -387,7 +396,9 @@ it("打开总览即按当前读法显示继承的音色、语速和音量", asyn
   expect(row.getByText("0.75×")).toBeVisible();
   expect(row.getByText("88%")).toBeVisible();
   expect(preview.synthesize).not.toHaveBeenCalled();
-  const play = row.getByRole("button", { name: "读法 1美式 播放语音" });
+  const play = row.getByRole("button", {
+    name: "读法 1美式 · Andrew Test 播放语音"
+  });
   expect(play).toBeEnabled();
   fireEvent.click(play);
   await waitFor(() =>
