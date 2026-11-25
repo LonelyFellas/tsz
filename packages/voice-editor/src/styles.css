@@ -204,8 +204,13 @@
   resize: none;
 }
 
-/* 选中时也由标注层绘制正文，避免后台通用选区字色让输入层显形。 */
+/* 原生选区叠在标注层上，背景半透明，选中文字仍由标注层绘制。 */
 .tsz-ve-canvas-input::selection {
+  background-color: color-mix(
+    in srgb,
+    var(--ui-color-primary) 15%,
+    transparent
+  );
   color: transparent;
 }
 
