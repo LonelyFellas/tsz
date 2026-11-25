@@ -937,6 +937,7 @@ export const creationResidualMessages = {
     "Check synthesis input and word boundaries"
   ],
   creation_uploaded_source: ["上传音频", "上傳音訊", "Uploaded audio"],
+  creation_no_pronunciation_audio: ["无配音", "無配音", "No audio"],
   creation_accent_not_configured: [
     "本侧暂不配置",
     "本側暫不配置",

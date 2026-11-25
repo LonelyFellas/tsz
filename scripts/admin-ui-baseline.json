@@ -144,8 +144,8 @@
   },
   "apps/admin/src/features/dictionary/word-creation-v3/v3-forms.css": {
     "raw-font-weight": 6,
-    "raw-color": 14,
     "raw-shadow": 1,
+    "raw-color": 13,
     "raw-font-size": 4,
     "raw-radius": 3
   },

@@ -1115,7 +1115,7 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(updatedRows[2]).toHaveTextContent(/—.*美式未填写/);
   });
 
-  it("总览复制音标悬停时同时高亮读法和实际发音", () => {
+  it("总览音标复制位于读法列，隐藏时回到实际发音列，悬停仍高亮两列", async () => {
     const form = commonFormFixture({
       spelling: "travel",
       pronunciations: [
@@ -1171,6 +1171,28 @@ describe("V3FormsAndPronunciationStep", () => {
 
     expect(styleCell).toHaveClass("is-copy-hovered");
     expect(phoneticCell).toHaveClass("is-copy-hovered");
+    expect(
+      within(styleCell).getByRole("button", { name: "复制英美音标" })
+    ).toBeInTheDocument();
+    expect(
+      within(phoneticCell).queryByRole("button", { name: "复制英美音标" })
+    ).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "列设置" }));
+    const panel = screen.getByRole("region", { name: "表格列设置" });
+    try {
+      fireEvent.click(within(panel).getByRole("checkbox", { name: "读法" }));
+      await waitFor(() =>
+        expect(
+          within(phoneticCell).getByRole("button", { name: "复制英美音标" })
+        ).toBeInTheDocument()
+      );
+    } finally {
+      fireEvent.click(within(panel).getByRole("checkbox", { name: "读法" }));
+      localStorage.removeItem(
+        "tsz:admin:table-columns:v1:form-content-overview"
+      );
+    }
   });
 
   it("总览词形名称保持文字，校验出错时可以调整类型并保留内容", async () => {
