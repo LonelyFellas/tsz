@@ -23,8 +23,8 @@ import type {
   NextAnnotationInput,
   NextAnnotationResult,
   CreateNextEntry,
-  NextDetection,
   NextDetectionInput,
+  NextDetectionResult,
   NextEntryMatchInput,
   NextEntryMatches,
   NextCapabilities,
@@ -286,8 +286,12 @@ export function createLexiconNextEndpoints(http: HttpClient) {
     },
     detect: (input: NextDetectionInput) =>
       http
-        .post<unknown>(`${root}/detections`, input)
-        .then((value) => decode<NextDetection>("NextDetection", value)),
+        .post<unknown>(`${root}/detections`, input, {
+          headers: { "x-tsz-next-dictionary-pos": "v1" }
+        })
+        .then((value) =>
+          decode<NextDetectionResult>("NextDetectionResult", value)
+        ),
     matchEntries: (
       input: NextEntryMatchInput,
       annotationKind?: "word" | "phrase"

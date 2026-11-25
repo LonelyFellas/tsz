@@ -638,43 +638,52 @@ it("顶栏语言组合贯穿列表、新建、编辑和返回，离开智能词�
   expect(screen.queryByRole("group", { name: "智能词库语言" })).toBeNull();
 });
 
-it("创建时按推荐词性生成默认复数行，并把词性带入词义步骤", async () => {
+it("创建 guilty 时识别词典的 adj 并生成形容词和名词模板", async () => {
   const api = requests();
+  const guilty = { ...entry, draft: { ...entry.draft, headword: "guilty" } };
   api.capabilities.mockResolvedValue({ ...caps, form_editor: true });
+  api.create.mockResolvedValue(guilty);
+  api.get.mockResolvedValue(guilty);
   api.detect.mockResolvedValue({
-    surface: "centre",
+    surface: "guilty",
     kind: "word",
-    matches: [
+    matches: ["adj", "noun"].map((pos) => ({
+      id: `dictionary:guilty:${pos}`,
+      term: "guilty",
+      part_of_speech: pos,
+      glosses: [],
+      forms: [],
+      phonetics: [],
+      source_name: "fixture-dictionary",
+      source_version: "1"
+    })),
+    part_of_speech_mappings: [
       {
-        id: "dictionary:centre:noun",
-        term: "centre",
-        part_of_speech: "noun",
-        glosses: ["中心"],
-        forms: [],
-        phonetics: [],
-        source_name: "fixture-dictionary",
-        source_version: "1"
-      }
+        source_code: "adj",
+        part_of_speech: "adjective",
+        base_form_only: false
+      },
+      { source_code: "noun", part_of_speech: "noun", base_form_only: false }
     ]
   });
   mount(api, "/lexicon-next/new");
   fireEvent.change(await screen.findByLabelText("录入词条"), {
-    target: { value: "centre" }
+    target: { value: "guilty" }
   });
   fireEvent.click(button("词典检测"));
-  fireEvent.click(await screen.findByRole("button", { name: "确认创建" }));
+  const confirm = await screen.findByRole("button", { name: "确认创建" });
+  expect(await screen.findByText("形容词", { exact: true })).toBeVisible();
+  fireEvent.click(confirm);
+
   await screen.findByTestId("lexicon-next-editor");
-  await waitFor(() =>
-    expect(
-      document.querySelector(".word-forms-tabs .word-pos-tab-label")
-    ).toHaveTextContent("名词")
-  );
+  expect(await screen.findByText("比较级", { exact: true })).toBeVisible();
+  expect(screen.getByText("最高级", { exact: true })).toBeVisible();
+  fireEvent.click(screen.getByRole("tab", { name: /名词/ }));
   expect(await screen.findByText("复数", { exact: true })).toBeVisible();
   fireEvent.click(stepButton(/^词义与例句/));
 
-  await waitFor(() =>
-    expect(screen.getByRole("tab", { name: "名词" })).toBeVisible()
-  );
+  expect(await screen.findByRole("tab", { name: "形容词" })).toBeVisible();
+  expect(screen.getByRole("tab", { name: "名词" })).toBeVisible();
 });
 
 it("创建完成后不等待列表统计刷新再进入编辑器", async () => {

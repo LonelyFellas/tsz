@@ -6,7 +6,7 @@ import { Form, Input } from "@tsz/ui/admin/forms";
 import { Search, Plus } from "lucide-react";
 import type {
   EntryAnnotationGroup,
-  NextDetection,
+  NextDetectionResult,
   NextEntryMatches,
   NextWorkspaceEntry
 } from "@tsz/types";
@@ -23,9 +23,10 @@ import { useLexiconLanguages } from "./LanguageSelection";
 import { EntryLayout } from "./EntryLayout";
 import { ExistingEntryMatches } from "./ExistingEntryMatches";
 import { DictionaryDetectionCard } from "./DictionaryDetectionCard";
+import type { SuggestedPartOfSpeech } from "./recommendedPosPrefill";
 
 export interface LexiconNextCreationNavigationState {
-  lexiconNextSuggestedPartOfSpeech?: string[];
+  lexiconNextSuggestedPartOfSpeech?: SuggestedPartOfSpeech[];
 }
 
 export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
@@ -41,7 +42,7 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
   const canEdit = usePermission("words.edit");
   const { t } = useLexiconEditorTranslation();
   const [value, setValue] = useState("");
-  const [detection, setDetection] = useState<NextDetection>();
+  const [detection, setDetection] = useState<NextDetectionResult>();
   const [entryMatches, setEntryMatches] = useState<NextEntryMatches>();
   const [busy, setBusy] = useState<"detect" | "create" | "matches">();
   const [error, setError] = useState<string>();
@@ -220,9 +221,9 @@ export function EntryStart({ requests }: { requests: LexiconNextRequests }) {
       setAnnotationEntries([]);
       setAnnotationEntryId(undefined);
       lock.current = false;
-      const suggestedPartOfSpeech = [
-        ...new Set(detection.matches.map((match) => match.part_of_speech))
-      ];
+      const suggestedPartOfSpeech =
+        detection.part_of_speech_mappings ??
+        detection.matches.map((match) => match.part_of_speech);
       navigate(`/lexicon-next/${createdId}?${languageSearch}`, {
         state: {
           lexiconNextSuggestedPartOfSpeech: suggestedPartOfSpeech

@@ -67,6 +67,7 @@ const ROOTS = [
   "CreateNextEntry",
   "NextDetection",
   "NextDetectionInput",
+  "NextDetectionResult",
   "NextEntryMatchInput",
   "NextEntryMatches",
   "SaveNextDraft",

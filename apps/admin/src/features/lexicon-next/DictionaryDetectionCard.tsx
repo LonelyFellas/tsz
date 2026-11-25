@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { EmptyState, Button, Card, Space, Tag } from "@tsz/ui/admin/display";
-import type { NextDetection } from "@tsz/types";
+import type { NextDetectionResult } from "@tsz/types";
 import { usePartOfSpeechLabel } from "@/features/dictionary/part-of-speech/PartOfSpeechLabels";
 import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
 import { usePartOfSpeechCatalog } from "@/features/dictionary/part-of-speech/api";
@@ -9,7 +9,7 @@ import { dictionaryMatchPosLabel } from "./dictionaryPosLabel";
 export function DictionaryDetectionCard({
   detection
 }: {
-  detection: NextDetection;
+  detection: NextDetectionResult;
 }) {
   const posLabel = usePartOfSpeechLabel();
   const partOfSpeechCatalog = usePartOfSpeechCatalog();
@@ -40,7 +40,10 @@ export function DictionaryDetectionCard({
                     match.part_of_speech,
                     partOfSpeechCatalog.data?.items,
                     posLabel,
-                    i18n.language
+                    i18n.language,
+                    detection.part_of_speech_mappings?.find(
+                      (mapping) => mapping.source_code === match.part_of_speech
+                    )
                   )}
                 </Tag>
               </Space>

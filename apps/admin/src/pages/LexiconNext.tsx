@@ -50,7 +50,7 @@ import { fillGeneratedDraft } from "@/features/lexicon-next/generatedDraft";
 import { HttpError } from "@tsz/api-client";
 import type {
   NextDraft,
-  NextDetection,
+  NextDetectionResult,
   NextPublicationIssue,
   NextEntry,
   NextWorkspaceEntry,
@@ -90,7 +90,10 @@ import {
   EntryStart,
   type LexiconNextCreationNavigationState
 } from "@/features/lexicon-next/EntryStart";
-import { seedRecommendedPartOfSpeech } from "@/features/lexicon-next/recommendedPosPrefill";
+import {
+  seedRecommendedPartOfSpeech,
+  type SuggestedPartOfSpeech
+} from "@/features/lexicon-next/recommendedPosPrefill";
 import { sanitizeFormsRichText } from "@/features/dictionary/word-creation-v3/operations";
 import { v3IssueMessage } from "@/features/dictionary/word-creation-v3/presentationErrors";
 import {
@@ -456,7 +459,7 @@ function EntryEditor({
   generationCandidatesAvailable: boolean;
   archived: boolean;
   initial: NextEntry;
-  suggestedPartOfSpeech?: readonly string[];
+  suggestedPartOfSpeech?: readonly SuggestedPartOfSpeech[];
   entryMedium: string;
   requests: LexiconNextRequests;
   language: NextLanguageCapability;
@@ -494,7 +497,7 @@ function EntryEditor({
   );
   const [saved, setSaved] = useState(initial);
   const [draft, setDraft] = useState<NextDraft>(initial.draft);
-  const [basicsDetection, setBasicsDetection] = useState<NextDetection>();
+  const [basicsDetection, setBasicsDetection] = useState<NextDetectionResult>();
   const [basicsDetectionLoading, setBasicsDetectionLoading] = useState(
     () => step === "basics"
   );

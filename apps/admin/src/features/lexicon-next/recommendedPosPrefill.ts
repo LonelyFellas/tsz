@@ -1,4 +1,5 @@
 import type {
+  NextDictionaryPosMapping,
   NextDraft,
   PartOfSpeechCatalogResponse,
   SharedFormsStepContentV3
@@ -18,6 +19,9 @@ const emptyForms: SharedFormsStepContentV3 = {
   pos: []
 };
 
+export type SuggestedPartOfSpeech =
+  string | Pick<NextDictionaryPosMapping, "part_of_speech" | "base_form_only">;
+
 /**
  * 把创建页内置词典给出的词性建议铺进新草稿的词形编辑结构。
  * 只接受当前目录中的词性，避免旧词典编码在编辑器里生成不可保存的行。
@@ -25,27 +29,38 @@ const emptyForms: SharedFormsStepContentV3 = {
 export function seedRecommendedPartOfSpeech(
   draft: NextDraft,
   kind: "word" | "phrase",
-  suggestedCodes: readonly string[],
+  suggestions: readonly SuggestedPartOfSpeech[],
   catalog: PartOfSpeechCatalogResponse
 ): NextDraft {
-  if (draft.form_editor?.pos.length || suggestedCodes.length === 0) {
+  if (draft.form_editor?.pos.length || suggestions.length === 0) {
     return draft;
   }
 
-  const items = suggestedCodes.flatMap((code) => {
-    const item = catalog.items.find(
-      (candidate) => candidate.code === code && candidate.kind === kind
-    );
-    return item ? [item] : [];
-  });
-  if (items.length === 0) return draft;
-
+  const eligibleParts = new Map(
+    catalog.items
+      .filter((item) => item.kind === kind)
+      .map((item) => [item.code, item])
+  );
+  const defaultTemplates = new Map<
+    string,
+    PartOfSpeechCatalogResponse["items"][number]
+  >();
   let forms = expandFormContents(emptyForms);
-  for (const item of items) {
+  for (const suggestion of suggestions) {
+    const legacy = typeof suggestion === "string";
+    const code = legacy ? suggestion : suggestion.part_of_speech;
+    const item = eligibleParts.get(code);
+    if (!item) continue;
+    if (legacy || !suggestion.base_form_only) defaultTemplates.set(code, item);
     const result = addPartOfSpeech(forms, item, newWordNodeId);
     if (result.ok) forms = result.value;
   }
-  const filled = fillFormTypeTemplate(forms, catalog.items, newWordNodeId);
+  if (forms.pos.length === 0) return draft;
+  const filled = fillFormTypeTemplate(
+    forms,
+    [...defaultTemplates.values()],
+    newWordNodeId
+  );
   const structured = applyFormsStructure(emptyForms, filled);
   if (!isSharedForms(structured)) return draft;
   const formIds = new Set(

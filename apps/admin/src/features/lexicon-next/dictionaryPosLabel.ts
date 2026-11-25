@@ -1,4 +1,7 @@
-import type { PartOfSpeechCatalogItem } from "@tsz/types";
+import type {
+  NextDictionaryPosMapping,
+  PartOfSpeechCatalogItem
+} from "@tsz/types";
 import { localizedCatalogName } from "@/features/dictionary/part-of-speech/catalog";
 
 const BASIC_PART_OF_SPEECH_CODES = new Set([
@@ -18,11 +21,19 @@ export function dictionaryMatchPosLabel(
   code: string,
   catalog: readonly PartOfSpeechCatalogItem[] | undefined,
   label: (value: string) => string,
-  interfaceLocale = "zh-Hans"
+  interfaceLocale = "zh-Hans",
+  mapping?: NextDictionaryPosMapping
 ): string {
   const normalized = code.trim();
-  const item = catalog?.find((candidate) => candidate.code === normalized);
-  if (item) return localizedCatalogName(item, interfaceLocale);
+  const item = catalog?.find(
+    (candidate) => candidate.code === (mapping?.part_of_speech ?? normalized)
+  );
+  if (item) {
+    const subPart = item.sub_parts?.find(
+      (part) => part.code === mapping?.sub_pos
+    );
+    return localizedCatalogName(subPart ?? item, interfaceLocale);
+  }
   if (catalog === undefined && BASIC_PART_OF_SPEECH_CODES.has(normalized)) {
     return label(normalized);
   }

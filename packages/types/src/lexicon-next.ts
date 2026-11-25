@@ -162,6 +162,15 @@ export interface NextDetection {
   kind: "word" | "phrase";
   matches: NextDictionaryMatch[];
 }
+export interface NextDictionaryPosMapping {
+  source_code: string;
+  part_of_speech: string;
+  sub_pos?: string;
+  base_form_only: boolean;
+}
+export interface NextDetectionResult extends NextDetection {
+  part_of_speech_mappings?: NextDictionaryPosMapping[];
+}
 export interface NextEntryMatchInput extends NextDetectionInput {
   medium_locale?: string;
   page?: number | null;

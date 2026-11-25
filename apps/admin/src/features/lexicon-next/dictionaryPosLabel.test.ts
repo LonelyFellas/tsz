@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PartOfSpeechCatalogItem } from "@tsz/types";
+import { partOfSpeechCatalogFixture } from "@/features/dictionary/word-creation/partOfSpeech.test.helper";
 import { dictionaryMatchPosLabel } from "./dictionaryPosLabel";
 
 describe("dictionaryMatchPosLabel", () => {
@@ -22,6 +23,39 @@ describe("dictionaryMatchPosLabel", () => {
         label
       )
     ).toBe("自定义词性");
+  });
+
+  it("shows the catalog label resolved by the detection API", () => {
+    expect(
+      dictionaryMatchPosLabel(
+        "adj",
+        partOfSpeechCatalogFixture.items,
+        label,
+        "zh-Hans",
+        {
+          source_code: "adj",
+          part_of_speech: "adjective",
+          base_form_only: false
+        }
+      )
+    ).toBe("形容词");
+  });
+
+  it("shows a resolved sub-part instead of its parent when the catalog still contains it", () => {
+    expect(
+      dictionaryMatchPosLabel(
+        "name",
+        partOfSpeechCatalogFixture.items,
+        label,
+        "zh-Hans",
+        {
+          source_code: "name",
+          part_of_speech: "noun",
+          sub_pos: "N-PROPER",
+          base_form_only: true
+        }
+      )
+    ).toBe("专有名词");
   });
 
   it("keeps an unconfigured dictionary POS as English source text", () => {
