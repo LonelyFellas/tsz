@@ -45,6 +45,7 @@ export interface NextAgentGroup {
 export interface NextAgentGrammar {
   pos: string;
   pattern: string;
+  sub_pos?: string;
 }
 
 export interface NextAgentDefinition {

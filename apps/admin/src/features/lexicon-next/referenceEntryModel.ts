@@ -12,6 +12,8 @@ type ReferenceEntry = {
   forms?: ReferenceForm[];
   formsByPos?: { pos: string; forms: ReferenceForm[] }[];
   definitions?: string[];
+  grammarPatterns?: string[];
+  grammarExamples?: string[];
   summary?: string;
   indexOnly?: boolean;
 };
@@ -204,6 +206,20 @@ function readStructured(
     } else if (field.startsWith("释义 ")) {
       hasFacts = true;
       entry.definitions = [field.slice("释义 ".length)];
+    } else if (
+      field.startsWith("句型 ") &&
+      field.slice("句型 ".length).trim()
+    ) {
+      hasFacts = true;
+      (entry.grammarPatterns ??= []).push(field.slice("句型 ".length).trim());
+    } else if (
+      field.startsWith("例句证据 ") &&
+      field.slice("例句证据 ".length).trim()
+    ) {
+      hasFacts = true;
+      (entry.grammarExamples ??= []).push(
+        field.slice("例句证据 ".length).trim()
+      );
     } else if (field.startsWith("来源摘要 ")) {
       unknown.push(field.slice("来源摘要 ".length));
     } else {

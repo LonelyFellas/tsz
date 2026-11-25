@@ -16,6 +16,21 @@ function parse(
 }
 
 describe("dictionaryReferenceEntry", () => {
+  it("keeps grammar patterns and example evidence separate from the dictionary summary", () => {
+    expect(
+      parse(
+        "Oxford Learner’s Dictionaries",
+        "rely · 词性 verb · 来源摘要 A dictionary summary · 句型 rely on somebody · 例句证据 We rely on you.",
+        "rely"
+      )
+    ).toEqual({
+      partsOfSpeech: ["verb"],
+      summary: "A dictionary summary",
+      grammarPatterns: ["rely on somebody"],
+      grammarExamples: ["We rely on you."]
+    });
+  });
+
   it("separates Youdao's labels from spellings and preserves pronunciation by dialect", () => {
     expect(
       parse(

@@ -156,6 +156,11 @@ export const lexiconEditorMessages = {
   entry_ai_forms: ["词形与发音", "詞形與發音", "Forms and pronunciation"],
   entry_ai_senses: ["词义目录", "詞義目錄", "Sense index"],
   entry_ai_groups: ["语义区间", "語義區間", "Sense groups"],
+  entry_ai_groups_need_senses: [
+    "请先添加词性和词义。",
+    "請先新增詞性和詞義。",
+    "Add a part of speech and a meaning first."
+  ],
   entry_ai_grammar: ["语法结构", "語法結構", "Grammar patterns"],
   entry_ai_definitions: ["释义与解释", "釋義與解釋", "Definitions"],
   entry_ai_equivalents: ["常见译词", "常見譯詞", "Equivalents"],

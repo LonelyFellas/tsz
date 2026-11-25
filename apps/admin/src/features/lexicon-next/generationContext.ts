@@ -1,6 +1,23 @@
 import { createContext } from "react";
 import type { NextAgentSection } from "@tsz/types";
 
+const meaningGenerationSections = [
+  "senses",
+  "definitions",
+  "examples",
+  "translations",
+  "equivalents",
+  "relations"
+] as const;
+export type MeaningGenerationSection =
+  (typeof meaningGenerationSections)[number];
+
+export function isMeaningGenerationSection(
+  section: NextAgentSection | "all"
+): section is MeaningGenerationSection {
+  return meaningGenerationSections.some((item) => item === section);
+}
+
 export interface GenerationTarget {
   section: NextAgentSection | "all";
   pos?: string;

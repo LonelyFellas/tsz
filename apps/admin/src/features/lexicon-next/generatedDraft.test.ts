@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
-import type { NextAgentResult, NextDraft, NextSentence } from "@tsz/types";
+import type {
+  NextAgentGrammar,
+  NextAgentResult,
+  NextDraft,
+  NextSentence
+} from "@tsz/types";
 import { partOfSpeechCatalogFixture } from "@/features/dictionary/word-creation/partOfSpeech.test.helper";
 import { newSentenceVariant, sentenceChanges } from "./sentenceDrafts";
 import { fillGeneratedDraft } from "./generatedDraft";
+import { newGrammarStructure } from "./model";
 
 describe("智能补全回填", () => {
   it("保留已有定义和明确无译词的决定，按具体词义保存新增例句与译文", () => {
@@ -76,6 +82,22 @@ describe("智能补全回填", () => {
     ]);
     expect(draft.senses[0]?.equivalents).toEqual([]);
     expect(draft.senses[1]?.sentence_ids).toEqual([resources[0]!.id]);
+    const senseOnly = fillGeneratedDraft(
+      original,
+      result,
+      partOfSpeechCatalogFixture,
+      "en-GB",
+      "zh-Hans",
+      "editor",
+      [],
+      {},
+      [],
+      { section: "senses" }
+    );
+    expect(senseOnly.dialect[senseOnly.draft.senses[1]!.id]?.usage).toBe(
+      "en-GB"
+    );
+    expect(senseOnly.resources).toEqual([]);
     const changes = sentenceChanges(
       [],
       Object.fromEntries(resources.map((s) => [s.id, s])),
@@ -232,4 +254,130 @@ it("按本次送出的词义顺序回填，并只修改点选语言的解释", (
     }
   ]);
   expect(draft.senses[1]?.equivalents).toEqual([]);
+});
+
+describe("语法结构候选回填", () => {
+  const original: NextDraft = {
+    schema_version: 1,
+    headword: "rely",
+    forms: [],
+    senses: []
+  };
+  const apply = (draft: NextDraft, grammar: NextAgentGrammar[]) =>
+    fillGeneratedDraft(
+      draft,
+      {
+        run_id: "run",
+        base_revision: 1,
+        snapshot_id: "snapshot",
+        done: true,
+        requires_human_review: true,
+        sources: [],
+        steps: [],
+        proposals: {
+          forms: [],
+          senses: [],
+          grammar,
+          groups: [],
+          relations: [],
+          examples: [],
+          translations: [],
+          dialect: [],
+          definitions: [],
+          equivalents: []
+        }
+      },
+      partOfSpeechCatalogFixture,
+      "en-GB",
+      "zh-Hans",
+      "editor",
+      [],
+      {},
+      [],
+      { section: "grammar", pos: "verb" }
+    ).draft;
+
+  it("按顺序回填同一词性的全部候选，保留初始占位 ID", () => {
+    const blank = newGrammarStructure("verb");
+    blank.variants[0]!.content = {
+      version: 1,
+      text: "",
+      spans: [],
+      liaisons: []
+    };
+    const patterns = [
+      "rely on somebody",
+      "rely on somebody to help",
+      "rely on somebody for advice"
+    ];
+    const proposals = patterns.map((pattern, index) => ({
+      pos: "verb",
+      pattern,
+      sub_pos: index === 2 ? "N-COUNT" : "V-I"
+    }));
+    const filled = apply(
+      { ...original, grammar_structures: [blank] },
+      proposals
+    );
+
+    expect(
+      filled.grammar_structures?.map((row) => row.variants[0]?.content.text)
+    ).toEqual(patterns);
+    expect(filled.grammar_structures?.[0]?.id).toBe(blank.id);
+    expect(filled.grammar_structures?.[0]?.variants[0]?.id).toBe(
+      blank.variants[0]?.id
+    );
+    expect(filled.grammar_structures?.map((row) => row.sub_pos)).toEqual([
+      "V-I",
+      "V-I",
+      undefined
+    ]);
+    expect(apply(filled, proposals)).toEqual(filled);
+  });
+
+  it("保留人工和另一方言内容，按同一结构对齐方言并去重", () => {
+    const manual = newGrammarStructure("verb");
+    manual.sub_pos = "V-T";
+    manual.variants[0]!.content.text = "rely on evidence";
+    const unrelated = newGrammarStructure("verb");
+    unrelated.variants[1]!.content.text = "rely on the system";
+    const matching = newGrammarStructure("verb");
+    matching.variants[1]!.content.text = "rely on somebody";
+    const legacy = newGrammarStructure("verb");
+    legacy.variants = [
+      {
+        ...legacy.variants[0]!,
+        locale: "en",
+        content: { version: 2, text: "rely on the weather", annotations: [] }
+      }
+    ];
+    const filled = apply(
+      {
+        ...original,
+        grammar_structures: [manual, unrelated, matching, legacy]
+      },
+      [
+        { pos: "verb", pattern: "rely on somebody", sub_pos: "V-I" },
+        { pos: "verb", pattern: "rely on somebody for advice" },
+        { pos: "verb", pattern: " rely on evidence ", sub_pos: "V-I" },
+        { pos: "verb", pattern: "rely on somebody for advice" },
+        { pos: "verb", pattern: "rely on the weather" },
+        { pos: "noun", pattern: "out of scope" }
+      ]
+    );
+    expect(filled.grammar_structures?.slice(0, 2)).toEqual([manual, unrelated]);
+    const rows = filled.grammar_structures!;
+    expect(rows[2]?.id).toBe(matching.id);
+    expect(rows[2]?.sub_pos).toBe("V-I");
+    expect(rows[2]?.variants.map((variant) => variant.content.text)).toEqual([
+      "rely on somebody",
+      "rely on somebody"
+    ]);
+    expect(rows[3]).toEqual(legacy);
+    expect(
+      rows
+        .slice(4)
+        .map((row) => row.variants.map((variant) => variant.content.text))
+    ).toEqual([["rely on somebody for advice", ""]]);
+  });
 });

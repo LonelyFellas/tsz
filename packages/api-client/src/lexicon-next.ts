@@ -91,6 +91,7 @@ export function createLexiconNextEndpoints(http: HttpClient) {
       "x-tsz-next-forms": "v1",
       "x-tsz-next-generation": "v1",
       "x-tsz-next-generation-candidates": "v1",
+      "x-tsz-next-section-candidates": "v1",
       "x-tsz-next-sentences": "v1",
       "x-tsz-next-sentence-details": "v1",
       "x-tsz-next-sentence-drafts": "v1",
@@ -123,10 +124,19 @@ export function createLexiconNextEndpoints(http: HttpClient) {
   const publicationOptions = {
     headers: { "x-tsz-next-publications": "v1", "x-tsz-next-levels": "v1" }
   };
+  const generationOptions = {
+    headers: {
+      "x-tsz-next-grammar-sub-pos": "v1",
+      "x-tsz-next-section-candidates": "v1"
+    }
+  };
   return {
     generate: (id: string, input: NextAgentInput, signal?: AbortSignal) =>
       http
-        .post<unknown>(`${entry(id)}/generation`, input, { signal })
+        .post<unknown>(`${entry(id)}/generation`, input, {
+          ...generationOptions,
+          signal
+        })
         .then((value) => decode<NextAgentResult>("NextAgentResult", value)),
     generationCandidates: (
       id: string,
@@ -134,7 +144,10 @@ export function createLexiconNextEndpoints(http: HttpClient) {
       signal?: AbortSignal
     ) =>
       http
-        .post<unknown>(`${entry(id)}/generation/candidates`, input, { signal })
+        .post<unknown>(`${entry(id)}/generation/candidates`, input, {
+          ...generationOptions,
+          signal
+        })
         .then((value) =>
           decode<NextGenerationCandidates>("NextGenerationCandidates", value)
         ),

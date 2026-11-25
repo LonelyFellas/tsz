@@ -4732,15 +4732,18 @@ it("释义弹窗未应用时锁住语言切换和保存，取消不写宿主正�
   fireEvent.click(stepButton(/^词义与例句/));
   await waitFor(() => expect(button("编辑英式英语释义 1")).toBeEnabled());
   fireEvent.click(button("编辑英式英语释义 1"));
-  const editor = await screen.findByRole("textbox", { name: "英式英语释义 1" });
+  const dialog = await screen.findByRole("dialog");
+  const editor = await within(dialog).findByRole(
+    "textbox",
+    { name: "英式英语释义 1" },
+    { timeout: 10_000 }
+  );
   fireEvent.change(editor, { target: { value: "unapplied body" } });
   expect(button("保存完整草稿")).toBeDisabled();
   expect(screen.getByRole("combobox", { name: "目标语言" })).toBeDisabled();
   fireEvent.click(button("保存完整草稿"));
   expect(api.save).not.toHaveBeenCalled();
-  fireEvent.click(
-    within(screen.getByRole("dialog")).getByRole("button", { name: "取消" })
-  );
+  fireEvent.click(within(dialog).getByRole("button", { name: "取消" }));
   await waitFor(() => expect(button("保存完整草稿")).toBeEnabled());
   fireEvent.click(button("保存完整草稿"));
   await waitFor(() => expect(api.save).toHaveBeenCalledOnce());

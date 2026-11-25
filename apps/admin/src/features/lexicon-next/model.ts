@@ -429,7 +429,7 @@ export function draftProblem(
   return null;
 }
 
-function grammarSubPosValid(
+export function grammarSubPosValid(
   pos: string | null,
   subPos: string | undefined,
   catalog: PartOfSpeechCatalogResponse | undefined

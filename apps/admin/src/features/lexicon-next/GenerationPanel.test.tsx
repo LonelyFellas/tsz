@@ -8,6 +8,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { InterfaceI18nProvider } from "@tsz/shared/i18n/react";
+import { partOfSpeechCatalogFixture } from "@/features/dictionary/word-creation/partOfSpeech.test.helper";
 import type {
   AssistantCandidatePos,
   NextAgentInput,
@@ -20,7 +21,7 @@ import {
   GenerationSenseScope
 } from "./GenerationActions";
 import { GenerationPanel } from "./GenerationPanel";
-import { FormGenerationResult } from "./FormGenerationResult";
+import { GenerationResult } from "./GenerationResult";
 
 function result(input: NextAgentInput): NextAgentResult {
   return {
@@ -52,6 +53,96 @@ const draft: NextDraft = {
   senses: []
 };
 afterEach(() => vi.unstubAllGlobals());
+it.each([true, false])(
+  "语义区间先预览再显式回填，按服务能力读回和刷新（%s）",
+  async (sectionCandidatesAvailable) => {
+    vi.stubGlobal("crypto", webcrypto);
+    const groupResult = (input: NextAgentInput, name: string) => {
+      const view = result(input);
+      view.steps = [{ section: "groups", state: "completed", error: "" }];
+      view.proposals.definitions = [];
+      view.proposals.groups = [
+        { sense: 0, name_zh: name, name_en: "movement" },
+        { sense: 1, name_zh: "经营", name_en: "management" }
+      ];
+      return view;
+    };
+    let currentRunId = "previous-run";
+    const lookup = vi.fn(async (_id: string, input: NextAgentInput) => ({
+      candidate: {
+        source_run_id: currentRunId,
+        generated_at: "2026-11-25T01:00:00Z",
+        result: groupResult(
+          input,
+          currentRunId === "previous-run" ? "快速奔跑" : "步行或跑步"
+        )
+      }
+    }));
+    const generate = vi.fn(async (_id: string, input: NextAgentInput) => {
+      currentRunId = input.run_id;
+      return groupResult(input, "步行或跑步");
+    });
+    const onFill = vi.fn(() => true);
+    render(
+      <GenerationPanel
+        entryId="entry"
+        revision={1}
+        draft={{
+          ...draft,
+          headword: "run",
+          senses: ["跑步", "经营业务"].map((text, index) => ({
+            id: String(index),
+            part_of_speech: "verb",
+            definitions: [],
+            equivalents: [{ id: text, locale: "zh-Hans", text }]
+          }))
+        }}
+        medium="zh-Hans"
+        target="en-GB"
+        sections={["groups"]}
+        contextVersion="1"
+        examples={[]}
+        disabled={false}
+        generate={generate}
+        lookup={lookup}
+        sectionCandidatesAvailable={sectionCandidatesAvailable}
+        onFill={onFill}
+      >
+        <SectionAI section="groups" />
+      </GenerationPanel>
+    );
+    fireEvent.click(screen.getByRole("button", { name: "AI 生成语义区间" }));
+    const dialog = within(screen.getByRole("dialog"));
+    expect(generate).not.toHaveBeenCalled();
+    if (sectionCandidatesAvailable) {
+      expect(await dialog.findByText("快速奔跑")).toBeVisible();
+      expect(generate).not.toHaveBeenCalled();
+      fireEvent.click(dialog.getByRole("button", { name: "重新生成" }));
+    } else {
+      expect(lookup).not.toHaveBeenCalled();
+      fireEvent.click(dialog.getByRole("button", { name: "AI 生成语义区间" }));
+    }
+    expect(await dialog.findByText("步行或跑步")).toBeVisible();
+    expect(generate.mock.calls[0]?.[1].force_refresh).toBe(
+      sectionCandidatesAvailable ? true : undefined
+    );
+    expect(
+      within(dialog.getByRole("row", { name: /经营业务/ })).getByText(
+        "management"
+      )
+    ).toBeVisible();
+    expect(onFill).not.toHaveBeenCalled();
+    fireEvent.click(dialog.getByRole("button", { name: "一键配置" }));
+    expect(onFill).toHaveBeenCalledWith(
+      expect.objectContaining({
+        proposals: expect.objectContaining({ groups: expect.any(Array) })
+      }),
+      expect.objectContaining({ section: "groups" }),
+      []
+    );
+  }
+);
+
 it("等待期间修改本地草稿会阻止迟到的回填", async () => {
   vi.stubGlobal("crypto", webcrypto);
   let finish: () => void = () => {};
@@ -137,9 +228,13 @@ it.each(["single", "all"])(
       id: String(i + 1),
       text: "Example " + (i + 1)
     }));
-    const generate = vi.fn(async (_id: string, input: NextAgentInput) =>
-      result(input)
-    );
+    const generate = vi.fn(async (_id: string, input: NextAgentInput) => {
+      const view = result(input);
+      view.steps = [{ section: "translations", state: "completed", error: "" }];
+      view.proposals.definitions = [];
+      view.proposals.translations = [{ example: 0, text: "译文候选" }];
+      return view;
+    });
     const onFill = vi.fn(() => true);
     render(
       <GenerationPanel
@@ -167,6 +262,13 @@ it.each(["single", "all"])(
       fireEvent.click(
         screen.getByRole("button", { name: "AI 生成第 51 条译文" })
       );
+      const dialog = within(screen.getByRole("dialog"));
+      fireEvent.click(
+        dialog.getByRole("button", { name: "AI 生成第 51 条译文" })
+      );
+      expect(await dialog.findByText("译文候选")).toBeVisible();
+      expect(onFill).not.toHaveBeenCalled();
+      fireEvent.click(dialog.getByRole("button", { name: "一键配置" }));
     } else {
       fireEvent.click(screen.getByRole("button", { name: "词条助手" }));
       fireEvent.click(
@@ -223,6 +325,12 @@ it("从第二个词义的中文解释发起时，只提交该词义并保留目�
     </GenerationPanel>
   );
   fireEvent.click(screen.getByRole("button", { name: "AI 生成简体中文解释" }));
+  const dialog = within(screen.getByRole("dialog"));
+  fireEvent.click(dialog.getByRole("button", { name: "AI 生成简体中文解释" }));
+  expect(await dialog.findByText("第二天")).toBeVisible();
+  expect(dialog.queryByText("Next day")).not.toBeInTheDocument();
+  expect(onFill).not.toHaveBeenCalled();
+  fireEvent.click(dialog.getByRole("button", { name: "一键配置" }));
   await waitFor(() => expect(onFill).toHaveBeenCalledOnce());
   expect(generate.mock.calls[0]![1]).toMatchObject({
     sections: ["definitions"],
@@ -235,6 +343,63 @@ it("从第二个词义的中文解释发起时，只提交该词义并保留目�
       senseId: "second",
       locale: "zh-Hans"
     }),
+    []
+  );
+});
+
+it("词义目录一并预览和配置有来源的方言建议", async () => {
+  vi.stubGlobal("crypto", webcrypto);
+  const proposals = {
+    senses: [{ pos: "noun", gloss: "公寓", level: "A2" }],
+    dialect: [
+      {
+        sense: 0,
+        usage: "en-GB" as const,
+        source_locator: "fixture",
+        evidence: "British"
+      }
+    ]
+  };
+  const generate = vi.fn(async (_id: string, input: NextAgentInput) => {
+    const view = result(input);
+    view.steps = [
+      { section: "senses", state: "completed", error: "" },
+      { section: "dialect", state: "completed", error: "" }
+    ];
+    view.proposals = { ...view.proposals, definitions: [], ...proposals };
+    return view;
+  });
+  const onFill = vi.fn(() => true);
+  render(
+    <GenerationPanel
+      entryId="entry"
+      revision={1}
+      draft={{ ...draft, headword: "flat" }}
+      medium="zh-Hans"
+      target="en-GB"
+      sections={["senses", "dialect"]}
+      contextVersion="1"
+      examples={[]}
+      disabled={false}
+      generate={generate}
+      onFill={onFill}
+    >
+      <SectionAI section="senses" pos="noun" />
+    </GenerationPanel>
+  );
+  fireEvent.click(screen.getByRole("button", { name: "AI 生成词义目录" }));
+  const dialog = within(screen.getByRole("dialog"));
+  fireEvent.click(dialog.getByRole("button", { name: "AI 生成词义目录" }));
+  const table = within(
+    await dialog.findByRole("table", { name: "词义目录候选" })
+  );
+  expect(table.getByRole("cell", { name: /公寓.*英式专用/s })).toBeVisible();
+  expect(generate.mock.calls[0]?.[1].sections).toEqual(["senses", "dialect"]);
+  expect(onFill).not.toHaveBeenCalled();
+  fireEvent.click(dialog.getByRole("button", { name: "一键配置" }));
+  expect(onFill).toHaveBeenCalledWith(
+    expect.objectContaining({ proposals: expect.objectContaining(proposals) }),
+    expect.objectContaining({ section: "senses" }),
     []
   );
 });
@@ -400,7 +565,8 @@ it("已加载旧文案的页面仍按词性显示韦氏变形和候选词形计�
   };
   render(
     <InterfaceI18nProvider resources={previousTranslations}>
-      <FormGenerationResult
+      <GenerationResult
+        section="forms"
         headword="center"
         sources={[
           {
@@ -458,8 +624,23 @@ it("重开语法面板只读旧候选，显式使用或刷新，并随方言切�
   function grammar(input: NextAgentInput, pattern: string) {
     const response = result(input);
     response.steps = [{ section: "grammar", state: "completed", error: "" }];
+    response.sources = [
+      {
+        source: "Oxford Learner’s Dictionaries",
+        locator: "",
+        excerpt:
+          "Definition of tomorrow noun in Oxford Advanced Learner's Dictionary.",
+        status: "found"
+      },
+      {
+        source: "Cambridge Dictionary",
+        locator: "",
+        excerpt: "tomorrow · 句型 by + day",
+        status: "found"
+      }
+    ];
     response.proposals.definitions = [];
-    response.proposals.grammar = [{ pos: "noun", pattern }];
+    response.proposals.grammar = [{ pos: "noun", pattern, sub_pos: "N-COUNT" }];
     return response;
   }
   let sourceRunId = "previous-run";
@@ -493,6 +674,7 @@ it("重开语法面板只读旧候选，显式使用或刷新，并随方言切�
   const props = {
     entryId: "entry",
     revision: 7,
+    catalog: partOfSpeechCatalogFixture,
     draft,
     medium: "zh-Hans",
     target: "en-GB",
@@ -509,7 +691,36 @@ it("重开语法面板只读旧候选，显式使用或刷新，并随方言切�
   const open = () =>
     fireEvent.click(screen.getByRole("button", { name: "AI 生成语法结构" }));
   open();
-  expect(await screen.findByText("by tomorrow")).toBeVisible();
+  const candidates = within(
+    await screen.findByRole("table", { name: "生成语法结构" })
+  );
+  expect(candidates.getByRole("rowheader", { name: "名词" })).toBeVisible();
+  expect(candidates.getByRole("cell", { name: "可数名词" })).toBeVisible();
+  expect(
+    candidates.getByRole("columnheader", { name: "语法结构 · 英式" })
+  ).toBeVisible();
+  expect(candidates.getByRole("cell", { name: "by tomorrow" })).toBeVisible();
+  const references = within(screen.getByRole("region", { name: "词典参考" }));
+  expect(
+    references.getByRole("button", { name: "剑桥", pressed: true })
+  ).toBeVisible();
+  expect(
+    within(references.getByRole("group", { name: "剑桥" })).getByText(
+      "已取得参考"
+    )
+  ).toBeVisible();
+  const grammarReference = within(
+    references.getByRole("region", { name: "语法参考" })
+  );
+  expect(
+    within(grammarReference.getByRole("list", { name: "原站句型" })).getByText(
+      "by + day"
+    )
+  ).toBeVisible();
+  fireEvent.click(references.getByRole("button", { name: "有道" }));
+  expect(references.getByRole("group", { name: "有道" })).toBeVisible();
+  expect(references.queryByText("by + day")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByText("板块进度与来源"));
   expect(screen.getByText("生成于")).toBeVisible();
   expect(generate).not.toHaveBeenCalled();
   expect(onFill).not.toHaveBeenCalled();
@@ -517,6 +728,9 @@ it("重开语法面板只读旧候选，显式使用或刷新，并随方言切�
   fireEvent.click(screen.getByRole("button", { name: "关闭" }));
   open();
   expect(await screen.findByText("by tomorrow")).toBeVisible();
+  expect(
+    screen.getByRole("button", { name: "剑桥", pressed: true })
+  ).toBeVisible();
   expect(lookup).toHaveBeenCalledTimes(2);
   fireEvent.click(screen.getByRole("button", { name: "一键配置" }));
   expect(screen.getByRole("alert")).toHaveTextContent(fillError);
@@ -584,4 +798,19 @@ it("重开语法面板只读旧候选，显式使用或刷新，并随方言切�
       expect.any(AbortSignal)
     )
   );
+
+  generate.mockImplementationOnce(async (_id, input) => {
+    const empty = grammar(input, "");
+    empty.proposals.grammar = [];
+    return empty;
+  });
+  fireEvent.click(
+    within(screen.getByRole("dialog")).getByRole("button", {
+      name: "AI 生成语法结构"
+    })
+  );
+  expect(await screen.findByText("没有语法结构候选")).toBeVisible();
+  expect(
+    screen.queryByRole("button", { name: "一键配置" })
+  ).not.toBeInTheDocument();
 });
