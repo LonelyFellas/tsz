@@ -76,6 +76,7 @@ describe("语雀统一音标规则", () => {
     ["stand", "stænd", "sdænd"],
     ["speak", "spiːk", "sbiːk"],
     ["last", "lɑːst", "lɑːst"],
+    ["ask", "ɑːsk", "ɑːsk"],
     ["butter", "ˈbʌɾər", "ˈbʌdər"],
     ["bottle", "ˈbɒtl", "ˈbɒtəl"],
     ["council", "ˈkaʊnsl", "ˈkaʊnsəl"],
@@ -91,6 +92,28 @@ describe("语雀统一音标规则", () => {
       ok: true,
       value: expected
     });
+  });
+
+  it.each([
+    ["workspace", "ˈwɜːkspeɪs", "uk", "en-GB", "ˈwɜːksbeɪs", "ˈwɜːkspeɪs"],
+    ["workspace", "ˈwɜːrkspeɪs", "us", "en-US", "ˈwərksbeɪs", "ˈwɝkspeɪs"],
+    ["chairing", "ˈtʃerɪŋ", "us", "en-US", "ˈtʃɛərɪŋ", "ˈtʃɛɹɪŋ"]
+  ] as const)(
+    "%s %s 将教学记法与 Azure 音标分开转换",
+    (word, input, dialect, locale, actual, ipa) => {
+      expect(
+        convertDictionaryToAzureIpa(input, word, locale, "citation")
+      ).toMatchObject({ ok: true, value: ipa });
+      expect(
+        convertDictionaryToUnified(input, word, dialect, "citation")
+      ).toMatchObject({ ok: true, value: actual });
+    }
+  );
+
+  it("通用读法不套用 chairing 的美式教学记法", () => {
+    expect(
+      convertDictionaryToUnified("ˈtʃerɪŋ", "chairing", "common")
+    ).toMatchObject({ ok: true, value: "ˈtʃɛrɪŋ" });
   });
 
   it.each([
