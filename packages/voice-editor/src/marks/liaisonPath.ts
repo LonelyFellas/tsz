@@ -22,14 +22,22 @@ export function liaisonPath(
   left: LiaisonAnchorGeometry,
   right: LiaisonAnchorGeometry,
   fontSize: number,
-  maxControlRise = Infinity
+  maxControlRise: number,
+  clearancePoints: { x: number; maxY: number }[]
 ): string {
-  const spanEm = (right.x - left.x) / fontSize;
+  const span = right.x - left.x;
   // 贝塞尔中点的抬升是控制点抬升的 3/4，保持原来的弧高规则。
-  const rise = Math.min(
-    (liaisonRiseEm(spanEm) * fontSize) / 0.75,
-    Math.max(0, maxControlRise)
-  );
+  let rise = (liaisonRiseEm(span / fontSize) * fontSize) / 0.75;
+  for (const { x, maxY } of clearancePoints) {
+    const fraction = (x - left.x) / span;
+    // 两个控制点的 x 分别等于两端点，反解 x(t) = 3t² - 2t³，
+    // 才能按字形所在的横向位置计算抬升；偏侧字形不能用弧顶的高度判断。
+    const t = 0.5 - Math.sin(Math.asin(1 - 2 * fraction) / 3);
+    const baseY = left.tipY + fraction * (right.tipY - left.tipY);
+    rise = Math.max(rise, (baseY - maxY) / (3 * t * (1 - t)));
+  }
+  // 仍遵守原有的 1em 弧高上限和上一行停顿的避让上限。
+  rise = Math.min(rise, fontSize / 0.75, Math.max(0, maxControlRise));
   return [
     `M ${round(left.x)} ${round(left.tipY)}`,
     `C ${round(left.x)} ${round(left.tipY - rise)}, ${round(right.x)} ${round(right.tipY - rise)}, ${round(right.x)} ${round(right.tipY)}`
