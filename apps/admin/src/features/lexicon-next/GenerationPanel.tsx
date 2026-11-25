@@ -273,8 +273,6 @@ export function GenerationPanel({
             run,
             generatedAt: candidate.generated_at
           });
-        } else {
-          setLastCandidate(undefined);
         }
       } catch {
         if (!signal.aborted && !completed) setLookupError(true);

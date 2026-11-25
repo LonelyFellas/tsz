@@ -559,6 +559,19 @@ it("重开语法面板只读旧候选，显式使用或刷新，并随方言切�
     proposals: { grammar: [{ pattern: "until tomorrow" }] }
   });
 
+  lookup.mockResolvedValueOnce({ candidate: null });
+  generate.mockRejectedValueOnce(new Error("生成服务暂不可用"));
+  const beforeFailure = lookup.mock.calls.length;
+  fireEvent.click(screen.getByRole("button", { name: "重新生成" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "生成服务暂不可用"
+  );
+  await waitFor(() => expect(lookup).toHaveBeenCalledTimes(beforeFailure + 1));
+  fireEvent.click(screen.getByRole("button", { name: "一键配置" }));
+  expect(onFill.mock.lastCall?.[0]).toMatchObject({
+    proposals: { grammar: [{ pattern: "until tomorrow" }] }
+  });
+
   ui.rerender(<GenerationPanel {...props} target="en-US" />);
   expect(screen.queryByText("until tomorrow")).not.toBeInTheDocument();
   expect(
