@@ -70,6 +70,22 @@ function matches(result: NextAgentResult, run: Run) {
   );
 }
 
+function sameBinding(left: GenerationTarget, right: GenerationTarget) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function hasUsableCandidates({ result, run }: Generation) {
+  const section = run.binding.section;
+  return (
+    (section === "forms" || section === "grammar") &&
+    result.done &&
+    result.steps.some(
+      (step) => step.section === section && step.state === "completed"
+    ) &&
+    result.proposals[section].length > 0
+  );
+}
+
 export function GenerationPanel({
   children,
   visible = true,
@@ -113,7 +129,7 @@ export function GenerationPanel({
   const [open, setOpen] = useState(false);
   const [selection, setSelection] = useState<GenerationTarget>(entryTarget);
   const [generated, setGeneration] = useState<Generation>();
-  const [stored, setStored] = useState<Generation>();
+  const [lastCandidate, setLastCandidate] = useState<Generation>();
   const [lookingUp, setLookingUp] = useState(false);
   const [lookupError, setLookupError] = useState(false);
   const [lookupAttempt, setLookupAttempt] = useState(0);
@@ -149,7 +165,7 @@ export function GenerationPanel({
       active.current?.abort();
       setOpen(false);
       setGeneration(undefined);
-      setStored(undefined);
+      setLastCandidate(undefined);
       setResume(undefined);
       setFeedback("");
       setError("");
@@ -170,18 +186,19 @@ export function GenerationPanel({
   const candidateMode = supportsCandidates(selection);
   const currentGeneration = candidateMode
     ? generated?.run.snapshot === snapshot &&
-      generated.run.binding === selection
+      sameBinding(generated.run.binding, selection)
       ? generated
       : undefined
     : generated;
-  const currentStored =
+  const currentCandidate =
     candidateMode &&
-    stored?.run.snapshot === snapshot &&
-    stored.run.binding === selection
-      ? stored
+    lastCandidate?.run.snapshot === snapshot &&
+    sameBinding(lastCandidate.run.binding, selection)
+      ? lastCandidate
       : undefined;
-  const generation = currentGeneration ?? currentStored;
-  const result = generation?.result;
+  const generation = currentCandidate ?? currentGeneration;
+  // Progress belongs to the latest attempt, including a failed refresh.
+  const result = currentGeneration?.result ?? generation?.result;
 
   async function prepareRun(binding: GenerationTarget, forceRefresh = false) {
     const section = binding.section;
@@ -235,37 +252,43 @@ export function GenerationPanel({
     } satisfies Run;
   }
 
-  const readCandidate = useEffectEvent(async (signal: AbortSignal) => {
-    if (!lookup) return;
-    setLookingUp(true);
-    setLookupError(false);
-    setStored(undefined);
-    try {
-      const run = await prepareRun(selection);
-      if (signal.aborted) return;
-      const { candidate } = await lookup(entryId, run.input, signal);
-      if (signal.aborted) return;
-      if (candidate) {
-        if (!matches(candidate.result, run))
-          throw new Error("候选与当前草稿不匹配。");
-        setStored({
-          result: candidate.result,
-          run,
-          generatedAt: candidate.generated_at
-        });
+  const readCandidate = useEffectEvent(
+    async (signal: AbortSignal, completed?: Generation) => {
+      if (!lookup) return;
+      setLookingUp(!completed);
+      setLookupError(false);
+      try {
+        const run = completed?.run ?? (await prepareRun(selection));
+        if (signal.aborted) return;
+        // force_refresh belongs only to the generation request.
+        const { force_refresh: _refresh, ...query } = run.input;
+        const { candidate } = await lookup(entryId, query, signal);
+        if (signal.aborted) return;
+        if (completed && candidate?.source_run_id !== run.input.run_id) return;
+        if (candidate) {
+          if (!matches(candidate.result, run))
+            throw new Error("候选与当前草稿不匹配。");
+          setLastCandidate({
+            result: candidate.result,
+            run,
+            generatedAt: candidate.generated_at
+          });
+        } else {
+          setLastCandidate(undefined);
+        }
+      } catch {
+        if (!signal.aborted && !completed) setLookupError(true);
+      } finally {
+        if (!signal.aborted) setLookingUp(false);
       }
-    } catch {
-      if (!signal.aborted) setLookupError(true);
-    } finally {
-      if (!signal.aborted) setLookingUp(false);
     }
-  });
+  );
 
   useEffect(() => {
-    if (!open || !candidateMode || locked || pending || currentGeneration)
-      return;
+    if (!open || !candidateMode || locked || pending) return;
+    if (currentGeneration && !hasUsableCandidates(currentGeneration)) return;
     const controller = new AbortController();
-    void readCandidate(controller.signal);
+    void readCandidate(controller.signal, currentGeneration);
     return () => controller.abort();
   }, [
     open,
@@ -345,7 +368,8 @@ export function GenerationPanel({
         const next = await generate(entryId, run.input, controller.signal);
         if (controller.signal.aborted) return;
         if (!matches(next, run)) throw new Error("返回结果与当前草稿不匹配。");
-        setGeneration({ result: next, run });
+        const attempt = { result: next, run };
+        setGeneration(attempt);
         if (next.done) {
           setResume(undefined);
           if (
@@ -359,7 +383,8 @@ export function GenerationPanel({
             setFeedback("本次没有可回填的候选。");
             return;
           }
-          if (!supportsCandidates(binding)) fill({ result: next, run });
+          if (!supportsCandidates(binding)) fill(attempt);
+          else if (hasUsableCandidates(attempt)) setLastCandidate(attempt);
           return;
         }
         if (next.steps.some((s) => s.state === "running"))
@@ -386,8 +411,7 @@ export function GenerationPanel({
     setOpen(true);
   }
   function resumeFor(binding: GenerationTarget) {
-    return resume?.snapshot === snapshot &&
-      JSON.stringify(binding) === JSON.stringify(resume.binding)
+    return resume?.snapshot === snapshot && sameBinding(binding, resume.binding)
       ? resume
       : undefined;
   }
@@ -399,7 +423,7 @@ export function GenerationPanel({
     }
     setSelection(binding);
     setGeneration(undefined);
-    setStored(undefined);
+    setLastCandidate(undefined);
     setLookupError(false);
     setFeedback("");
     setError("");
@@ -435,12 +459,7 @@ export function GenerationPanel({
   );
 
   const resumable = resumeFor(selection);
-  const canUse =
-    candidateMode &&
-    generation &&
-    result?.done &&
-    selection.section !== "all" &&
-    result.proposals[selection.section].length > 0;
+  const canUse = candidateMode && generation && hasUsableCandidates(generation);
   const refresh = candidateMode && !!result?.done && !resumable;
 
   return (
@@ -560,11 +579,13 @@ export function GenerationPanel({
             )}
             {candidateMode &&
               selection.section === "grammar" &&
-              !!result?.proposals.grammar.length && (
+              !!generation?.result.proposals.grammar.length && (
                 <ul>
                   {[
                     ...new Set(
-                      result.proposals.grammar.map((row) => row.pattern)
+                      generation.result.proposals.grammar.map(
+                        (row) => row.pattern
+                      )
                     )
                   ].map((pattern) => (
                     <li key={pattern}>{pattern}</li>

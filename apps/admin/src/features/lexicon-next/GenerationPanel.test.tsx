@@ -462,22 +462,31 @@ it("重开语法面板只读旧候选，显式使用或刷新，并随方言切�
     response.proposals.grammar = [{ pos: "noun", pattern }];
     return response;
   }
+  let sourceRunId = "previous-run";
+  const refreshedTime = "2026-11-25T00:00:00Z";
   const lookup = vi.fn(async (_id: string, input: NextAgentInput) => ({
     candidate:
       input.target === "en-GB"
         ? {
-            source_run_id: "previous-run",
-            generated_at: "2026-11-24T00:00:00Z",
-            result: grammar(input, "by tomorrow")
+            source_run_id: sourceRunId,
+            generated_at:
+              sourceRunId === "previous-run"
+                ? "2026-11-24T00:00:00Z"
+                : refreshedTime,
+            result: grammar(
+              input,
+              sourceRunId === "previous-run" ? "by tomorrow" : "until tomorrow"
+            )
           }
         : null
   }));
-  const generate = vi.fn(async (_id: string, input: NextAgentInput) =>
-    grammar(input, "until tomorrow")
-  );
+  const generate = vi.fn(async (_id: string, input: NextAgentInput) => {
+    sourceRunId = input.run_id;
+    return grammar(input, "until tomorrow");
+  });
   const fillError = "草稿内容已超出数量限制，请缩小生成范围。";
   const onFill = vi
-    .fn(() => true)
+    .fn((_result: NextAgentResult) => true)
     .mockImplementationOnce(() => {
       throw new Error(fillError);
     });
@@ -524,6 +533,31 @@ it("重开语法面板只读旧候选，显式使用或刷新，并随方言切�
     expect.any(AbortSignal)
   );
   expect(onFill).toHaveBeenCalledTimes(2);
+
+  await waitFor(() =>
+    expect(screen.getByText("生成于").querySelector("time")).toHaveAttribute(
+      "datetime",
+      refreshedTime
+    )
+  );
+
+  expect(lookup.mock.lastCall?.[1]).not.toHaveProperty("force_refresh");
+
+  generate.mockImplementationOnce(async (_id, input) => {
+    const failed = grammar(input, "");
+    failed.steps = [
+      { section: "grammar", state: "failed", error: "provider_error" }
+    ];
+    failed.proposals.grammar = [];
+    return failed;
+  });
+  fireEvent.click(screen.getByRole("button", { name: "重新生成" }));
+  expect(await screen.findByText("本次没有可回填的候选。")).toBeVisible();
+  expect(screen.getByText("until tomorrow")).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "一键配置" }));
+  expect(onFill.mock.lastCall?.[0]).toMatchObject({
+    proposals: { grammar: [{ pattern: "until tomorrow" }] }
+  });
 
   ui.rerender(<GenerationPanel {...props} target="en-US" />);
   expect(screen.queryByText("until tomorrow")).not.toBeInTheDocument();
