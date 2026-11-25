@@ -229,6 +229,9 @@ function convertDictionary(
       }
     }
     if (target === "actual") {
+      // The dictionary may omit the onset boundary before the space stem.
+      if (word === "workspace")
+        value = value.replace(/^([ˈˌ]?w(?:ɜːr?|ɜr|ər)k)sp(eɪs)$/u, "$1sb$2");
       if (word === "hudson" && value === "ˈhʌdsən") value = "ˈhʌtsən";
       if (word === "bib" && value === "bɪb" && dialect === "uk") value = "bɪp";
       if (
@@ -238,6 +241,9 @@ function convertDictionary(
       )
         value = "əf";
       if (dialect === "us") {
+        // Preserve the teaching vowel of chair before the inflectional suffix.
+        if (word === "chairing")
+          value = value.replace(/^([ˈˌ]?tʃɛ)(\.?r\.?ɪŋ)$/u, "$1ə$2");
         if (word === "butter" && value === "ˈbʌtər") value = "ˈbʌdər";
         if (word === "city" && value === "ˈsɪtɪ") value = "ˈsɪdɪ";
         if (
