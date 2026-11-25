@@ -626,6 +626,13 @@ it("重开语法面板只读旧候选，显式使用或刷新，并随方言切�
     response.steps = [{ section: "grammar", state: "completed", error: "" }];
     response.sources = [
       {
+        source: "Oxford Learner’s Dictionaries",
+        locator: "",
+        excerpt:
+          "Definition of tomorrow noun in Oxford Advanced Learner's Dictionary.",
+        status: "found"
+      },
+      {
         source: "Cambridge Dictionary",
         locator: "",
         excerpt: "tomorrow · 句型 by + day",

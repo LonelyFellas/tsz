@@ -20,6 +20,7 @@ import {
   type MeaningCandidates
 } from "./MeaningCandidateTable";
 import { ReferenceEntryContent } from "./ReferenceEntryContent";
+import { dictionaryReferenceEntry } from "./referenceEntryModel";
 import { useFormGenerationTranslation } from "./formGenerationMessages";
 import "./GenerationResult.css";
 
@@ -35,17 +36,27 @@ function ReferenceSlider({
   const { t } = useFormGenerationTranslation();
   const titleId = useId();
   const [selectedIndex, setSelectedIndex] = useState<number>();
-  const defaultIndex = Math.max(
-    0,
-    dictionaries.findIndex(({ source }) =>
-      sources.some(
-        (item) =>
-          item.source === source &&
-          item.status === "found" &&
-          item.excerpt.trim()
-      )
-    )
+  const references = dictionaries.map(({ source }) =>
+    sources.find((item) => item.source === source)
   );
+  const grammarIndex = showGrammar
+    ? references.findIndex((reference) => {
+        const entry = dictionaryReferenceEntry(reference, headword);
+        return !!(
+          entry.grammarPatterns?.length || entry.grammarExamples?.length
+        );
+      })
+    : -1;
+  const defaultIndex =
+    grammarIndex >= 0
+      ? grammarIndex
+      : Math.max(
+          0,
+          references.findIndex(
+            (reference) =>
+              reference?.status === "found" && reference.excerpt.trim()
+          )
+        );
   const index = selectedIndex ?? defaultIndex;
   const touch = useRef<{ x: number; y: number } | undefined>(undefined);
   const move = (offset: number) =>
@@ -57,7 +68,7 @@ function ReferenceSlider({
     );
 
   const dictionary = dictionaries[index]!;
-  const row = sources.find((item) => item.source === dictionary.source);
+  const row = references[index];
   const status = row?.status;
   const statusLabel =
     status === "found"
