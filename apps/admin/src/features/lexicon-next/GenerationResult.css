@@ -1,4 +1,4 @@
-.lexicon-form-generation-result {
+.lexicon-generation-result {
   display: grid;
   grid-template-columns: minmax(0, 4fr) minmax(0, 5fr);
   align-items: start;
@@ -6,7 +6,7 @@
   min-width: 0;
 }
 
-.lexicon-form-generation-result h2 {
+.lexicon-generation-result h2 {
   margin: 0;
   font-size: var(--ui-font-size-section);
   font-weight: var(--ui-font-weight-semibold);
@@ -158,8 +158,12 @@
   line-height: var(--ui-line-height);
 }
 
-.lexicon-reference-definitions ol {
+.lexicon-reference-definitions :is(ol, ul) {
   padding-inline-start: var(--ui-space-5);
+}
+
+.lexicon-reference-grammar-group + .lexicon-reference-grammar-group {
+  margin-block-start: var(--ui-space-2);
 }
 
 .lexicon-reference-definitions li + li {
@@ -197,12 +201,29 @@
   font-weight: var(--ui-font-weight-medium);
 }
 
-.lexicon-proposal-table thead th:first-child {
+.lexicon-proposal-forms thead th:first-child {
   width: 17%;
 }
 
-.lexicon-proposal-table thead th:nth-child(2) {
+.lexicon-proposal-forms thead th:nth-child(2) {
   width: 23%;
+}
+
+.lexicon-proposal-grammar thead th:first-child {
+  width: 19%;
+}
+
+.lexicon-proposal-grammar thead th:nth-child(2) {
+  width: 25%;
+}
+
+.lexicon-proposal-groups thead th:first-child,
+.lexicon-proposal-meaning thead th:first-child {
+  width: 40%;
+}
+
+.lexicon-proposal-grammar td[lang] {
+  font-family: var(--tsz-font-words);
 }
 
 .lexicon-proposal-table tbody tr {
@@ -218,14 +239,14 @@
 }
 
 .lexicon-proposal-phonetic,
-.lexicon-proposal-form-count {
+.lexicon-proposal-secondary {
   display: block;
   color: var(--ui-color-text-secondary);
   font-size: var(--ui-font-size-sm);
 }
 
 @media (width <= 720px) {
-  .lexicon-form-generation-result {
+  .lexicon-generation-result {
     grid-template-columns: minmax(0, 1fr);
   }
 }

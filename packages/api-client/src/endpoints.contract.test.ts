@@ -856,7 +856,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "1f46fa194e033b89474ac10793e78fe07bb0f6b50bc301b0abb5d5e08cf50565"
+      "b27b3e48d0b5c70d4fd360ffa624db53d6cfec4767875da90521851207e12b83"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -1178,7 +1178,27 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       required: false,
       schema: { type: ["string", "null"] }
     };
+    const grammarSubPosHeader = {
+      name: "x-tsz-next-grammar-sub-pos",
+      in: "header",
+      required: false,
+      schema: { type: ["string", "null"] }
+    };
+    const sectionCandidatesHeader = {
+      name: "x-tsz-next-section-candidates",
+      in: "header",
+      required: false,
+      schema: { type: ["string", "null"] }
+    };
     expect(snapshot.operationHeaders).toEqual({
+      "post /admin/lexicon-next/entries/{id}/generation": [
+        grammarSubPosHeader,
+        sectionCandidatesHeader
+      ],
+      "post /admin/lexicon-next/entries/{id}/generation/candidates": [
+        grammarSubPosHeader,
+        sectionCandidatesHeader
+      ],
       "post /admin/lexicon-next/detections": [
         {
           name: "x-tsz-next-dictionary-pos",
@@ -1377,6 +1397,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
           required: false,
           schema: { type: ["string", "null"] }
         },
+        sectionCandidatesHeader,
         {
           name: "x-tsz-next-sentence-associations",
           in: "header",

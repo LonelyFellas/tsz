@@ -47,6 +47,37 @@ const messages = {
     "没有词形候选",
     "沒有詞形候選",
     "No form candidates"
+  ],
+  entry_ai_generated_grammar: [
+    "生成语法结构",
+    "生成文法結構",
+    "Generated grammar patterns"
+  ],
+  entry_ai_no_grammar_proposals: [
+    "没有语法结构候选",
+    "沒有文法結構候選",
+    "No grammar pattern candidates"
+  ],
+  entry_ai_generated_groups: [
+    "生成语义区间",
+    "生成語義區間",
+    "Generated sense groups"
+  ],
+  entry_ai_no_group_proposals: [
+    "没有语义区间候选",
+    "沒有語義區間候選",
+    "No sense group candidates"
+  ],
+  entry_ai_generated_content: [
+    "{{section}}候选",
+    "{{section}}候選",
+    "{{section}} candidates"
+  ],
+  entry_ai_content_column: ["候选", "候選", "Candidate"],
+  entry_ai_no_content_proposals: [
+    "没有可用候选",
+    "沒有可用候選",
+    "No candidates available"
   ]
 } as const;
 

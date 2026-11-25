@@ -1,4 +1,3 @@
-import { SectionAI } from "./GenerationActions";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { NextDialectSense, NextDialectUsage, NextDraft } from "@tsz/types";
@@ -286,7 +285,6 @@ export function DialectEditor({
         <span className="lexicon-next-dialect-label">
           {t("dialect_pair_usage")}
         </span>
-        <SectionAI section="dialect" disabled={disabled} />
         <Segmented
           aria-label={t("dialect_pair_usage")}
           value={row.usage}

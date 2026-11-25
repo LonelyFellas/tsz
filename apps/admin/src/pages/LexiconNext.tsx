@@ -208,6 +208,9 @@ function LexiconNextWorkspace({ requests }: { requests: LexiconNextRequests }) {
               generationCandidatesAvailable={
                 capability.data?.generation_candidates === true
               }
+              sectionCandidatesAvailable={
+                capability.data?.section_generation_candidates === true
+              }
               publishingAvailable={capability.data?.publishing === true}
               relationsAvailable={capability.data?.relations === true}
               formEditorAvailable={capability.data?.form_editor === true}
@@ -253,6 +256,7 @@ function EntryLoader({
   language,
   generationAvailable,
   generationCandidatesAvailable,
+  sectionCandidatesAvailable,
   formEditorAvailable,
   senseGroupsAvailable,
   senseMetadataAvailable,
@@ -284,6 +288,7 @@ function EntryLoader({
   publishingAvailable: boolean;
   generationAvailable: boolean;
   generationCandidatesAvailable: boolean;
+  sectionCandidatesAvailable: boolean;
   id: string;
   requests: LexiconNextRequests;
   language: NextLanguageCapability;
@@ -399,6 +404,7 @@ function EntryLoader({
       language={language}
       generationAvailable={generationAvailable}
       generationCandidatesAvailable={generationCandidatesAvailable}
+      sectionCandidatesAvailable={sectionCandidatesAvailable}
       archived={metadata.data.status === "archived"}
       publishingAvailable={publishingAvailable}
       relationsAvailable={relationsAvailable}
@@ -420,6 +426,7 @@ function EntryLoader({
 function EntryEditor({
   generationAvailable,
   generationCandidatesAvailable,
+  sectionCandidatesAvailable,
   initial,
   suggestedPartOfSpeech,
   entryMedium,
@@ -457,6 +464,7 @@ function EntryEditor({
   publishingAvailable: boolean;
   generationAvailable: boolean;
   generationCandidatesAvailable: boolean;
+  sectionCandidatesAvailable: boolean;
   archived: boolean;
   initial: NextEntry;
   suggestedPartOfSpeech?: readonly SuggestedPartOfSpeech[];
@@ -1863,6 +1871,7 @@ function EntryEditor({
             ? requests.generationCandidates
             : undefined
         }
+        sectionCandidatesAvailable={sectionCandidatesAvailable}
         onFill={(result, binding, exampleIds) => {
           if (!grammarCatalog.data) return false;
           const next = fillGeneratedDraft(

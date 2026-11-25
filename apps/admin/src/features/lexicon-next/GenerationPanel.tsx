@@ -20,12 +20,13 @@ import { Bot, Sparkles } from "lucide-react";
 import {
   externalDictionaries,
   GenerationContext,
+  isMeaningGenerationSection,
   type GenerationTarget
 } from "./generationContext";
 import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
 import type { LexiconNextRequests } from "@/pages/LexiconNext";
 import { generationSenses } from "./generatedDraft";
-import { FormGenerationResult } from "./FormGenerationResult";
+import { GenerationResult } from "./GenerationResult";
 import { FormTypeLabelsProvider } from "@/features/dictionary/part-of-speech/FormTypeLabels";
 import { PartOfSpeechLabelsProvider } from "@/features/dictionary/part-of-speech/PartOfSpeechLabels";
 
@@ -77,12 +78,15 @@ function sameBinding(left: GenerationTarget, right: GenerationTarget) {
 function hasUsableCandidates({ result, run }: Generation) {
   const section = run.binding.section;
   return (
-    (section === "forms" || section === "grammar") &&
+    section !== "all" &&
     result.done &&
     result.steps.some(
-      (step) => step.section === section && step.state === "completed"
-    ) &&
-    result.proposals[section].length > 0
+      (step) =>
+        (step.section === section ||
+          (section === "senses" && step.section === "dialect")) &&
+        step.state === "completed" &&
+        result.proposals[step.section].length > 0
+    )
   );
 }
 
@@ -102,6 +106,7 @@ export function GenerationPanel({
   disabled,
   generate,
   lookup,
+  sectionCandidatesAvailable = false,
   onFill
 }: {
   children: ReactNode;
@@ -119,6 +124,7 @@ export function GenerationPanel({
   disabled: boolean;
   generate: LexiconNextRequests["generate"];
   lookup?: LexiconNextRequests["generationCandidates"];
+  sectionCandidatesAvailable?: boolean;
   onFill: (
     result: NextAgentResult,
     binding: GenerationTarget,
@@ -171,19 +177,38 @@ export function GenerationPanel({
       setError("");
     }
   }, [visible, available]);
-  function supportsCandidates(binding: GenerationTarget) {
+  function supportsCandidateLookup(binding: GenerationTarget) {
+    if (!lookup) return false;
+    if (
+      binding.section === "groups" ||
+      isMeaningGenerationSection(binding.section)
+    ) {
+      if (!sectionCandidatesAvailable) return false;
+      if (binding.section === "senses" && binding.pos) return true;
+      return generationSenses(draft, medium, binding).length > 0;
+    }
     return (
-      !!lookup &&
-      (binding.section === "forms" ||
-        (binding.section === "grammar" &&
-          Boolean(
-            binding.pos ||
-            draft.form_editor?.pos.length ||
-            generationSenses(draft, medium, binding).length
-          )))
+      binding.section === "forms" ||
+      (binding.section === "grammar" &&
+        Boolean(
+          binding.pos ||
+          draft.form_editor?.pos.length ||
+          generationSenses(draft, medium, binding).length
+        ))
     );
   }
-  const candidateMode = supportsCandidates(selection);
+  function requiresCandidateReview(binding: GenerationTarget) {
+    return (
+      binding.section === "groups" ||
+      isMeaningGenerationSection(binding.section) ||
+      supportsCandidateLookup(binding)
+    );
+  }
+  const candidateMode = requiresCandidateReview(selection);
+  const lookupMode = supportsCandidateLookup(selection);
+  const missingGroupSenses =
+    selection.section === "groups" &&
+    !generationSenses(draft, medium, selection).length;
   const currentGeneration = candidateMode
     ? generated?.run.snapshot === snapshot &&
       sameBinding(generated.run.binding, selection)
@@ -222,7 +247,7 @@ export function GenerationPanel({
           ? "本次生成的词义超出数量上限，请选择具体板块。"
           : section === "translations"
             ? t("entry_ai_translation_ineligible")
-            : "请先添加词性和词义。"
+            : t("entry_ai_groups_need_senses")
       );
     }
     const digest = await crypto.subtle.digest(
@@ -245,7 +270,12 @@ export function GenerationPanel({
         existing_pos: scopedPos
           ? [scopedPos]
           : (draft.form_editor?.pos.map((p) => p.pos) ?? []),
-        sections: section === "all" ? sections : [section],
+        sections:
+          section === "all"
+            ? sections
+            : section === "senses" && sections.includes("dialect")
+              ? ["senses", "dialect"]
+              : [section],
         senses: senses.map(({ pos, gloss }) => ({ pos, gloss })),
         ...(forceRefresh ? { force_refresh: true } : {})
       }
@@ -283,14 +313,14 @@ export function GenerationPanel({
   );
 
   useEffect(() => {
-    if (!open || !candidateMode || locked || pending) return;
+    if (!open || !lookupMode || locked || pending) return;
     if (currentGeneration && !hasUsableCandidates(currentGeneration)) return;
     const controller = new AbortController();
     void readCandidate(controller.signal, currentGeneration);
     return () => controller.abort();
   }, [
     open,
-    candidateMode,
+    lookupMode,
     locked,
     pending,
     snapshot,
@@ -381,7 +411,7 @@ export function GenerationPanel({
             setFeedback("本次没有可回填的候选。");
             return;
           }
-          if (!supportsCandidates(binding)) fill(attempt);
+          if (!requiresCandidateReview(binding)) fill(attempt);
           else if (hasUsableCandidates(attempt)) setLastCandidate(attempt);
           return;
         }
@@ -415,13 +445,15 @@ export function GenerationPanel({
   }
 
   function openSection(binding: GenerationTarget) {
-    if (!supportsCandidates(binding)) {
+    if (!requiresCandidateReview(binding)) {
       void start(binding, resumeFor(binding));
       return;
     }
+    if (supportsCandidateLookup(binding) || !sameBinding(binding, selection)) {
+      setGeneration(undefined);
+      setLastCandidate(undefined);
+    }
     setSelection(binding);
-    setGeneration(undefined);
-    setLastCandidate(undefined);
     setLookupError(false);
     setFeedback("");
     setError("");
@@ -442,10 +474,16 @@ export function GenerationPanel({
     selection.section === "all"
       ? undefined
       : (selection.label ?? t(`entry_ai_${selection.section}`));
-  const showForms =
-    selection.section === "forms" ||
-    (selection.section === "all" &&
-      result?.steps.some((step) => step.section === "forms"));
+  const previewSection =
+    selection.section === "grammar" ||
+    selection.section === "groups" ||
+    isMeaningGenerationSection(selection.section)
+      ? selection.section
+      : selection.section === "forms" ||
+          (selection.section === "all" &&
+            result?.steps.some((step) => step.section === "forms"))
+        ? "forms"
+        : undefined;
 
   const generatedTime = generation?.generatedAt && (
     <Typography.Text type="secondary">
@@ -479,7 +517,7 @@ export function GenerationPanel({
           }
           open={open}
           onClose={() => setOpen(false)}
-          size={showForms ? "min(880px, 100vw)" : "min(440px, 100vw)"}
+          size={previewSection ? "min(880px, 100vw)" : "min(440px, 100vw)"}
           destroyOnHidden
         >
           <Space
@@ -498,9 +536,11 @@ export function GenerationPanel({
                 </Typography.Text>
                 <div>
                   <Space wrap size="small">
-                    {sections.map((s) => (
-                      <Tag key={s}>{t(`entry_ai_${s}`)}</Tag>
-                    ))}
+                    {sections
+                      .filter((s) => s !== "dialect")
+                      .map((s) => (
+                        <Tag key={s}>{t(`entry_ai_${s}`)}</Tag>
+                      ))}
                   </Space>
                 </div>
               </div>
@@ -508,11 +548,16 @@ export function GenerationPanel({
             {!available && (
               <Alert type="info" title={t("entry_ai_unavailable")} />
             )}
+            {missingGroupSenses && (
+              <Alert type="info" title={t("entry_ai_groups_need_senses")} />
+            )}
             <Space wrap>
               <Button
                 loading={pending}
-                disabled={locked || pending}
-                onClick={() => void start(selection, resumable, refresh)}
+                disabled={locked || pending || missingGroupSenses}
+                onClick={() =>
+                  void start(selection, resumable, refresh && lookupMode)
+                }
               >
                 {resumable && !pending
                   ? "继续生成"
@@ -544,12 +589,12 @@ export function GenerationPanel({
                 </Button>
               )}
             </Space>
-            {candidateMode && !pending && !currentGeneration && lookingUp && (
+            {lookupMode && !pending && !currentGeneration && lookingUp && (
               <Typography.Text type="secondary" role="status">
                 {t("entry_ai_lookup_pending")}
               </Typography.Text>
             )}
-            {candidateMode && !pending && !currentGeneration && lookupError && (
+            {lookupMode && !pending && !currentGeneration && lookupError && (
               <Alert
                 type="error"
                 title={t("entry_ai_lookup_failed")}
@@ -560,36 +605,46 @@ export function GenerationPanel({
                 }
               />
             )}
-            {!showForms && generatedTime}
             {error && <Alert type="error" title={error} />}
             {feedback && <p role="status">{feedback}</p>}
-            {showForms && generation && (
+            {previewSection && generation && (
               <PartOfSpeechLabelsProvider items={catalog?.items}>
                 <FormTypeLabelsProvider items={catalog?.form_types}>
-                  <FormGenerationResult
+                  <GenerationResult
                     key={generation.result.run_id}
                     headword={generation.run.input.headword}
                     sources={generation.result.sources}
-                    forms={generation.result.proposals.forms}
+                    {...(previewSection === "grammar"
+                      ? {
+                          section: "grammar",
+                          grammar: generation.result.proposals.grammar,
+                          target: generation.run.input.target
+                        }
+                      : previewSection === "groups"
+                        ? {
+                            section: "groups",
+                            groups: generation.result.proposals.groups,
+                            senses: generation.run.input.senses
+                          }
+                        : isMeaningGenerationSection(previewSection)
+                          ? {
+                              section: previewSection,
+                              proposals: generation.result.proposals,
+                              input: generation.run.input,
+                              locale: selection.locale,
+                              senseLabel: selection.senseLabel,
+                              medium,
+                              sectionLabel:
+                                sectionLabel ?? t(`entry_ai_${previewSection}`)
+                            }
+                          : {
+                              section: "forms",
+                              forms: generation.result.proposals.forms
+                            })}
                   />
                 </FormTypeLabelsProvider>
               </PartOfSpeechLabelsProvider>
             )}
-            {candidateMode &&
-              selection.section === "grammar" &&
-              !!generation?.result.proposals.grammar.length && (
-                <ul>
-                  {[
-                    ...new Set(
-                      generation.result.proposals.grammar.map(
-                        (row) => row.pattern
-                      )
-                    )
-                  ].map((pattern) => (
-                    <li key={pattern}>{pattern}</li>
-                  ))}
-                </ul>
-              )}
             {result && (
               <details
                 open={
@@ -599,7 +654,7 @@ export function GenerationPanel({
                 }
               >
                 <summary>板块进度与来源</summary>
-                {showForms && generatedTime}
+                {generatedTime}
                 <ul>
                   {result.steps.map((s) => (
                     <li key={s.section}>
@@ -609,6 +664,7 @@ export function GenerationPanel({
                         `（${result.proposals[s.section].length} 项）`}
                       {s.error && ` · ${failureReasons[s.error] ?? "未能生成"}`}
                       {s.state === "failed" &&
+                        s.section !== "dialect" &&
                         result.done &&
                         sections.includes(s.section) && (
                           <Button
@@ -623,7 +679,7 @@ export function GenerationPanel({
                               void start(
                                 binding,
                                 undefined,
-                                supportsCandidates(binding)
+                                supportsCandidateLookup(binding)
                               );
                             }}
                           >
@@ -637,7 +693,8 @@ export function GenerationPanel({
                   {result.sources
                     .filter(
                       (source) =>
-                        !showForms || !externalDictionaries.has(source.source)
+                        !previewSection ||
+                        !externalDictionaries.has(source.source)
                     )
                     .map((s, i) => (
                       <li key={`${s.source}-${i}`}>

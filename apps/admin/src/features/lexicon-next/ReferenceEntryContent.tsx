@@ -1,3 +1,4 @@
+import { useId } from "react";
 import type { NextAgentSource } from "@tsz/types";
 import { useAdminModuleTranslation } from "@/i18n";
 import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
@@ -15,6 +16,14 @@ const messages = {
   reading: ["原站读音标记", "原站讀音標記", "Source pronunciation notation"],
   pronunciation: ["发音", "發音", "Pronunciation"],
   meaning: ["词义参考", "詞義參考", "Meaning reference"],
+  grammar: ["语法参考", "語法參考", "Grammar reference"],
+  grammarPatterns: ["原站句型", "原站句型", "Source patterns"],
+  grammarExamples: ["例句证据", "例句證據", "Example evidence"],
+  noGrammar: [
+    "未取得语法参考",
+    "未取得語法參考",
+    "No grammar reference returned"
+  ],
   spellings: ["拼写变体", "拼寫變體", "Spelling variants"],
   unassigned: ["未标注词性", "未標註詞性", "Part of speech unmarked"],
   formCount: ["{{count}} 项", "{{count}} 項", "Forms ({{count}})"],
@@ -45,10 +54,12 @@ const resources = { "zh-Hans": bundle(0), "zh-Hant": bundle(1), en: bundle(2) };
 
 export function ReferenceEntryContent({
   source,
-  headword
+  headword,
+  showGrammar
 }: {
   source?: NextAgentSource;
   headword: string;
+  showGrammar?: boolean;
 }) {
   const { t } = useAdminModuleTranslation(
     "adminLexiconDictionaryReference",
@@ -59,6 +70,11 @@ export function ReferenceEntryContent({
   const formTypeLabel = useFormTypeLabel();
   const posLabel = usePartOfSpeechLabel();
   const entry = dictionaryReferenceEntry(source, headword);
+  const grammarId = useId();
+  const grammarGroups = [
+    { label: t("grammarPatterns"), items: entry.grammarPatterns ?? [] },
+    { label: t("grammarExamples"), items: entry.grammarExamples ?? [] }
+  ].filter(({ items }) => items.length);
   const { partsOfSpeech, groups } = dictionaryReferenceLayout(entry);
   const labelForPos = (pos: string) =>
     dictionaryMatchPosLabel(pos, undefined, posLabel);
@@ -98,6 +114,30 @@ export function ReferenceEntryContent({
       <h3 lang="en" className="tsz-words">
         {headword}
       </h3>
+      {showGrammar && source?.status === "found" && (
+        <section
+          aria-labelledby={grammarId}
+          className="lexicon-reference-definitions"
+        >
+          <h4 id={grammarId}>{t("grammar")}</h4>
+          {grammarGroups.length ? (
+            grammarGroups.map(({ label, items }) => (
+              <div className="lexicon-reference-grammar-group" key={label}>
+                <p className="lexicon-reference-label">{label}</p>
+                <ul aria-label={label}>
+                  {items.map((text) => (
+                    <li key={text} lang="en">
+                      {text}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))
+          ) : (
+            <p className="lexicon-reference-missing">{t("noGrammar")}</p>
+          )}
+        </section>
+      )}
       <dl className="lexicon-reference-facts">
         <div>
           <dt>{editor("pos")}</dt>

@@ -246,6 +246,7 @@ export interface NextCapabilities {
   manual_drafts: boolean;
   generation: boolean;
   generation_candidates?: boolean;
+  section_generation_candidates?: boolean;
   publishing: boolean;
   form_editor?: boolean;
   sense_groups?: boolean;

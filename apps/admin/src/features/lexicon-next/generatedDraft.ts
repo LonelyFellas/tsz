@@ -10,7 +10,12 @@ import type { GenerationTarget } from "./generationContext";
 import { isSharedForms } from "@tsz/shared";
 import { planFormCandidates } from "@/features/dictionary/assistant/formCandidatesModel";
 import { emptyFormEditor } from "./FormsStep";
-import { generalSense, newSense, newGrammarStructure } from "./model";
+import {
+  generalSense,
+  grammarSubPosValid,
+  newSense,
+  newGrammarStructure
+} from "./model";
 import { newSentenceVariant } from "./sentenceDrafts";
 import { equivalentKey } from "./equivalents";
 
@@ -80,7 +85,7 @@ export function fillGeneratedDraft(
           definitions: [],
           equivalents: [],
           relations: [],
-          dialect: [],
+          dialect: section === "senses" ? result.proposals.dialect : [],
           examples: [],
           translations: [],
           [section]: result.proposals[section]
@@ -172,46 +177,93 @@ export function fillGeneratedDraft(
       (g) => g.name_en === row.name_en && g.name_zh === row.name_zh
     );
     if (!group) {
-      group = {
-        id: crypto.randomUUID(),
-        name_en: row.name_en,
-        name_zh: row.name_zh
-      };
-      groups.push(group);
+      const placeholder = groups.find(
+        (candidate) =>
+          !candidate.name_en.trim() &&
+          !candidate.name_zh.trim() &&
+          !draft.senses.some(
+            (other) =>
+              other.id !== sense.id && other.sense_group_id === candidate.id
+          )
+      );
+      if (placeholder) {
+        group = placeholder;
+        group.name_en = row.name_en;
+        group.name_zh = row.name_zh;
+      } else {
+        group = {
+          id: crypto.randomUUID(),
+          name_en: row.name_en,
+          name_zh: row.name_zh
+        };
+        groups.push(group);
+      }
     }
     sense.sense_group_id = group.id;
   }
   for (const row of proposals.grammar) {
-    if (binding?.pos && row.pos !== binding.pos) continue;
-    const grammars = (draft.grammar_structures ??= []);
+    const pattern = row.pattern.trim();
     if (
-      grammars.some(
-        (g) =>
-          g.part_of_speech === row.pos &&
-          g.variants.some(
-            (v) =>
-              (v.locale === target || v.locale === "en") &&
-              v.content.text.trim()
-          )
-      )
+      !validGeneratedText(pattern, 500) ||
+      (binding?.pos && row.pos !== binding.pos)
     )
       continue;
-    let grammar = grammars.find(
-      (g) =>
-        g.part_of_speech === row.pos &&
-        g.variants.some(
-          (v) =>
-            v.locale === target &&
-            !v.content.text.trim() &&
-            !v.audio_assets?.length
-        )
+    const grammars = (draft.grammar_structures ??= []);
+    const samePos = grammars.filter((g) => g.part_of_speech === row.pos);
+    const subPos = grammarSubPosValid(row.pos, row.sub_pos, catalog)
+      ? row.sub_pos
+      : undefined;
+    const existing = samePos.find((grammar) =>
+      grammar.variants.some(
+        (v) =>
+          (v.locale === target || v.locale === "en") &&
+          v.content.text.trim() === pattern
+      )
     );
-    if (!grammar) {
-      grammar = newGrammarStructure(row.pos);
+    if (existing) {
+      if (!existing.sub_pos && subPos) existing.sub_pos = subPos;
+      continue;
+    }
+
+    const writable = samePos.flatMap((grammar) => {
+      const variant = grammar.variants.find((v) => v.locale === target);
+      if (
+        !variant ||
+        variant.content.text.trim() ||
+        variant.audio_assets?.length ||
+        variant.form_links?.length
+      )
+        return [];
+      const { content } = variant;
+      const annotated =
+        content.version === 2
+          ? content.annotations.length
+          : content.spans.length || content.liaisons.length;
+      return annotated ? [] : [{ grammar, variant }];
+    });
+    // Prefer the matching regional row before using a completely blank placeholder.
+    const placeholder =
+      writable.find(({ grammar }) =>
+        grammar.variants.some((v) => v.content.text.trim() === pattern)
+      ) ??
+      writable.find(
+        ({ grammar }) =>
+          (!subPos || !grammar.sub_pos || grammar.sub_pos === subPos) &&
+          grammar.variants.every((v) => !v.content.text.trim())
+      );
+    const content = { version: 2 as const, text: pattern, annotations: [] };
+    if (placeholder) {
+      placeholder.variant.content = content;
+      if (!placeholder.grammar.sub_pos && subPos)
+        placeholder.grammar.sub_pos = subPos;
+    } else {
+      const grammar = newGrammarStructure(row.pos);
+      const variant = grammar.variants.find((v) => v.locale === target);
+      if (!variant) continue;
+      variant.content = content;
+      if (subPos) grammar.sub_pos = subPos;
       grammars.push(grammar);
     }
-    const variant = grammar.variants.find((v) => v.locale === target)!;
-    variant.content = { version: 2, text: row.pattern, annotations: [] };
   }
   for (const row of proposals.definitions) {
     const sense = indexed[row.sense];
