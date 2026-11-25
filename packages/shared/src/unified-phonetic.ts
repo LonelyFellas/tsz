@@ -15,6 +15,40 @@ export function stripPhoneticDelimiters(input: string): string {
     : value;
 }
 
+const PHONETIC_GROUP_CLOSERS = new Map([
+  ["/", "/"],
+  ["[", "]"],
+  ["(", ")"],
+  ["{", "}"]
+]);
+
+/** A complete, separately delimited segment can be an alternative reading. */
+export function hasDelimitedPhoneticSegments(source: string): boolean {
+  for (const match of source.matchAll(/(?:^|\s)([/[({])/gu)) {
+    const opening = match[1]!;
+    const closing = PHONETIC_GROUP_CLOSERS.get(opening);
+    let depth = 1;
+    for (
+      let index = match.index + match[0].length;
+      index < source.length;
+      index++
+    ) {
+      const symbol = source[index];
+      if (symbol === closing) {
+        depth--;
+        if (depth === 0) {
+          if (index + 1 === source.length || /\s/u.test(source[index + 1]!))
+            return true;
+          break;
+        }
+      } else if (symbol === opening) {
+        depth++;
+      }
+    }
+  }
+  return false;
+}
+
 // These are the document's explicit lexical examples. Match the source as well
 // as the spelling: an unrelated/alternative transcription must never be replaced.
 const STYLE_EXAMPLES: Record<
@@ -174,17 +208,19 @@ function convertDictionary(
 ): Conversion {
   if (/\p{Cc}/u.test(input))
     return { ok: false, message: "字典音标不能包含控制字符" };
-  const source = stripPhoneticDelimiters(input);
+  const source = stripPhoneticDelimiters(
+    target === "azure-ipa" ? input.replace(/[()[\]{}]/gu, "") : input
+  );
   if (!source) return { ok: false, message: "请先填写字典音标" };
   if (Array.from(source).length > 200)
     return { ok: false, message: "字典音标最多 200 个字符" };
-  const words = spelling.trim().split(/\s+/u).filter(Boolean);
+  if (!spelling.trim()) return { ok: false, message: "请先填写词形拼写" };
+  const words = spelling.trim().toLowerCase().split(/\s+/u);
   const phones = source.split(/\s+/u).map(stripPhoneticDelimiters);
-  if (!words.length || words.length > 30 || words.length !== phones.length)
-    return {
-      ok: false,
-      message: "字典音标与词形词数不一致，请用空格明确逐词音标"
-    };
+  const aligned = words.length === phones.length;
+  // Examine the source grouping before stripping Azure's optional notation.
+  if (!aligned && hasDelimitedPhoneticSegments(stripPhoneticDelimiters(input)))
+    return { ok: false, message: "请每次只输入一个读音版本" };
   const notices = new Set<string>();
   const values: string[] = [];
   for (const [index, phone] of phones.entries()) {
@@ -194,9 +230,10 @@ function convertDictionary(
     )
       return {
         ok: false,
-        message: `第 ${index + 1} 个词包含未支持的音标，请每次只输入一个读音版本`
+        message: `第 ${index + 1} 段音标包含未支持的符号，请每次只输入一个读音版本`
       };
-    const word = words[index]!.toLowerCase();
+    // Without word boundaries, skip spelling-dependent rules for every segment.
+    const word = aligned ? words[index]! : "";
     let value = dictionaryWord(phone, dialect, target, word);
     const styleValue =
       target === "actual"
@@ -209,7 +246,7 @@ function convertDictionary(
     )
       return {
         ok: false,
-        message: `第 ${index + 1} 个词的音素、重音或音节标记不完整`
+        message: `第 ${index + 1} 段音标的音素、重音或音节标记不完整`
       };
     const exampleKey = `${word}:${dialect}`;
     const example = Object.hasOwn(STYLE_EXAMPLES, exampleKey)
@@ -234,11 +271,7 @@ function convertDictionary(
         value = value.replace(/^([ˈˌ]?w(?:ɜːr?|ɜr|ər)k)sp(eɪs)$/u, "$1sb$2");
       if (word === "hudson" && value === "ˈhʌdsən") value = "ˈhʌtsən";
       if (word === "bib" && value === "bɪb" && dialect === "uk") value = "bɪp";
-      if (
-        word === "of" &&
-        words[index + 1]?.toLowerCase() === "course" &&
-        value === "əv"
-      )
+      if (word === "of" && words[index + 1] === "course" && value === "əv")
         value = "əf";
       if (dialect === "us") {
         // Preserve the teaching vowel of chair before the inflectional suffix.
@@ -256,7 +289,7 @@ function convertDictionary(
         }
       }
     }
-    if (style !== "normal" && !styleApplied)
+    if (!aligned || (style !== "normal" && !styleApplied))
       notices.add("仅规范已有音标，请核对读法。");
     if (
       dialect === "common" &&
