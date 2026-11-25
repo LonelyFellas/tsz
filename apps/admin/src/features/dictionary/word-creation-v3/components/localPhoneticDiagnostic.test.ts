@@ -26,7 +26,7 @@ it("翻译真实本地转换诊断，保留音素、字符位置和未知诊断�
   expect(dictionary.ok).toBe(false);
   if (!dictionary.ok)
     expect(localPhoneticDiagnostic(dictionary.message, en)).toMatch(
-      /^Word 1 contains an unsupported transcription/
+      /^Transcription segment 1 contains an unsupported symbol/
     );
   const ups = convertAzureIpaToUps("ʔ", "word", "en-US");
   expect(ups.ok).toBe(false);

@@ -15,9 +15,11 @@ import { ipaWordToUps } from "./ipa-ups";
 import { speechAccentGroup, type SpeechAccentGroup } from "./speech-locale";
 import {
   stripPhoneticDelimiters,
+  hasDelimitedPhoneticSegments,
   convertDictionaryToAzureIpaSource,
   unifiedWordToAzureIpa
 } from "./unified-phonetic";
+const MAX_UPS_WORDS = 30;
 export const SYNTHESIS_LIMITS = { ipa: 200, ups: 1600 } as const;
 export const EMPTY_SYNTHESIS: PronunciationSynthesisV3 = {
   alphabet: "ipa",
@@ -175,7 +177,7 @@ function basePronunciationSynthesisContent(
     const matches = [...spelling.matchAll(/\S+/gu)];
     if (
       !words ||
-      words.length > 30 ||
+      words.length > MAX_UPS_WORDS ||
       words.length !== matches.length ||
       words.some(
         (word, index) =>
@@ -225,10 +227,10 @@ export function synthesisPhonemeWordRanges(
   const words = [...spelling.matchAll(/\S+/gu)];
   const value = candidate[alphabet];
   const phones =
-    alphabet === "ipa"
-      ? [...value.matchAll(/\S+/gu)].map((match) => match[0])
-      : words.length === 1
-        ? [value.trim()]
+    words.length === 1
+      ? [value.trim()]
+      : alphabet === "ipa"
+        ? [...value.matchAll(/\S+/gu)].map((match) => match[0])
         : candidate.ups_words?.map((word, index) =>
             word.text === words[index]?.[0] ? word.phoneme : ""
           );
@@ -434,15 +436,29 @@ export function convertDictionaryToAzureIpa(
   locale: PhonemeLocaleV3,
   style?: WordPronunciationV3["style"]
 ) {
-  const dictionary = input.replace(/[()[\]{}]/gu, "");
   const source = convertDictionaryToAzureIpaSource(
-    dictionary,
+    input,
     spelling,
     locale === "en-GB" ? "uk" : "us",
     style
   );
   if (!source.ok) return source;
   return convertActualPronunciation(source.value, spelling, "ipa", locale);
+}
+
+function upsConversionResult(spelling: string, values: string[]) {
+  const words = spelling.trim().split(/\s+/u);
+  // Each IPA segment is complete. Inside a single spelling, keep the given
+  // segment breaks as syllable boundaries so stress stays on the intended syllable.
+  const wordValues = words.length === 1 ? [values.join(" . ")] : values;
+  const value = wordValues.join(" ");
+  const issue = synthesisInputIssue("ups", value);
+  if (issue) return { ok: false as const, message: issue };
+  const ups_words =
+    words.length === wordValues.length && words.length <= MAX_UPS_WORDS
+      ? words.map((text, index) => ({ text, phoneme: wordValues[index]! }))
+      : null;
+  return { ok: true as const, value, ups_words };
 }
 
 /** Consume the current, possibly manually corrected IPA without reapplying dictionary rules. */
@@ -452,32 +468,19 @@ export function convertAzureIpaToUps(
   locale: PhonemeLocaleV3
 ) {
   const source = stripPhoneticDelimiters(input);
-  const words = spelling.trim().split(/\s+/u).filter(Boolean);
-  const phones = source.split(/\s+/u).filter(Boolean);
   if (!source)
     return { ok: false as const, message: "请先填写对应口音的 Azure IPA" };
-  if (!words.length || words.length > 30 || words.length !== phones.length)
-    return {
-      ok: false as const,
-      message: "Azure IPA 与正文词数不一致，请用空格明确逐词音标"
-    };
+  if (!spelling.trim())
+    return { ok: false as const, message: "请先填写词形拼写" };
+  const issue = synthesisInputIssue("ipa", input);
+  if (issue) return { ok: false as const, message: issue };
   const values: string[] = [];
-  for (const phone of phones) {
+  for (const phone of source.split(/\s+/u)) {
     const result = ipaWordToUps(phone, locale);
     if (!result.ok) return result;
     values.push(result.value);
   }
-  const value = values.join(" ");
-  const issue = synthesisInputIssue("ups", value);
-  if (issue) return { ok: false as const, message: issue };
-  return {
-    ok: true as const,
-    value,
-    ups_words: values.map((phoneme, index) => ({
-      text: words[index]!,
-      phoneme
-    }))
-  };
+  return upsConversionResult(spelling, values);
 }
 
 export function readingRevision(
@@ -599,19 +602,15 @@ export function convertActualPronunciation(
   if (/\p{Cc}/u.test(input))
     return { ok: false as const, message: "实际发音不能包含控制字符" };
   const source = stripPhoneticDelimiters(input);
-  const textWords = spelling.trim().split(/\s+/u).filter(Boolean);
-  const phones = source.split(/\s+/u).filter(Boolean);
   if (!source) return { ok: false as const, message: "请先填写实际发音" };
+  if (!spelling.trim())
+    return { ok: false as const, message: "请先填写词形拼写" };
+  const phones = source.split(/\s+/u);
   if (
-    !textWords.length ||
-    textWords.length > 30 ||
-    textWords.length !== phones.length
+    hasDelimitedPhoneticSegments(source) &&
+    spelling.trim().split(/\s+/u).length !== phones.length
   )
-    return {
-      ok: false as const,
-      message:
-        "实际发音与正文词数不一致，请用空格明确逐词音标；不自动推断连读词界"
-    };
+    return { ok: false as const, message: "请每次只输入一个读音版本" };
   const values: string[] = [];
   for (const [index, phone] of phones.entries()) {
     const adapted = unifiedWordToAzureIpa(
@@ -621,7 +620,7 @@ export function convertActualPronunciation(
     if (!adapted.ok)
       return {
         ok: false as const,
-        message: `第 ${index + 1} 个词：${adapted.message}`
+        message: `第 ${index + 1} 段音标：${adapted.message}`
       };
     const result =
       alphabet === "ups"
@@ -630,21 +629,15 @@ export function convertActualPronunciation(
     if (!result.ok)
       return {
         ok: false as const,
-        message: `第 ${index + 1} 个词：${result.message}`
+        message: `第 ${index + 1} 段音标：${result.message}`
       };
     values.push(result.value);
   }
+  if (alphabet === "ups") return upsConversionResult(spelling, values);
   const value = values.join(" ");
-  const issue = synthesisInputIssue(alphabet, value);
+  const issue = synthesisInputIssue("ipa", value);
   if (issue) return { ok: false as const, message: issue };
-  return {
-    ok: true as const,
-    value,
-    ups_words:
-      alphabet === "ups"
-        ? values.map((phoneme, index) => ({ text: textWords[index]!, phoneme }))
-        : undefined
-  };
+  return { ok: true as const, value, ups_words: undefined };
 }
 
 export type PhoneticConversion =

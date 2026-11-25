@@ -1,13 +1,11 @@
-import {
-  useLexiconEditorTranslation,
-  type LexiconEditorTranslation
-} from "../../i18n/editor";
+import { useLexiconEditorTranslation } from "../../i18n/editor";
 import { useState } from "react";
 import { App } from "@tsz/ui/admin/overlays";
 import { Button } from "@tsz/ui/admin/display";
 import { ArrowLeftRightIcon, Undo2Icon } from "lucide-react";
 import type { Dialect, WordPronunciationV3 } from "@tsz/types";
 import { convertDictionaryToUnified } from "@tsz/shared";
+import { localPhoneticDiagnostic } from "./localPhoneticDiagnostic";
 export function V3ActualPronunciationCopy({
   pronunciation,
   spelling,
@@ -69,7 +67,7 @@ export function V3ActualPronunciationCopy({
             pronunciation.style
           );
           if (!result.ok) {
-            void message.error(conversionMessage(result.message, t));
+            void message.error(localPhoneticDiagnostic(result.message, t));
             return;
           }
           apply(result.value);
@@ -98,28 +96,4 @@ export function V3ActualPronunciationCopy({
         )}
     </>
   );
-}
-
-// 这里只接收本地音标转换器的提示，业务原文和服务端错误不经过此映射。
-function conversionMessage(message: string, t: LexiconEditorTranslation) {
-  const keys = {
-    字典音标不能包含控制字符: "conversion_control_characters",
-    请先填写字典音标: "conversion_required",
-    "字典音标最多 200 个字符": "conversion_too_long",
-    "字典音标与词形词数不一致，请用空格明确逐词音标": "conversion_word_count",
-    "仅规范已有音标，请核对读法。": "conversion_normalised_notice",
-    "仅转换通用音标；英美差异读音请切换口音后转换。": "conversion_common_notice"
-  } as const;
-  const key = keys[message as keyof typeof keys];
-  if (key) return t(key);
-  const unsupported =
-    /^第 (\d+) 个词包含未支持的音标，请每次只输入一个读音版本$/.exec(message);
-  if (unsupported)
-    return t("conversion_unsupported_word", { index: unsupported[1]! });
-  const incomplete = /^第 (\d+) 个词的音素、重音或音节标记不完整$/.exec(
-    message
-  );
-  return incomplete
-    ? t("conversion_incomplete_word", { index: incomplete[1]! })
-    : message;
 }

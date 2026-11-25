@@ -2236,46 +2236,6 @@ export const lexiconEditorPanelMessages = {
     "{{label}}: {{details}}"
   ],
   summary_list_separator: ["、", "、", ", "],
-  conversion_control_characters: [
-    "字典音标不能包含控制字符",
-    "字典音標不能包含控制字元",
-    "Dictionary transcriptions cannot contain control characters"
-  ],
-  conversion_required: [
-    "请先填写字典音标",
-    "請先填寫字典音標",
-    "Enter the dictionary transcription first"
-  ],
-  conversion_too_long: [
-    "字典音标最多 200 个字符",
-    "字典音標最多 200 個字元",
-    "Dictionary transcriptions must not exceed 200 characters"
-  ],
-  conversion_word_count: [
-    "字典音标与词形词数不一致，请用空格明确逐词音标",
-    "字典音標與詞形的詞數不符，請用空格分隔逐詞音標",
-    "Transcription and spelling word counts differ. Separate each word’s transcription with a space."
-  ],
-  conversion_normalised_notice: [
-    "仅规范已有音标，请核对读法。",
-    "僅規範既有音標，請核對讀法。",
-    "Existing transcriptions were normalised. Check the readings."
-  ],
-  conversion_common_notice: [
-    "仅转换通用音标；英美差异读音请切换口音后转换。",
-    "僅轉換通用音標；英美差異讀音請切換口音後轉換。",
-    "Only common transcriptions were converted. Switch accents to convert accent-specific readings."
-  ],
-  conversion_unsupported_word: [
-    "第 {{index}} 个词包含未支持的音标，请每次只输入一个读音版本",
-    "第 {{index}} 個詞包含不支援的音標，每次請只輸入一個讀音版本",
-    "Word {{index}} contains unsupported phonetic symbols. Enter one pronunciation version at a time."
-  ],
-  conversion_incomplete_word: [
-    "第 {{index}} 个词的音素、重音或音节标记不完整",
-    "第 {{index}} 個詞的音素、重音或音節標記不完整",
-    "Word {{index}} has incomplete phonemes, stress or syllable marks"
-  ],
   translation_language_label: [
     "{{language}}译文",
     "{{language}}譯文",

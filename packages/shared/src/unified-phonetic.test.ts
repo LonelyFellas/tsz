@@ -386,13 +386,42 @@ describe("语雀统一音标规则", () => {
     ).toMatchObject({ ok: true, value: "ˈlɪtɹətʃɚ" });
   });
 
-  it("空值、控制符、混合读音和词界错误不返回部分转换", () => {
+  it("段数不一致时只规范音标，跳过依赖拼写对应关系的读法规则", () => {
+    expect(
+      convertDictionaryToUnified("/bɪb dɒg wel/", "bib dog", "uk")
+    ).toMatchObject({
+      ok: true,
+      value: "bɪb dɒg wɛl",
+      notices: [expect.stringContaining("请核对读法")]
+    });
+  });
+
+  it.each([
+    "/ˈiːðə/ /ˈaɪðə/",
+    "[ˈiːðə] [ˈaɪðə]",
+    "[ˈiː ðə] [ˈaɪ ðə]",
+    "(ˈiːðə) (ˈaɪðə)",
+    "{ˈiːðə} {ˈaɪðə}",
+    "([ˈiːðə]) ([ˈaɪðə])",
+    "((ˈiːðə)) ((ˈaɪðə))"
+  ])("单个词形拒绝将各自括起的备选读法合并：%s", (transcription) => {
+    expect(convertDictionaryToUnified(transcription, "either", "uk").ok).toBe(
+      false
+    );
+    expect(
+      convertDictionaryToAzureIpa(transcription, "either", "en-GB").ok
+    ).toBe(false);
+    expect(
+      convertActualPronunciation(transcription, "either", "ipa", "en-GB").ok
+    ).toBe(false);
+  });
+
+  it("空值、控制符和非法音标不返回部分转换", () => {
     for (const [input, word] of [
       ["", "cat"],
       ["kæt\n", "cat"],
       ["kæt😀", "cat"],
       ["kæt; kɛt", "cat"],
-      ["kæt dɒg", "cat"],
       ["[kæt", "cat"],
       [".", "cat"],
       ["kætˈ", "cat"],
@@ -404,6 +433,9 @@ describe("语雀统一音标规则", () => {
     expect(
       convertDictionaryToUnified(" [ /skuːl/ /deɪ/ ] ", "school day", "uk")
     ).toMatchObject({ value: "sguːl deɪ" });
+    expect(
+      convertDictionaryToAzureIpa("[skuːl] [deɪ]", "school day", "en-GB")
+    ).toMatchObject({ value: "skuːl deɪ" });
   });
 });
 

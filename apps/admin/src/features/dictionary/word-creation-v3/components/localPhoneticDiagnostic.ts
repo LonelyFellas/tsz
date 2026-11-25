@@ -8,21 +8,17 @@ const LOCAL_DIAGNOSTICS: Readonly<Record<string, LexiconEditorKey>> = {
     "creation_phonetic_phonemes_cannot_contain_line_breaks_tabs_or_other_control_characters",
   "请先填写对应口音的 Azure IPA":
     "creation_phonetic_enter_azure_ipa_for_the_corresponding_accent_first",
-  "Azure IPA 与正文词数不一致，请用空格明确逐词音标":
-    "creation_phonetic_azure_ipa_does_not_match_the_text_word_count_separate_word_transcriptions_with_spaces",
   实际发音不能包含控制字符:
     "creation_phonetic_actual_pronunciation_cannot_contain_control_characters",
+  请先填写词形拼写: "panel_enter_the_form_spelling_first",
+  请每次只输入一个读音版本: "creation_phonetic_enter_one_reading_at_a_time",
   请先填写实际发音: "creation_phonetic_enter_actual_pronunciation_first",
-  "实际发音与正文词数不一致，请用空格明确逐词音标；不自动推断连读词界":
-    "creation_phonetic_actual_pronunciation_does_not_match_the_text_word_count_separate_word_transcriptions_",
   请先填写字典音标:
     "creation_phonetic_enter_the_dictionary_transcription_first",
   字典音标不能包含控制字符:
     "creation_phonetic_dictionary_transcriptions_cannot_contain_control_characters",
   "字典音标最多 200 个字符":
     "creation_phonetic_dictionary_transcriptions_must_be_at_most_200_characters",
-  "字典音标与词形词数不一致，请用空格明确逐词音标":
-    "creation_phonetic_the_dictionary_transcription_does_not_match_the_form_word_count_separate_word_transcr",
   仅支持英式和美式音标转换:
     "creation_phonetic_only_british_and_american_transcription_conversion_is_supported",
   "Azure 英语音素表未提供喉塞音 ʔ；请选用其他已录入读法或真人录音，不会自动替换成 t":
@@ -100,14 +96,14 @@ export function localPhoneticDiagnostic(
     );
   if (
     (match = message.match(
-      /^第 (\d+) 个词包含未支持的音标，请每次只输入一个读音版本$/
+      /^第 (\d+) 段音标包含未支持的符号，请每次只输入一个读音版本$/
     ))
   )
     return t(
       "creation_phonetic_word_index_contains_an_unsupported_transcription_enter_one_reading_at_a_time",
       { index: match[1]! }
     );
-  if ((match = message.match(/^第 (\d+) 个词的音素、重音或音节标记不完整$/)))
+  if ((match = message.match(/^第 (\d+) 段音标的音素、重音或音节标记不完整$/)))
     return t(
       "creation_phonetic_word_index_has_incomplete_phonemes_stress_or_syllable_markers",
       { index: match[1]! }
@@ -121,7 +117,7 @@ export function localPhoneticDiagnostic(
       "creation_phonetic_character_index_symbol_has_no_confirmed_rule_long_vowels_and_rhotic_vowels_are_not_si",
       { index: match[1]!, symbol: match[2]! }
     );
-  if ((match = message.match(/^第 (\d+) 个词：(.+)$/)))
+  if ((match = message.match(/^第 (\d+) 段音标：(.+)$/)))
     return t("creation_phonetic_word_index_message", {
       index: match[1]!,
       message: localPhoneticDiagnostic(match[2], t)!
