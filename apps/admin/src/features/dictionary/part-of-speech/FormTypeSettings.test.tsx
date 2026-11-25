@@ -52,6 +52,20 @@ vi.mock("../dataSource", () => ({
           sub_parts_extensible: true,
           sub_pos_required: false,
           sub_parts: []
+        },
+        {
+          id: "pos-phrase-verbal",
+          kind: "phrase",
+          code: "phrase_verbal",
+          name_zh: "动词短语",
+          name_en: "Verbal phrase",
+          abbreviation: "vph.",
+          short_name_zh: "动词短语",
+          full_name_en: "verbal phrase",
+          sort_order: 10,
+          sub_parts_extensible: true,
+          sub_pos_required: false,
+          sub_parts: []
         }
       ],
       form_types: mock.items
@@ -185,6 +199,42 @@ it("短语词形使用短语分页参数，并仅允许选择短语词性", asyn
   fireEvent.mouseDown(within(dialog).getByLabelText("所属基本词性"));
   expect(await screen.findByText("动词性成分", { exact: true })).toBeVisible();
   expect(screen.queryByText("动词", { exact: true })).toBeNull();
+});
+
+it("两个短语词性可分别创建同名词形，生成的编码不同", async () => {
+  mock.create.mockResolvedValue(base);
+  setup("phrase");
+  const addButton = screen.getByRole("button", { name: "新增词形变化" });
+  await waitFor(() => expect(addButton).toBeEnabled());
+
+  for (const parentName of ["动词性成分", "动词短语"]) {
+    fireEvent.click(addButton);
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.mouseDown(within(dialog).getByLabelText("所属基本词性"));
+    fireEvent.click(await screen.findByText(parentName, { exact: true }));
+    for (const [label, value] of Object.entries({
+      正式中文: "过去式",
+      简洁显示: "过去式",
+      正式英文: "Past tense",
+      英文全称: "past tense",
+      英文缩写: "past"
+    })) {
+      fireEvent.change(within(dialog).getByLabelText(label), {
+        target: { value }
+      });
+    }
+    fireEvent.click(within(dialog).getByText(/^新\s*建$/));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  }
+
+  const inputs = mock.create.mock.calls.map(([input]) => input);
+  expect(inputs.map((input) => input.part_of_speech_id)).toEqual([
+    "pos-phrase-verb",
+    "pos-phrase-verbal"
+  ]);
+  const codes = inputs.map((input) => input.code);
+  expect(codes[0]).not.toBe(codes[1]);
+  for (const code of codes) expect(code).toMatch(/^[a-z][a-z0-9_]{0,31}$/);
 });
 
 it("序号列显示真实排序值，而不是行内位置", async () => {

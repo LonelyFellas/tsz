@@ -36,13 +36,23 @@ type Values = Omit<CreatePartOfSpeechInput, "code"> & {
   is_default?: boolean;
 };
 
-/**
- * 词形编码全局唯一，而不同基本词性下允许重名（形容词与副词各有「比较级」），
- * 所以派生编码要带上父词性前缀。父编码本身可长达 32 字，截到 8 字给英文全称留位置。
- */
-function deriveFormTypeCode(parentCode: string, fullNameEn: string): string {
-  const parent = slugifyCode(parentCode).slice(0, 8);
-  return slugifyCode(`${parent} ${fullNameEn}`);
+function deriveFormTypeCode(
+  kind: AdminWordKind,
+  parentCode: string,
+  fullNameEn: string
+): string {
+  if (kind === "word") {
+    const parent = slugifyCode(parentCode).slice(0, 8);
+    return slugifyCode(`${parent} ${fullNameEn}`);
+  }
+  // 短语词性共享 phrase_ 前缀。用完整归属和名称计算 FNV-1a，区分跨词性的同名词形。
+  const key = `${parentCode}:${fullNameEn.trim().toLowerCase()}`;
+  let hash = 0xcbf29ce484222325n;
+  for (const byte of new TextEncoder().encode(key)) {
+    hash = BigInt.asUintN(64, (hash ^ BigInt(byte)) * 0x100000001b3n);
+  }
+  const name = slugifyCode(fullNameEn).slice(0, 8);
+  return `phrase_${name}_${hash.toString(16).padStart(16, "0")}`;
 }
 
 export function FormTypeSettings({ kind }: { kind: AdminWordKind }) {
@@ -107,7 +117,7 @@ export function FormTypeSettings({ kind }: { kind: AdminWordKind }) {
       return partOfSpeechDataSource.createFormType({
         ...values,
         part_of_speech_id: partId,
-        code: deriveFormTypeCode(parent?.code ?? "", values.full_name_en)
+        code: deriveFormTypeCode(kind, parent?.code ?? "", values.full_name_en)
       });
     },
     onSuccess: async () => {

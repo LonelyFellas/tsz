@@ -213,7 +213,9 @@ export interface FormTypeConfig extends FormTypeCatalogItem {
 }
 
 export interface FormTypeConfigListQuery extends PartOfSpeechConfigListQuery {
-  /** 在 kind 范围内筛选所属基本词性。GET 词形类型默认查询单词侧，通用原形在两侧均可见。 */
+  /** 缺省查询单词侧，通用原形在两侧均可见。 */
+  kind?: AdminWordKind;
+  /** 在 kind 范围内筛选所属基本词性。 */
   part_of_speech_id?: string;
 }
 
