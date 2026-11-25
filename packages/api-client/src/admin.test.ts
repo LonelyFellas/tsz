@@ -1742,7 +1742,7 @@ it("词形配置CRUD发送稳定路径及版本，不转换wire字段", () => {
   const api = createAdminEndpoints(http).partOfSpeechSettings;
   const input = {
     is_default: false,
-    part_of_speech_id: "pos-verb",
+    part_of_speech_id: "pos-phrase-verb",
     code: "custom_variant",
     name_zh: "自定义",
     name_en: "Custom",
@@ -1753,7 +1753,8 @@ it("词形配置CRUD发送稳定路径及版本，不转换wire字段", () => {
   };
   api.listFormTypes({
     q: "custom",
-    part_of_speech_id: "pos-verb",
+    kind: "phrase",
+    part_of_speech_id: "pos-phrase-verb",
     page: 2,
     page_size: 10
   });
@@ -1762,7 +1763,7 @@ it("词形配置CRUD发送稳定路径及版本，不转换wire字段", () => {
   api.updateFormType("form-1", { ...fields, base_revision: 3 });
   api.removeFormType("form-1", { base_revision: 4 });
   expect(http.get).toHaveBeenCalledWith(
-    "/settings/form-types?q=custom&part_of_speech_id=pos-verb&page=2&page_size=10"
+    "/settings/form-types?q=custom&kind=phrase&part_of_speech_id=pos-phrase-verb&page=2&page_size=10"
   );
   expect(http.post).toHaveBeenCalledWith("/settings/form-types", input);
   expect(http.patch).toHaveBeenCalledWith("/settings/form-types/form-1", {

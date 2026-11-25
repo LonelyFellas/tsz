@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/zentao-262-dictionary-pos-7494/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-11-25T02:04:35.987Z",
+  "_source": "/Users/darwish/.codex/worktrees/zentao-264-phrase-forms/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-11-25T03:11:19.539Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -2956,6 +2956,12 @@
       }
     ],
     "get /admin/settings/form-types": [
+      {
+        "name": "kind",
+        "in": "query",
+        "required": false,
+        "schema": { "$ref": "#/components/schemas/EntryKind" }
+      },
       {
         "name": "page",
         "in": "query",

@@ -1178,9 +1178,7 @@ export function fillFormTypeTemplate(
   for (const pos of content.pos) {
     if (onlyPosId && pos.pos_id !== onlyPosId) continue;
     const catalogItem = catalogItems.find((item) => item.code === pos.pos);
-    // 目录里没有这个词性就不铺，跟着目录 fail closed；短语没有词形变化，后端的
-    // 词形类型也只挂在单词词性下。
-    if (!catalogItem || catalogItem.kind === "phrase") continue;
+    if (!catalogItem) continue;
     const template = (
       catalogItem.default_form_types ??
       catalogItem.allowed_form_types ??
