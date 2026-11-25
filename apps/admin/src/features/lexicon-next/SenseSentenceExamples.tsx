@@ -18,7 +18,9 @@ import { Input } from "@tsz/ui/admin/forms";
 import { Modal } from "@tsz/ui/admin/overlays";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import { toRichTextV2 } from "@tsz/voice-editor/core";
-import { Plus, Trash2 } from "lucide-react";
+import { MessageSquareText, Plus, Trash2 } from "lucide-react";
+import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
+import { SenseEmptyState } from "./SenseEmptyState";
 import { AdminTable } from "@/components/AdminTable";
 import { useAuthStore, usePermission } from "@/lib/auth";
 import type { LexiconNextRequests } from "@/pages/LexiconNext";
@@ -347,6 +349,7 @@ export function SenseSentenceExamples({
   onChange: (ids: string[]) => void;
   registerLeaveGuard?: (guard?: () => Promise<boolean>) => void;
 }) {
+  const { t } = useLexiconEditorTranslation();
   const workspace = useSentenceDraftWorkspace();
   const actor = useAuthStore((s) => s.profile);
   const canRead = usePermission("sentences.access");
@@ -445,6 +448,12 @@ export function SenseSentenceExamples({
               </PronunciationPreviewProvider>
             </EntryDialectContext.Provider>
             {!canRead && <Alert type="warning" title="没有例句查看权限" />}
+            {canRead && !ids.length && (
+              <SenseEmptyState
+                icon={MessageSquareText}
+                description={t("panel_no_linked_examples_yet")}
+              />
+            )}
             <Space>
               <Button
                 icon={<Plus />}

@@ -6,17 +6,11 @@ import type {
   NextEquivalentCatalog,
   NextSense
 } from "@tsz/types";
-import {
-  EmptyState,
-  Alert,
-  Button,
-  Skeleton,
-  Space,
-  Tag
-} from "@tsz/ui/admin/display";
+import { SenseEmptyState } from "./SenseEmptyState";
+import { Alert, Button, Skeleton, Space, Tag } from "@tsz/ui/admin/display";
 import { Checkbox, Input, Select } from "@tsz/ui/admin/forms";
 import { Popover, Tooltip } from "@tsz/ui/admin/overlays";
-import { ChevronDown, Plus, Trash2, X } from "lucide-react";
+import { ChevronDown, Languages, Plus, Trash2, X } from "lucide-react";
 import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
 import { SenseSection } from "@/features/dictionary/word-creation-v3/components/V3SenseSection";
 import {
@@ -330,13 +324,13 @@ export function EquivalentRows({
           </label>
         </div>
         {!visible.length ? (
-          <EmptyState
-            description={
-              disabled && !sense.no_equivalents?.includes(locale)
-                ? t("eq_empty")
-                : undefined
-            }
-          >
+          <>
+            {!loading &&
+              !catalogError &&
+              !missing &&
+              !sense.no_equivalents?.includes(locale) && (
+                <SenseEmptyState icon={Languages} description={t("eq_empty")} />
+              )}
             <Checkbox
               disabled={disabled}
               checked={sense.no_equivalents?.includes(locale) ?? false}
@@ -353,7 +347,7 @@ export function EquivalentRows({
             >
               {t("eq_no_suitable")}
             </Checkbox>
-          </EmptyState>
+          </>
         ) : (
           <div className="lexicon-next-equivalent-scroll">
             <table className="lexicon-next-equivalent-table">

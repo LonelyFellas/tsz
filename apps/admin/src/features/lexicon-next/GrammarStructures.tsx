@@ -17,7 +17,6 @@ import type {
   PartOfSpeechCatalogItem
 } from "@tsz/types";
 import {
-  EmptyState,
   Alert,
   Button,
   Card,
@@ -491,17 +490,12 @@ export function GrammarStructures({
       className="lexicon-next-grammar"
       size="small"
       aria-labelledby={headingId}
-      extra={
-        <SectionAI section="grammar" pos={pos} disabled={disabled || !pos} />
-      }
       title={
         <div className="lexicon-next-section-caption">
           <h2 id={headingId} className="lexicon-next-section-title">
             语法结构 · {localeLabels[target] ?? target}
           </h2>
-          {visibleRows.length === 0 && (
-            <EmptyState description={t("no_grammar")} />
-          )}
+          <SectionAI section="grammar" pos={pos} disabled={disabled || !pos} />
         </div>
       }
     >
