@@ -96,6 +96,7 @@ const RUNTIME_SCHEMA_ROOTS = [
   "CreateNextEntry",
   "NextDetection",
   "NextDetectionInput",
+  "NextDetectionResult",
   "NextEntryMatchInput",
   "NextEntryMatches",
   "SaveNextDraft",

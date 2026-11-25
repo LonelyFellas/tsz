@@ -12,6 +12,27 @@ const emptyDraft: NextDraft = {
 };
 
 describe("seedRecommendedPartOfSpeech", () => {
+  it.each([{ nounEvidence: [] }, { nounEvidence: ["noun"] }])(
+    "专有名词只有存在普通名词证据时才补默认复数（$nounEvidence）",
+    ({ nounEvidence }) => {
+      const draft = seedRecommendedPartOfSpeech(
+        { ...emptyDraft, headword: "London" },
+        "word",
+        [{ part_of_speech: "noun", base_form_only: true }, ...nounEvidence],
+        partOfSpeechCatalogFixture
+      );
+
+      expect(
+        expandFormContents(draft.form_editor!).pos.map((pos) => [
+          pos.pos,
+          pos.forms.map((form) => form.form_type)
+        ])
+      ).toEqual([
+        ["noun", nounEvidence.length ? ["base", "plural"] : ["base"]]
+      ]);
+    }
+  );
+
   it.each([
     { defaults: ["plural"], expected: ["base", "plural"] },
     { defaults: [], expected: ["base"] }

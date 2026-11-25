@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/lexicon-candidate-reuse-5484/tsz-rust/docs/openapi.json",
-  "_source_sha256": "7b1c71e78e1a82cf115cb4ca136357313751971d6e62474eff49e35769d53885",
+  "_source": "/Users/darwish/.codex/worktrees/zentao-262-dictionary-pos-7494/tsz-rust/docs/openapi.json",
+  "_source_sha256": "3f1b811f706a5433f63a36d260833b7605fa1fdf6108887a2e0131f96798ec66",
   "roots": [
     "LexiconTaxonomy",
     "LexiconTaxonomyKind",
@@ -35,6 +35,7 @@
     "CreateNextEntry",
     "NextDetection",
     "NextDetectionInput",
+    "NextDetectionResult",
     "NextEntryMatchInput",
     "NextEntryMatches",
     "SaveNextDraft",
@@ -3953,6 +3954,23 @@
       },
       "additionalProperties": false
     },
+    "NextDetectionResult": {
+      "type": "object",
+      "required": ["surface", "kind", "matches"],
+      "properties": {
+        "kind": { "$ref": "#/$defs/NextEntryKind" },
+        "matches": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextDictionaryMatch" }
+        },
+        "part_of_speech_mappings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextDictionaryPosMapping" }
+        },
+        "surface": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
     "NextDialectChange": {
       "type": "object",
       "required": ["sense_id", "usage"],
@@ -4053,6 +4071,17 @@
       "properties": {
         "ipa": { "type": "string" },
         "tags": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "NextDictionaryPosMapping": {
+      "type": "object",
+      "required": ["source_code", "part_of_speech", "base_form_only"],
+      "properties": {
+        "base_form_only": { "type": "boolean" },
+        "part_of_speech": { "type": "string" },
+        "source_code": { "type": "string" },
+        "sub_pos": { "type": "string" }
       },
       "additionalProperties": false
     },

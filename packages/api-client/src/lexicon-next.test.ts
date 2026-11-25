@@ -297,6 +297,26 @@ describe("lexicon-next authoritative wire contract", () => {
       target_language: "en",
       surface: "Colour"
     });
+    expect(
+      new Headers(fetch.mock.calls[0]![1].headers).get(
+        "x-tsz-next-dictionary-pos"
+      )
+    ).toBe("v1");
+    const mappedReply = {
+      ...reply,
+      part_of_speech_mappings: [
+        { source_code: "noun", part_of_speech: "noun", base_form_only: false }
+      ]
+    };
+    await expect(
+      client(mappedReply).api.detect({
+        target_language: "en",
+        surface: "Colour"
+      })
+    ).resolves.toEqual(mappedReply);
+    expect(validateRuntimeSchema("NextDetection", mappedReply).valid).toBe(
+      false
+    );
     const invalid = client({
       ...reply,
       matches: [{ ...reply.matches[0], glosses: "a hue" }]

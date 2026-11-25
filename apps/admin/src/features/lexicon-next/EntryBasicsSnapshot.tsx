@@ -8,7 +8,7 @@ import {
   Typography
 } from "@tsz/ui/admin/display";
 import { Form, Input } from "@tsz/ui/admin/forms";
-import type { NextDetection } from "@tsz/types";
+import type { NextDetectionResult } from "@tsz/types";
 import { DictionaryDetectionCard } from "./DictionaryDetectionCard";
 
 export function EntryBasicsSnapshot({
@@ -21,7 +21,7 @@ export function EntryBasicsSnapshot({
 }: {
   headword: string;
   kind: "word" | "phrase";
-  detection?: NextDetection;
+  detection?: NextDetectionResult;
   loading?: boolean;
   error?: unknown;
   onRetry?: () => void;
