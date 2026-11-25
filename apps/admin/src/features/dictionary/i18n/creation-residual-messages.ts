@@ -84,12 +84,6 @@ export const creationResidualMessages = {
     "請先填寫對應口音的 Azure IPA",
     "Enter Azure IPA for the corresponding accent first"
   ],
-  creation_phonetic_azure_ipa_does_not_match_the_text_word_count_separate_word_transcriptions_with_spaces:
-    [
-      "Azure IPA 与正文词数不一致，请用空格明确逐词音标",
-      "Azure IPA 與正文詞數不一致，請用空格明確逐字音標",
-      "Azure IPA does not match the text word count. Separate word transcriptions with spaces"
-    ],
   creation_phonetic_actual_pronunciation_cannot_contain_control_characters: [
     "实际发音不能包含控制字符",
     "實際發音不能包含控制字元",
@@ -100,12 +94,11 @@ export const creationResidualMessages = {
     "請先填寫實際發音",
     "Enter actual pronunciation first"
   ],
-  creation_phonetic_actual_pronunciation_does_not_match_the_text_word_count_separate_word_transcriptions_:
-    [
-      "实际发音与正文词数不一致，请用空格明确逐词音标；不自动推断连读词界",
-      "實際發音與正文詞數不一致，請用空格明確逐字音標；不自動推斷連讀詞界",
-      "Actual pronunciation does not match the text word count. Separate word transcriptions with spaces; connected-speech boundaries are not inferred"
-    ],
+  creation_phonetic_enter_one_reading_at_a_time: [
+    "请每次只输入一个读音版本",
+    "請每次只輸入一個讀音版本",
+    "Enter one pronunciation version at a time"
+  ],
   creation_phonetic_enter_the_dictionary_transcription_first: [
     "请先填写字典音标",
     "請先填寫字典音標",
@@ -122,23 +115,17 @@ export const creationResidualMessages = {
     "字典音標最多 200 個字元",
     "Dictionary transcriptions must be at most 200 characters"
   ],
-  creation_phonetic_the_dictionary_transcription_does_not_match_the_form_word_count_separate_word_transcr:
-    [
-      "字典音标与词形词数不一致，请用空格明确逐词音标",
-      "字典音標與詞形詞數不一致，請用空格明確逐字音標",
-      "The dictionary transcription does not match the form word count. Separate word transcriptions with spaces"
-    ],
   creation_phonetic_word_index_contains_an_unsupported_transcription_enter_one_reading_at_a_time:
     [
-      "第 {{index}} 个词包含未支持的音标，请每次只输入一个读音版本",
-      "第 {{index}} 個字包含未支援的音標，請每次只輸入一個讀音版本",
-      "Word {{index}} contains an unsupported transcription. Enter one reading at a time"
+      "第 {{index}} 段音标包含未支持的符号，请每次只输入一个读音版本",
+      "第 {{index}} 段音標包含未支援的符號，請每次只輸入一個讀音版本",
+      "Transcription segment {{index}} contains an unsupported symbol. Enter one reading at a time"
     ],
   creation_phonetic_word_index_has_incomplete_phonemes_stress_or_syllable_markers:
     [
-      "第 {{index}} 个词的音素、重音或音节标记不完整",
-      "第 {{index}} 個字的音素、重音或音節標記不完整",
-      "Word {{index}} has incomplete phonemes, stress or syllable markers"
+      "第 {{index}} 段音标的音素、重音或音节标记不完整",
+      "第 {{index}} 段音標的音素、重音或音節標記不完整",
+      "Transcription segment {{index}} has incomplete phonemes, stress or syllable markers"
     ],
   creation_phonetic_only_british_and_american_transcription_conversion_is_supported:
     [
@@ -219,9 +206,9 @@ export const creationResidualMessages = {
       "Character {{index}}, ‘{{symbol}}’, has no confirmed rule. Long vowels and rhotic vowels are not silently removed or split."
     ],
   creation_phonetic_word_index_message: [
-    "第 {{index}} 个词：{{message}}",
-    "第 {{index}} 個字：{{message}}",
-    "Word {{index}}: {{message}}"
+    "第 {{index}} 段音标：{{message}}",
+    "第 {{index}} 段音標：{{message}}",
+    "Transcription segment {{index}}: {{message}}"
   ],
 
   creation_trash: ["垃圾桶", "垃圾桶", "Trash"],

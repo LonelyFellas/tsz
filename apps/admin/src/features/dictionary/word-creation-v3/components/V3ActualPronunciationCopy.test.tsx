@@ -138,7 +138,7 @@ it("无效音标不改写实际发音或标注", async () => {
   });
   fireEvent.click(screen.getByLabelText("从字典音标填入实际发音"));
   expect(onChange).not.toHaveBeenCalled();
-  expect(await screen.findByText(/未支持的音标/)).toBeInTheDocument();
+  expect(await screen.findByText(/未支持的符号/)).toBeInTheDocument();
 });
 
 it("字典音标为空时不能转换", () => {

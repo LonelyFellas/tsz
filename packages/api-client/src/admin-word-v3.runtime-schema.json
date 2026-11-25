@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/zentao-262-dictionary-pos-7494/tsz-rust/docs/openapi.json",
-  "_source_sha256": "3f1b811f706a5433f63a36d260833b7605fa1fdf6108887a2e0131f96798ec66",
+  "_source": "/Users/darwish/.codex/worktrees/zentao-264-phrase-forms/tsz-rust/docs/openapi.json",
+  "_source_sha256": "1f46fa194e033b89474ac10793e78fe07bb0f6b50bc301b0abb5d5e08cf50565",
   "roots": [
     "LexiconTaxonomy",
     "LexiconTaxonomyKind",

@@ -524,6 +524,58 @@ describe("独立合成输入", () => {
 });
 
 describe("IPA/UPS 来源与独立停顿", () => {
+  it("连读音标可普通转换，逐词定位和词间停顿仍须有明确词界", () => {
+    const spelling = "cat dog";
+    const ipa = "kætdɑg";
+    const converted = convertAzureIpaToUps(ipa, spelling, "en-US");
+    expect(converted).toEqual({
+      ok: true,
+      value: "K AE T D AA G",
+      ups_words: null
+    });
+    if (!converted.ok) throw Error(converted.message);
+    const candidate = {
+      ipa,
+      ups: converted.value,
+      ups_words: converted.ups_words
+    };
+    expect(
+      pronunciationSynthesisContent(spelling, { ...candidate, alphabet: "ipa" })
+        ?.annotations
+    ).toEqual([
+      { type: "phoneme", start: 0, end: 7, alphabet: "ipa", phoneme: ipa }
+    ]);
+    const speech = {
+      content: {
+        version: 2 as const,
+        text: spelling,
+        annotations: [{ type: "pause" as const, at: 3, duration_ms: 500 }]
+      },
+      voice_profile: { voices: [] }
+    };
+    for (const alphabet of ["ipa", "ups"] as const) {
+      expect(
+        synthesisPhonemeWordRanges(spelling, candidate, alphabet)
+      ).toBeUndefined();
+      expect(
+        mapSynthesisSpeechContent(
+          speech.content,
+          spelling,
+          candidate,
+          alphabet,
+          false
+        )
+      ).toBeUndefined();
+      expect(
+        pronunciationSynthesisContent(spelling, {
+          ...candidate,
+          alphabet,
+          [`${alphabet}_speech`]: speech
+        })
+      ).toBeUndefined();
+    }
+  });
+
   it("特殊读法按完整 UPS 词界往返，覆盖当前词音素且保留其余词", () => {
     const candidate = {
       ipa: "fɑː əˈweɪ",
@@ -702,7 +754,7 @@ describe("IPA/UPS 来源与独立停顿", () => {
     expect(convertAzureIpaToUps("", "cat", "en-US")).toMatchObject({
       ok: false
     });
-    expect(convertAzureIpaToUps("kæt dɔg", "cat", "en-US")).toMatchObject({
+    expect(convertAzureIpaToUps("kæt; dɔg", "cat", "en-US")).toMatchObject({
       ok: false
     });
   });

@@ -249,6 +249,31 @@ describe("独立发音输入", () => {
     expect(rows()).toEqual(before);
   });
 
+  it("全部转换支持带空格的词典音标并保留 sci-fi 原写法", () => {
+    const phonetic = "/ˈsaɪ faɪ/";
+    renderWithUps(<Harness word="sci-fi" phonetic={phonetic} />);
+    fireEvent.click(screen.getByRole("button", { name: "全部转换" }));
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getByText("应用转换结果")
+    );
+
+    const variant = JSON.parse(screen.getByTestId("form-state").textContent!)
+      .pos[0].forms[0].regional_variants.common;
+    expect(variant.spelling).toBe("sci-fi");
+    expect(variant.pronunciations[0]).toMatchObject({
+      dict_phonetic: phonetic,
+      actual_pron: "ˈsaɪ faɪ",
+      synthesis: {
+        uk: { ipa: "ˈsaɪ faɪ" },
+        us: {
+          ipa: "ˈsaɪ faɪ",
+          ups: "S1 S AI . F AI",
+          ups_words: [{ text: "sci-fi", phoneme: "S1 S AI . F AI" }]
+        }
+      }
+    });
+  });
+
   it("英美分开时全部转换只写当前侧，不修改另一侧", () => {
     renderWithUps(<RegionalHarness />);
     changeVoiceText(
@@ -699,7 +724,7 @@ it("r 规范化后仍有不支持音素时保持严格拒绝，不改写 IPA 或
 it("字典转换失败保留目标，转换后继续编辑不被旧快照覆盖", async () => {
   const view = renderWithUps(<Harness phonetic="kæt😀" />);
   fireEvent.click(screen.getByLabelText("从字典音标填入实际发音"));
-  expect(screen.getByText(/第 1 个词包含未支持的音标/)).toBeInTheDocument();
+  expect(screen.getByText(/第 1 段音标包含未支持的符号/)).toBeInTheDocument();
   expect(field("实际发音")).toHaveValue("kæt");
   view.unmount();
   renderWithUps(<Harness word="school" phonetic="skuːl" />);
