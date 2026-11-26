@@ -65,6 +65,7 @@ export interface NextAgentRelation {
   word: string;
   gloss: string;
   score: number;
+  target?: { entry_id: string; sense_id: string };
 }
 
 export interface NextAgentExample {

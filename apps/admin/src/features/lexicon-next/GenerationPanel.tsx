@@ -26,6 +26,7 @@ import {
 import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
 import type { LexiconNextRequests } from "@/pages/LexiconNext";
 import { generationSenses } from "./generatedDraft";
+import { generatedRelationCandidates } from "./generatedRelations";
 import { GenerationResult } from "./GenerationResult";
 import { FormTypeLabelsProvider } from "@/features/dictionary/part-of-speech/FormTypeLabels";
 import { PartOfSpeechLabelsProvider } from "@/features/dictionary/part-of-speech/PartOfSpeechLabels";
@@ -75,6 +76,25 @@ function matches(result: NextAgentResult, run: Run) {
 
 function sameBinding(left: GenerationTarget, right: GenerationTarget) {
   return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function validateCandidates(
+  result: NextAgentResult,
+  run: Run,
+  draft: NextDraft
+) {
+  if (!result.proposals.relations.length) return result;
+  return {
+    ...result,
+    proposals: {
+      ...result.proposals,
+      relations: generatedRelationCandidates(
+        draft,
+        result.proposals.relations,
+        run.input.senses.length + result.proposals.senses.length
+      )
+    }
+  };
 }
 
 function hasUsableCandidates({ result, run }: Generation) {
@@ -321,7 +341,7 @@ export function GenerationPanel({
           if (!matches(candidate.result, run))
             throw new Error("候选与当前草稿不匹配。");
           setLastCandidate({
-            result: candidate.result,
+            result: validateCandidates(candidate.result, run, draft),
             run,
             generatedAt: candidate.generated_at,
             sourceRunId: candidate.source_run_id
@@ -417,9 +437,11 @@ export function GenerationPanel({
           setResume(undefined);
           return;
         }
-        const next = await generate(entryId, run.input, controller.signal);
+        const response = await generate(entryId, run.input, controller.signal);
         if (controller.signal.aborted) return;
-        if (!matches(next, run)) throw new Error("返回结果与当前草稿不匹配。");
+        if (!matches(response, run))
+          throw new Error("返回结果与当前草稿不匹配。");
+        const next = validateCandidates(response, run, draft);
         const attempt = { result: next, run };
         setGeneration(attempt);
         if (next.done) {

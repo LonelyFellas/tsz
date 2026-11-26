@@ -134,6 +134,7 @@ export function createLexiconNextEndpoints(http: HttpClient) {
   const generationOptions = {
     headers: {
       "x-tsz-next-grammar-sub-pos": "v1",
+      "x-tsz-next-relation-targets": "v1",
       "x-tsz-next-section-candidates": "v1"
     }
   };

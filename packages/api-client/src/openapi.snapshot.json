@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/liaison-arc-adjustment/docs/openapi.json",
-  "_generatedAt": "2026-11-26T04:50:23.928Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/fix-ai-related-words/docs/openapi.json",
+  "_generatedAt": "2026-11-26T06:30:14.884Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -539,6 +539,12 @@
         "schema": { "type": ["string", "null"] }
       },
       {
+        "name": "x-tsz-next-relation-targets",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "x-tsz-next-section-candidates",
         "in": "header",
         "required": false,
@@ -548,6 +554,12 @@
     "post /admin/lexicon-next/entries/{id}/generation/candidates": [
       {
         "name": "x-tsz-next-grammar-sub-pos",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "x-tsz-next-relation-targets",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }

@@ -23,6 +23,7 @@ import {
 } from "./GenerationActions";
 import { GenerationPanel } from "./GenerationPanel";
 import { GenerationResult } from "./GenerationResult";
+import { fillGeneratedDraft } from "./generatedDraft";
 
 function result(input: NextAgentInput): NextAgentResult {
   return {
@@ -54,6 +55,189 @@ const draft: NextDraft = {
   senses: []
 };
 afterEach(() => vi.unstubAllGlobals());
+
+it.each([true, false])(
+  "拓展词预览和一键配置共用编辑表单规则（缓存：%s）",
+  async (useCache) => {
+    vi.stubGlobal("crypto", webcrypto);
+    const manual = {
+      id: "manual",
+      relation: "synonym",
+      pending_target_headword: "conversation",
+      pending_target_gloss: "谈话",
+      score: "92"
+    };
+    const chat: NextDraft = {
+      ...draft,
+      headword: "chat",
+      senses: [
+        {
+          id: "chat-noun",
+          part_of_speech: "noun",
+          definitions: [],
+          equivalents: [{ id: "gloss", locale: "zh-Hans", text: "闲谈" }],
+          relations: [manual]
+        }
+      ]
+    };
+    const generate = vi.fn(async (_id: string, input: NextAgentInput) => {
+      const view = result(input);
+      view.steps = [{ section: "relations", state: "completed", error: "" }];
+      view.proposals.definitions = [];
+      view.proposals.relations = [
+        {
+          sense: 0,
+          kind: "synonym",
+          word: "闲聊",
+          gloss: "非正式交谈",
+          score: 90
+        },
+        {
+          sense: 0,
+          kind: "derivative",
+          word: "chats",
+          gloss: "复数形式",
+          score: 70
+        },
+        {
+          sense: 0,
+          kind: "synonym",
+          word: "small talk",
+          gloss: "寒暄",
+          score: 85.25
+        },
+        {
+          sense: 0,
+          kind: "synonym",
+          word: " SMALL  TALK ",
+          gloss: "闲聊",
+          score: 80
+        },
+        {
+          sense: 0,
+          kind: "derivative",
+          word: "chatty",
+          gloss: "健谈的",
+          score: 80,
+          target: { entry_id: "chatty-entry", sense_id: "chatty-sense" }
+        },
+        {
+          sense: 0,
+          kind: "synonym",
+          word: "chitchat",
+          gloss: "闲聊",
+          score: 83,
+          target: { entry_id: "chitchat-entry", sense_id: "chitchat-sense" }
+        },
+        {
+          sense: 0,
+          kind: "synonym",
+          word: "Conversation",
+          gloss: "交谈",
+          score: 87
+        },
+        {
+          sense: 0,
+          kind: "derivative",
+          word: "chatter",
+          gloss: "闲聊",
+          score: 74
+        },
+        {
+          sense: 0,
+          kind: "antonym",
+          word: "silence",
+          gloss: "沉默",
+          score: 100.01
+        }
+      ];
+      return view;
+    });
+    const lookup = async (id: string, input: NextAgentInput) => ({
+      candidate: {
+        source_run_id: "cached",
+        generated_at: "2026-11-25T01:00:00Z",
+        result: await generate(id, input)
+      }
+    });
+    const onFill = vi.fn((view: NextAgentResult) =>
+      fillGeneratedDraft(
+        chat,
+        view,
+        partOfSpeechCatalogFixture,
+        "en-GB",
+        "zh-Hans",
+        "editor"
+      )
+    );
+    render(
+      <GenerationPanel
+        entryId="chat"
+        revision={1}
+        draft={chat}
+        medium="zh-Hans"
+        target="en-GB"
+        sections={["relations"]}
+        contextVersion="1"
+        examples={[]}
+        disabled={false}
+        generate={generate}
+        lookup={useCache ? lookup : undefined}
+        sectionCandidatesAvailable={useCache}
+        onFill={(view) => !!onFill(view)}
+      >
+        <SectionAI section="relations" />
+      </GenerationPanel>
+    );
+    fireEvent.click(screen.getByRole("button", { name: "AI 生成拓展词" }));
+    const dialog = within(screen.getByRole("dialog"));
+    if (!useCache)
+      fireEvent.click(dialog.getByRole("button", { name: "AI 生成拓展词" }));
+    expect(await dialog.findByText("small talk")).toBeVisible();
+    expect(dialog.queryByText("闲聊", { exact: true })).toBeNull();
+    expect(dialog.queryByText("chats", { exact: true })).toBeNull();
+    expect(dialog.queryByText("silence", { exact: true })).toBeNull();
+    expect(dialog.getByText(/相似度.*85\.25%/)).toBeVisible();
+    const internal = dialog.getByRole("row", { name: /chitchat/ });
+    const pending = dialog.getByRole("row", { name: /chatter/ });
+    expect(within(internal).getByText(/智能词库/)).toBeVisible();
+    expect(internal.compareDocumentPosition(pending)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+    fireEvent.click(dialog.getByRole("button", { name: "一键配置" }));
+    expect(onFill.mock.results[0]?.value.draft.senses[0]?.relations).toEqual([
+      manual,
+      expect.objectContaining({
+        relation: "derivative",
+        target_word_id: "chatty-entry",
+        target_sense_id: "chatty-sense",
+        score: "80"
+      }),
+      expect.objectContaining({
+        relation: "synonym",
+        target_word_id: "chitchat-entry",
+        target_sense_id: "chitchat-sense",
+        score: "83"
+      }),
+      expect.objectContaining({
+        relation: "synonym",
+        pending_target_headword: "small talk",
+        pending_target_gloss: "寒暄",
+        score: "85.25"
+      }),
+      expect.objectContaining({
+        relation: "derivative",
+        pending_target_headword: "chatter",
+        pending_target_gloss: "闲聊",
+        score: "74"
+      })
+    ]);
+    expect(
+      onFill.mock.results[0]?.value.draft.senses[0]?.relations?.[1]
+    ).not.toHaveProperty("pending_target_headword");
+  }
+);
+
 it.each([true, false])(
   "语义区间先预览再显式回填，按服务能力读回和刷新（%s）",
   async (sectionCandidatesAvailable) => {

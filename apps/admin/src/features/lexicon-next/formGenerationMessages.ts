@@ -1,6 +1,7 @@
 import { useAdminModuleTranslation } from "@/i18n";
 
 const messages = {
+  entry_ai_relation_in_lexicon: ["智能词库", "智能詞庫", "Smart lexicon"],
   entry_ai_dictionary_references: [
     "词典参考",
     "詞典參考",

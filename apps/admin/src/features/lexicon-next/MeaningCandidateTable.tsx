@@ -2,7 +2,11 @@ import type { NextAgentInput, NextAgentProposals } from "@tsz/types";
 import { Empty } from "@tsz/ui/admin/display";
 import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
 import { usePartOfSpeechLabel } from "@/features/dictionary/part-of-speech/PartOfSpeechLabels";
-import { relationLabel } from "@/features/dictionary/word-creation-v3/presentation";
+import {
+  RELATION_TYPES,
+  relationLabel,
+  relationMetricLabel
+} from "@/features/dictionary/word-creation-v3/presentation";
 import type { MeaningGenerationSection } from "./generationContext";
 import { useFormGenerationTranslation } from "./formGenerationMessages";
 
@@ -94,12 +98,25 @@ export function MeaningCandidateTable({
       }));
       break;
     case "relations":
-      rows = proposals.relations.map(({ sense, kind, word, gloss }) => ({
-        context: describeSense(sense),
-        text: word,
-        lang: input.target,
-        note: [relationLabel(kind, t), gloss].filter(Boolean).join(" · ")
-      }));
+      rows = RELATION_TYPES.flatMap((kind) =>
+        proposals.relations
+          .filter((row) => row.kind === kind)
+          .map((row) => ({ ...row, kind }))
+      )
+        .sort((left, right) => Number(!left.target) - Number(!right.target))
+        .map(({ sense, kind, word, gloss, score, target }) => ({
+          context: describeSense(sense),
+          text: word,
+          lang: input.target,
+          note: [
+            relationLabel(kind, t),
+            gloss,
+            `${relationMetricLabel(kind, t)} ${score.toFixed(2)}%`,
+            target && generationText("entry_ai_relation_in_lexicon")
+          ]
+            .filter(Boolean)
+            .join(" · ")
+        }));
       break;
     case "examples":
       rows = proposals.examples.map(({ sense, text, level }) => ({

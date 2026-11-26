@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/liaison-arc-adjustment/docs/openapi.json",
-  "_source_sha256": "cc814cd4387fa3df2c9b2eba62b4c7ccb51832d122f4d8100dbe207462556fd0",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/fix-ai-related-words/docs/openapi.json",
+  "_source_sha256": "11f03258172d7ae4c4ae361b99b64973c03201989f60fae6f59638cf8b2f912e",
   "roots": [
     "LexiconTaxonomy",
     "LexiconTaxonomyKind",
@@ -3755,7 +3755,17 @@
         "kind": { "type": "string" },
         "score": { "type": "number" },
         "sense": { "type": "integer", "minimum": 0 },
+        "target": { "$ref": "#/$defs/NextAgentRelationTarget" },
         "word": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "NextAgentRelationTarget": {
+      "type": "object",
+      "required": ["entry_id", "sense_id"],
+      "properties": {
+        "entry_id": { "type": "string", "format": "uuid" },
+        "sense_id": { "type": "string", "format": "uuid" }
       },
       "additionalProperties": false
     },

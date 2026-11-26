@@ -856,7 +856,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "cc814cd4387fa3df2c9b2eba62b4c7ccb51832d122f4d8100dbe207462556fd0"
+      "11f03258172d7ae4c4ae361b99b64973c03201989f60fae6f59638cf8b2f912e"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -1194,6 +1194,10 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       required: false,
       schema: { type: ["string", "null"] }
     };
+    const relationTargetsHeader = {
+      ...grammarSubPosHeader,
+      name: "x-tsz-next-relation-targets"
+    };
     const wordlistSourceHeader = {
       ...dialectPairsHeader,
       name: "X-TSZ-Wordlist-Source"
@@ -1203,10 +1207,12 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       "post /wordlists/import-matches": [wordlistSourceHeader],
       "post /admin/lexicon-next/entries/{id}/generation": [
         grammarSubPosHeader,
+        relationTargetsHeader,
         sectionCandidatesHeader
       ],
       "post /admin/lexicon-next/entries/{id}/generation/candidates": [
         grammarSubPosHeader,
+        relationTargetsHeader,
         sectionCandidatesHeader
       ],
       "post /admin/lexicon-next/detections": [
