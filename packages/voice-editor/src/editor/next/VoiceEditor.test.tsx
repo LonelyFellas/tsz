@@ -3931,6 +3931,27 @@ describe("VoiceEditor 发音区", () => {
     expect(screen.queryByText("音频暂时无法试听，请稍后重试")).toBeNull();
   });
 
+  it("播放已有录音遇到测试批次不匹配时保留明确提示", async () => {
+    const hint =
+      "音频不属于当前测试批次。请切换到匹配的批次，或退出测试模式后访问普通音频。";
+    const adapter = audioAdapter({
+      resolveUrl: vi
+        .fn()
+        .mockRejectedValue(new AudioUploadError("unknown", hint))
+    });
+    const existing = asset({ original_name: "scope-fixture.wav" });
+    render(
+      <VoiceEditor
+        {...props({ audioUploadAdapter: adapter, audioAssets: [existing] })}
+      />
+    );
+    openTool("音频");
+    fireEvent.click(screen.getByLabelText("试听 scope-fixture.wav"));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(hint);
+    expect(AudioMock.instances).toHaveLength(0);
+  });
+
   it("单个音色拒绝越界自定义语速，合法值不改勾选", async () => {
     const onVoiceProfileChange = vi.fn();
     render(
