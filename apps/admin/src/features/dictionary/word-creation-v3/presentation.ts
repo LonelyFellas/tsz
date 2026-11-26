@@ -197,6 +197,23 @@ export function relationLabel(
   return key ? t(key) : t("presentation_unknown_relationLabel");
 }
 
+/** 拓展词表单及预览的展示顺序。 */
+export const RELATION_TYPES = ["derivative", "synonym", "antonym"] as const;
+export type RelationType = (typeof RELATION_TYPES)[number];
+
+const RELATION_METRIC = {
+  synonym: "panel_similarity",
+  antonym: "panel_difference",
+  derivative: "panel_relatedness"
+} as const;
+
+export function relationMetricLabel(
+  value: RelationType,
+  t: LexiconEditorTranslation
+): string {
+  return t(RELATION_METRIC[value]);
+}
+
 export function sentenceLinkRoleLabel(
   value: string,
   t: LexiconEditorTranslation = defaultLexiconEditorTranslation

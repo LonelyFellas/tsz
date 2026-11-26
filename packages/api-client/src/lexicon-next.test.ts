@@ -171,6 +171,82 @@ describe("lexicon-next authoritative wire contract", () => {
     }
   );
 
+  it("拓展词支持可选的内部词义关联，拒绝截断的关联", async () => {
+    const input: NextAgentInput = {
+      run_id: uuid(11),
+      base_revision: 2,
+      snapshot_id: "a".repeat(64),
+      headword: "chat",
+      target: "en-GB",
+      sections: ["relations"],
+      existing_pos: ["noun"],
+      examples: [],
+      senses: [{ pos: "noun", gloss: "闲谈" }]
+    };
+    const target = { entry_id: uuid(13), sense_id: uuid(14) };
+    const candidate = {
+      sense: 0,
+      kind: "derivative",
+      word: "chatty",
+      gloss: "健谈的",
+      score: 80,
+      target
+    };
+    const result: NextAgentResult = {
+      run_id: input.run_id,
+      base_revision: input.base_revision,
+      snapshot_id: input.snapshot_id,
+      done: true,
+      requires_human_review: true,
+      steps: [{ section: "relations", state: "completed", error: "" }],
+      sources: [],
+      proposals: {
+        forms: [],
+        senses: [],
+        groups: [],
+        grammar: [],
+        definitions: [],
+        equivalents: [],
+        relations: [candidate],
+        examples: [],
+        dialect: [],
+        translations: []
+      }
+    };
+    const generated = client(result);
+    await expect(generated.api.generate(entry.id, input)).resolves.toEqual(
+      result
+    );
+    const cached = {
+      candidate: {
+        source_run_id: uuid(12),
+        generated_at: "2026-11-26T00:00:00Z",
+        result
+      }
+    };
+    const lookup = client(cached);
+    await expect(
+      lookup.api.generationCandidates(entry.id, input)
+    ).resolves.toEqual(cached);
+    for (const request of [generated, lookup]) {
+      expect(
+        new Headers(request.fetch.mock.calls[0]![1].headers).get(
+          "x-tsz-next-relation-targets"
+        )
+      ).toBe("v1");
+    }
+    const malformed = client({
+      ...result,
+      proposals: {
+        ...result.proposals,
+        relations: [{ ...candidate, target: { entry_id: target.entry_id } }]
+      }
+    });
+    await expect(malformed.api.generate(entry.id, input)).rejects.toThrow(
+      "不符合接口契约"
+    );
+  });
+
   it("读取草稿 schema 兼容范围，旧服务缺少端点时保持失败而不保存", async () => {
     const compatibility = {
       draft_schema_version: 1,

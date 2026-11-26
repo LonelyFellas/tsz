@@ -1,9 +1,5 @@
 import { useAdminDisabled } from "@tsz/ui/admin/context";
-import {
-  useLexiconEditorTranslation,
-  defaultLexiconEditorTranslation,
-  type LexiconEditorTranslation
-} from "../../i18n/editor";
+import { useLexiconEditorTranslation } from "../../i18n/editor";
 import {
   ChevronDownIcon,
   ChevronUpIcon,
@@ -36,7 +32,12 @@ import {
 } from "../../relatedSuggestions";
 import { validateEntryInput } from "../../word-creation/entryClassification";
 import type { RelationDisplaySnapshots } from "../meaningsModel";
-import { relationLabel } from "../presentation";
+import {
+  RELATION_TYPES,
+  relationLabel,
+  relationMetricLabel,
+  type RelationType
+} from "../presentation";
 import {
   groupRelations,
   replaceRelationGroup,
@@ -48,20 +49,6 @@ import { RelationSortScope, RelationDeleteButton } from "./V3RelationSorting";
 import { SenseSectionBody } from "./V3SenseSection";
 
 type DraftMutation = (draft: DraftMeaningsStepContentWritableV3) => void;
-
-/** 卡片自上而下的展示顺序：派生词在前，近义词与反义词在后。 */
-const RELATION_TYPES = ["derivative", "synonym", "antonym"] as const;
-type RelationType = (typeof RELATION_TYPES)[number];
-
-function relationMetrics(
-  t: LexiconEditorTranslation = defaultLexiconEditorTranslation
-): Record<RelationType, { metric: string }> {
-  return {
-    synonym: { metric: t("panel_similarity") },
-    antonym: { metric: t("panel_difference") },
-    derivative: { metric: t("panel_relatedness") }
-  };
-}
 
 /** 未保存选择优先用搜索结果，已绑定关系回显服务端快照。 */
 function relationDisplayHeadword(
@@ -213,7 +200,7 @@ export function V3RelationsGrid({
   return (
     <div className="word-relations-grid word-relations-grid-stacked">
       {RELATION_TYPES.map((relationType) => {
-        const meta = relationMetrics(t)[relationType];
+        const metric = relationMetricLabel(relationType, t);
         const relations = groupRelations(
           sense.relations,
           relationRowKeys.current
@@ -295,7 +282,7 @@ export function V3RelationsGrid({
                       <Flex className="word-relation-list" vertical>
                         <div className="word-relation-column-heads">
                           <span />
-                          <span>{meta.metric}</span>
+                          <span>{metric}</span>
                           <span>{relationLabel(relationType, t)}</span>
                           <span>{t("panel_match_meaning")}</span>
                           <span />
@@ -318,7 +305,7 @@ export function V3RelationsGrid({
                               relationSorting.handleDrop(event, relationIndex)
                             }
                             data-v3-node-id={relation.id}
-                            data-relation-metric={meta.metric}
+                            data-relation-metric={metric}
                             key={
                               relationRowKeys.current.get(relation.id) ??
                               relation.id
@@ -350,7 +337,7 @@ export function V3RelationsGrid({
                               </span>
                             </Flex>
                             <InputNumber
-                              aria-label={meta.metric}
+                              aria-label={metric}
                               status={
                                 isUnlinkedText(relation) ? "warning" : undefined
                               }

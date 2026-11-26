@@ -11,6 +11,7 @@ import type {
 import type { GenerationTarget } from "./generationContext";
 import { isSharedForms } from "@tsz/shared";
 import { planFormCandidates } from "@/features/dictionary/assistant/formCandidatesModel";
+import { normalizeSentenceSurface } from "@/features/sentences/associationModel";
 import { emptyFormEditor } from "./FormsStep";
 import {
   generalSense,
@@ -20,6 +21,7 @@ import {
 } from "./model";
 import { newSentenceVariant } from "./sentenceDrafts";
 import { equivalentKey } from "./equivalents";
+import { generatedRelationCandidates } from "./generatedRelations";
 
 function validGeneratedText(text: string, limit: number, multiline = false) {
   return (
@@ -329,24 +331,45 @@ export function fillGeneratedDraft(
         text: row.word
       });
   }
-  for (const row of proposals.relations) {
-    const sense = indexed[row.sense];
-    if (!sense) continue;
+  for (const row of generatedRelationCandidates(
+    draft,
+    proposals.relations,
+    indexed.length
+  )) {
+    const sense = indexed[row.sense]!;
     const rels = (sense.relations ??= []);
+    const key = normalizeSentenceSurface(row.word);
+    const existing = rels.filter(
+      (r) =>
+        r.relation === row.kind &&
+        ((row.target && r.target_word_id === row.target.entry_id) ||
+          normalizeSentenceSurface(r.pending_target_headword ?? "") === key)
+    );
     if (
-      !rels.some(
-        (r) =>
-          r.relation === row.kind &&
-          r.pending_target_headword?.toLowerCase() === row.word.toLowerCase()
-      )
+      existing.length &&
+      (row.kind !== "derivative" ||
+        existing.some(
+          (r) =>
+            (row.target && r.target_sense_id === row.target.sense_id) ||
+            r.pending_target_gloss?.trim() === row.gloss
+        ))
     )
-      rels.push({
-        id: crypto.randomUUID(),
-        relation: row.kind,
-        pending_target_headword: row.word,
-        pending_target_gloss: row.gloss,
-        score: String(row.score)
-      });
+      continue;
+    rels.push({
+      id: crypto.randomUUID(),
+      relation: row.kind,
+      ...(row.target
+        ? {
+            target_word_id: row.target.entry_id,
+            target_sense_id: row.target.sense_id
+          }
+        : {
+            pending_target_headword:
+              existing[0]?.pending_target_headword ?? row.word,
+            pending_target_gloss: row.gloss
+          }),
+      score: existing[0]?.score ?? String(row.score)
+    });
   }
   const translationsFor = (index: number) =>
     proposals.translations
