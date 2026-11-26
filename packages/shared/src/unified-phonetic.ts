@@ -170,8 +170,7 @@ function dictionaryWord(
   // Actual pronunciation applies lexical substitutions. Azure IPA keeps symbols
   // whose Azure inventory has a distinct phoneme until locale adaptation.
   if (target === "actual") {
-    // Happy vowel: bare i after an earlier vowel, without an immediately preceding
-    // stress marker. Do not reinterpret a sole/stressed i as the lax vowel.
+    // Keep the existing happy-vowel normalization for matching reading variants.
     value = value.replace(/i(?!ː)/gu, (phone, offset: number) => {
       const prefix = value.slice(0, offset);
       const stressedOnset = /[ˈˌ][^ɑæʌɔəɛɪɒʊuiɜ.ˈˌ]*$/u.test(prefix);
@@ -288,6 +287,8 @@ function convertDictionary(
           styleApplied = true;
         }
       }
+      // Apply the teaching notation after matching existing reading variants.
+      value = value.replace(/i(?!ː)/gu, "ɪ");
     }
     if (!aligned || (style !== "normal" && !styleApplied))
       notices.add("仅规范已有音标，请核对读法。");
