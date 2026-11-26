@@ -381,3 +381,117 @@ describe("语法结构候选回填", () => {
     ).toEqual([["rely on somebody for advice", ""]]);
   });
 });
+
+describe("共享空白语义区间回填", () => {
+  const movement = { name_en: "movement", name_zh: "运动" };
+  const business = { name_en: "business", name_zh: "经营" };
+  const blank = { id: "original", name_en: "", name_zh: "" };
+  const manual = { ...blank, id: "manual" };
+
+  function apply(
+    groups: NextAgentResult["proposals"]["groups"],
+    existing = [blank, manual]
+  ) {
+    return fillGeneratedDraft(
+      {
+        schema_version: 1,
+        headword: "run",
+        forms: [],
+        sense_groups: existing,
+        senses: ["one", "two"].map((id) => ({
+          id,
+          part_of_speech: "verb",
+          sense_group_id: blank.id,
+          equivalents: [],
+          definitions: []
+        }))
+      },
+      {
+        run_id: "run",
+        snapshot_id: "snapshot",
+        base_revision: 1,
+        done: true,
+        requires_human_review: true,
+        sources: [],
+        steps: [],
+        proposals: {
+          groups,
+          grammar: [],
+          forms: [],
+          senses: [],
+          relations: [],
+          examples: [],
+          translations: [],
+          dialect: [],
+          definitions: [],
+          equivalents: []
+        }
+      },
+      partOfSpeechCatalogFixture,
+      "en-GB",
+      "zh-Hans",
+      "editor",
+      [],
+      {},
+      [],
+      { section: "groups" }
+    ).draft;
+  }
+
+  it("两个词义同名时保留共享区间 ID，草稿没有多余的待命名区间", () => {
+    const draft = apply(
+      [
+        { sense: 0, ...movement },
+        { sense: 1, ...movement }
+      ],
+      [blank]
+    );
+    expect(draft.sense_groups).toEqual([{ id: blank.id, ...movement }]);
+    expect(draft.senses.map((s) => s.sense_group_id)).toEqual([
+      blank.id,
+      blank.id
+    ]);
+  });
+
+  it("部分推荐保留另一词义的空区间及未参与回填的手工占位", () => {
+    const draft = apply([
+      { sense: 0, ...movement },
+      { sense: 1, ...movement, name_en: "" }
+    ]);
+    expect(draft.sense_groups).toEqual([
+      blank,
+      manual,
+      { id: draft.senses[0]!.sense_group_id, ...movement }
+    ]);
+    expect(draft.senses[1]!.sense_group_id).toBe(blank.id);
+  });
+
+  it("分到不同组时按草稿词义顺序复用原 ID", () => {
+    const draft = apply([
+      { sense: 1, ...business },
+      { sense: 0, ...movement }
+    ]);
+    expect(draft.senses[0]!.sense_group_id).toBe(blank.id);
+    expect(draft.sense_groups).toEqual([
+      { id: blank.id, ...movement },
+      manual,
+      { id: draft.senses[1]!.sense_group_id, ...business }
+    ]);
+  });
+
+  it("并入已有同名区间时仅移除本次腾空的占位", () => {
+    const named = { id: "named", ...movement };
+    const draft = apply(
+      [
+        { sense: 0, ...movement },
+        { sense: 1, ...movement }
+      ],
+      [blank, manual, named]
+    );
+    expect(draft.sense_groups).toEqual([manual, named]);
+    expect(draft.senses.map((s) => s.sense_group_id)).toEqual([
+      named.id,
+      named.id
+    ]);
+  });
+});
