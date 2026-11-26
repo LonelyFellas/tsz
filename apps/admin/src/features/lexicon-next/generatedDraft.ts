@@ -2,6 +2,8 @@ import type {
   NextDraft,
   NextDialectSense,
   NextAgentResult,
+  NextAgentGroup,
+  NextSenseGroup,
   NextSentence,
   NextDefinition,
   PartOfSpeechCatalogResponse
@@ -58,6 +60,75 @@ export function generationSenses(
         .slice(0, 500)
         .join("")
     }));
+}
+
+function fillSenseGroups(
+  draft: NextDraft,
+  indexed: NextDraft["senses"],
+  proposals: NextAgentGroup[]
+) {
+  if (!proposals.length) return;
+  const groups = draft.sense_groups ?? [];
+  const isBlank = (group: NextSenseGroup) =>
+    !group.name_en.trim() && !group.name_zh.trim();
+  const namedGroup = (row: NextAgentGroup) =>
+    groups.find((g) => g.name_en === row.name_en && g.name_zh === row.name_zh);
+  const bySense = new Map<string, NextAgentGroup>();
+  for (const row of proposals) {
+    const sense = indexed[row.sense];
+    if (
+      !sense ||
+      bySense.has(sense.id) ||
+      !validGeneratedText(row.name_zh, 200) ||
+      !validGeneratedText(row.name_en, 200)
+    )
+      continue;
+    const original = groups.find((g) => g.id === sense.sense_group_id);
+    if (!original || isBlank(original)) bySense.set(sense.id, row);
+  }
+  if (!bySense.size) return;
+
+  // Resolve shared placeholders before moving any sense. An unselected owner keeps its group.
+  const vacated = new Set<string>();
+  const unused: NextSenseGroup[] = [];
+  for (const group of groups.filter(isBlank)) {
+    const owners = draft.senses.filter((s) => s.sense_group_id === group.id);
+    if (!owners.length) {
+      unused.push(group);
+      continue;
+    }
+    if (!owners.every((s) => bySense.has(s.id))) continue;
+    const target = owners
+      .map((s) => bySense.get(s.id)!)
+      .find((row) => !namedGroup(row));
+    if (target) {
+      group.name_en = target.name_en;
+      group.name_zh = target.name_zh;
+    } else vacated.add(group.id);
+  }
+
+  for (const sense of draft.senses) {
+    const row = bySense.get(sense.id);
+    if (!row) continue;
+    let group = namedGroup(row);
+    if (!group) {
+      // Preserve the existing empty-slot behavior for senses without a group.
+      group = !sense.sense_group_id ? unused.shift() : undefined;
+      if (!group) {
+        group = {
+          id: crypto.randomUUID(),
+          name_en: row.name_en,
+          name_zh: row.name_zh
+        };
+        groups.push(group);
+      } else {
+        group.name_en = row.name_en;
+        group.name_zh = row.name_zh;
+      }
+    }
+    sense.sense_group_id = group.id;
+  }
+  draft.sense_groups = groups.filter((g) => !vacated.has(g.id));
 }
 
 export function fillGeneratedDraft(
@@ -159,48 +230,7 @@ export function fillGeneratedDraft(
       fillDefinition(sense, medium, row.gloss);
   }
   const indexed = ids.map((id) => draft.senses.find((s) => s.id === id)!);
-  for (const row of proposals.groups) {
-    const sense = indexed[row.sense];
-    if (
-      !sense ||
-      !validGeneratedText(row.name_zh, 200) ||
-      !validGeneratedText(row.name_en, 200)
-    )
-      continue;
-    const original = draft.sense_groups?.find(
-      (g) => g.id === sense.sense_group_id
-    );
-    if (original && (original.name_en.trim() || original.name_zh.trim()))
-      continue;
-    const groups = (draft.sense_groups ??= []);
-    let group = groups.find(
-      (g) => g.name_en === row.name_en && g.name_zh === row.name_zh
-    );
-    if (!group) {
-      const placeholder = groups.find(
-        (candidate) =>
-          !candidate.name_en.trim() &&
-          !candidate.name_zh.trim() &&
-          !draft.senses.some(
-            (other) =>
-              other.id !== sense.id && other.sense_group_id === candidate.id
-          )
-      );
-      if (placeholder) {
-        group = placeholder;
-        group.name_en = row.name_en;
-        group.name_zh = row.name_zh;
-      } else {
-        group = {
-          id: crypto.randomUUID(),
-          name_en: row.name_en,
-          name_zh: row.name_zh
-        };
-        groups.push(group);
-      }
-    }
-    sense.sense_group_id = group.id;
-  }
+  fillSenseGroups(draft, indexed, proposals.groups);
   for (const row of proposals.grammar) {
     const pattern = row.pattern.trim();
     if (
