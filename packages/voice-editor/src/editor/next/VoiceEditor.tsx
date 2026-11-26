@@ -25,6 +25,12 @@ import { Alert, Button, Space, Tag, Typography } from "@tsz/ui/admin/display";
 import { Input, Select } from "@tsz/ui/admin/forms";
 import { Modal, Tooltip } from "@tsz/ui/admin/overlays";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  LIAISON_ADJUSTMENT_LIMITS,
+  liaisonAdjustment,
+  withoutLiaisonAdjustments,
+  type LiaisonAdjustment
+} from "../../core/liaison";
 import type {
   GrammarFormLinkV3,
   RichText,
@@ -332,6 +338,11 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   const [draft, setDraft] = useState<LiaisonDraft>({});
   /** 接下来点的字母归哪一端；由面板上的「起点 / 终点」开关决定。 */
   const [liaisonEnd, setLiaisonEnd] = useState<LiaisonEnd>("start");
+  const [selectedLiaisonIndex, setSelectedLiaisonIndex] = useState<number>();
+  const selectedLiaison =
+    selectedLiaisonIndex === undefined
+      ? undefined
+      : marks.liaisons[selectedLiaisonIndex];
   /**
    * 语法结构画笔上一次单击上色的那个字母。同一个词里再单击另一个字母时，
    * 两者之间的字母一并上色——点首尾两个字母就能标一段，不必拖。
@@ -355,6 +366,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     setDraft({});
     setRoleAnchor(undefined);
     setLiaisonEnd("start");
+    setSelectedLiaisonIndex(undefined);
   }, []);
   const tokens = tokenize(text);
   const gapAtCaret = (position?: number) => {
@@ -702,6 +714,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     onVoiceProfileChange?.(profile);
   };
 
+  const auditionContent = withoutLiaisonAdjustments(
+    mode === "synthesis" ? toRichTextV2(value) : workingValue
+  );
   const {
     voices,
     voicesLoading,
@@ -714,7 +729,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   } = useVoiceAudition({
     open: mode !== "actual-pron",
     language,
-    content: mode === "synthesis" ? toRichTextV2(value) : workingValue,
+    content: auditionContent,
     settings: voiceSettings,
     previewAdapter
   });
@@ -736,16 +751,14 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   }
 
   const generationContent =
-    mode === "synthesis"
-      ? toRichTextV2(value)
-      : mode === "spelling" || mode === "spelling-settings"
-        ? {
-            ...workingValue,
-            annotations: workingValue.annotations.filter((mark) =>
-              ["pause", "say_as", "sub"].includes(mark.type)
-            )
-          }
-        : workingValue;
+    mode === "spelling" || mode === "spelling-settings"
+      ? {
+          ...auditionContent,
+          annotations: auditionContent.annotations.filter((mark) =>
+            ["pause", "say_as", "sub"].includes(mark.type)
+          )
+        }
+      : auditionContent;
   const phonemeLocale =
     mode === "synthesis" || mode === "phoneme-settings" ? locale : undefined;
   const inherited = profileHasInheritance(voiceProfile, locale);
@@ -1482,6 +1495,13 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
    * 既可能是想收笔、也可能是想重新打开面板换个分类，同一个手势两个意思。
    */
   const openToolAndArm = (key?: string) => {
+    if (key === "liaison-adjust") {
+      if (readOnly || marks.liaisons.length === 0) return;
+      changeBrush({ kind: "liaison-adjust" });
+      setOpenTool(key);
+      return;
+    }
+    if (brush.kind === "liaison-adjust") changeBrush({ kind: "none" });
     if (key === "italic" || key === "bold" || key === "underline") {
       toggleTextFormat(key);
       return;
@@ -2407,8 +2427,12 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   };
 
   const handleLiaisonClick = (index: number) => {
-    if (readOnly || (brush.kind !== "liaison" && brush.kind !== "erase"))
+    if (readOnly) return;
+    if (brush.kind === "liaison-adjust") {
+      setSelectedLiaisonIndex(index);
       return;
+    }
+    if (brush.kind !== "liaison" && brush.kind !== "erase") return;
     commit((current) => ({
       ...current,
       marks: {
@@ -2420,7 +2444,27 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     }));
   };
 
+  const updateLiaisonAdjustment = (adjustment: LiaisonAdjustment) => {
+    if (readOnly || !selectedLiaison) return;
+    commit((current) => ({
+      ...current,
+      marks: {
+        ...current.marks,
+        liaisons: current.marks.liaisons.map((link, position) =>
+          position === selectedLiaisonIndex
+            ? {
+                start: link.start,
+                end: link.end,
+                ...liaisonAdjustment(adjustment)
+              }
+            : link
+        )
+      }
+    }));
+  };
+
   const clearAll = () => {
+    setSelectedLiaisonIndex(undefined);
     // 正文编辑保留历史音标；试听模式明确清除本次标注和临时读法关联。
     commit((current) => ({
       ...current,
@@ -2879,6 +2923,10 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
             )
         )
       : current.readingLinks;
+  const liaisonLabelPoints =
+    brush.kind === "liaison-adjust" ? Array.from(text) : [];
+  const liaisonAnchorText = (anchor: LiaisonAnchor) =>
+    liaisonLabelPoints.slice(anchor.start, anchor.end).join("");
   const tools = [
     ...(mode === "voice-trial"
       ? [
@@ -3366,6 +3414,70 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       )
     },
     {
+      key: "liaison-adjust",
+      label: t("adjust_liaison_arc"),
+      active: brush.kind === "liaison-adjust",
+      disabled: !marks.liaisons.length && brush.kind !== "liaison-adjust",
+      content:
+        brush.kind === "liaison-adjust" ? (
+          <div className="tsz-ve-selection-liaison">
+            <Select<number>
+              size="small"
+              className="tsz-ve-liaison-adjust-select"
+              aria-label={t("select_liaison_arc")}
+              placeholder={t("select_liaison_arc")}
+              value={selectedLiaisonIndex}
+              disabled={readOnly || marks.liaisons.length === 0}
+              options={marks.liaisons.map(({ start, end }, index) => ({
+                value: index,
+                label: `${index + 1}. ${liaisonAnchorText(start)} → ${liaisonAnchorText(end)}`
+              }))}
+              onChange={setSelectedLiaisonIndex}
+            />
+            {(
+              [
+                ["left_offset_pct", 10, "raise_liaison_left"],
+                ["left_offset_pct", -10, "lower_liaison_left"],
+                ["right_offset_pct", 10, "raise_liaison_right"],
+                ["right_offset_pct", -10, "lower_liaison_right"]
+              ] as const
+            ).map(([field, step, label]) => {
+              const offset = selectedLiaison?.[field] ?? 0;
+              const limit = LIAISON_ADJUSTMENT_LIMITS[field];
+              const next = Math.max(-limit, Math.min(limit, offset + step));
+              return (
+                <Button
+                  key={label}
+                  size="small"
+                  disabled={readOnly || !selectedLiaison || next === offset}
+                  onClick={() =>
+                    updateLiaisonAdjustment({
+                      ...selectedLiaison,
+                      [field]: next
+                    })
+                  }
+                >
+                  {t(label)}
+                </Button>
+              );
+            })}
+            <Button
+              size="small"
+              disabled={
+                readOnly ||
+                !(
+                  selectedLiaison?.left_offset_pct ||
+                  selectedLiaison?.right_offset_pct
+                )
+              }
+              onClick={() => updateLiaisonAdjustment({})}
+            >
+              {t("reset_liaison_arc")}
+            </Button>
+          </div>
+        ) : undefined
+    },
+    {
       key: "pause",
       label: t("pause_3"),
       icon: <PauseIcon />,
@@ -3735,6 +3847,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         "text",
         "italic",
         "liaison",
+        "liaison-adjust",
         "erase",
         "pause",
         "voices",
@@ -3742,12 +3855,10 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         "uploads"
       ].includes(tool.key);
     if (mode === "dict-phonetic")
-      return tool.key !== "roles" && tool.key !== "liaison";
+      return !["roles", "liaison", "liaison-adjust"].includes(tool.key);
     // 实际发音只用于展示，其余工具都是冲着合成去的。
     if (mode === "actual-pron")
-      return (
-        tool.key === "text" || tool.key === "liaison" || tool.key === "erase"
-      );
+      return ["text", "liaison", "liaison-adjust", "erase"].includes(tool.key);
     if (mode === "pronunciation") return tool.key !== "roles";
     return true;
   });
@@ -4243,6 +4354,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         }}
         onLetterClick={handleLetterClick}
         onLiaisonClick={handleLiaisonClick}
+        selectedLiaisonIndex={selectedLiaisonIndex}
         onClearAll={clearAll}
         inputLabel={
           contextLabel === "语音编辑器" ? t("voice_editor") : contextLabel

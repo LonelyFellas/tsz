@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/zentao-232-form-eligibility-api/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-11-26T01:47:01.000Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/liaison-arc-adjustment/docs/openapi.json",
+  "_generatedAt": "2026-11-26T04:29:46.281Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -9450,7 +9450,7 @@
         "existing_pos": { "type": "array", "items": { "type": "string" } },
         "force_refresh": {
           "type": "boolean",
-          "description": "Bypass reuse for an independent forms, grammar or sense-group generation."
+          "description": "Bypass cached candidates when generating forms or grammar independently.\nWith the x-tsz-next-section-candidates: v1 header, also supports a single groups,\nsenses, definitions, equivalents, relations, examples or translations section,\nor the ordered pair [senses, dialect]."
         },
         "headword": { "type": "string" },
         "run_id": { "type": "string", "format": "uuid" },
@@ -10551,6 +10551,22 @@
               "default": 1,
               "minimum": 1
             },
+            "left_offset_pct": {
+              "type": "integer",
+              "format": "int32",
+              "description": "弧顶左半弧在可调高度内的偏移百分比，正值向上。",
+              "default": 0,
+              "maximum": 100,
+              "minimum": -100
+            },
+            "right_offset_pct": {
+              "type": "integer",
+              "format": "int32",
+              "description": "右半弧在可调高度内的偏移百分比，正值向上。",
+              "default": 0,
+              "maximum": 100,
+              "minimum": -100
+            },
             "start": { "type": "integer", "minimum": 0 },
             "start_len": {
               "type": "integer",
@@ -10672,6 +10688,22 @@
               "description": "终点锚点的宽度：锚点占 `[end - end_len, end)`。",
               "default": 1,
               "minimum": 1
+            },
+            "left_offset_pct": {
+              "type": "integer",
+              "format": "int32",
+              "description": "弧顶左半弧在可调高度内的偏移百分比，正值向上。",
+              "default": 0,
+              "maximum": 100,
+              "minimum": -100
+            },
+            "right_offset_pct": {
+              "type": "integer",
+              "format": "int32",
+              "description": "右半弧在可调高度内的偏移百分比，正值向上。",
+              "default": 0,
+              "maximum": 100,
+              "minimum": -100
             },
             "start": { "type": "integer", "minimum": 0 },
             "start_len": {

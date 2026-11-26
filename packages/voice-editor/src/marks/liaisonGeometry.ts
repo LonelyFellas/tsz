@@ -1,3 +1,4 @@
+import type { LiaisonAdjustment } from "../core/liaison";
 import {
   liaisonHalfPaths,
   liaisonPath,
@@ -56,7 +57,7 @@ export function collectLiaisonGlyphs(element: Element): LiaisonGlyph[] {
   return glyphs;
 }
 
-export interface LiaisonLinkElements {
+export interface LiaisonLinkElements extends LiaisonAdjustment {
   start: LiaisonAnchorElements;
   end: LiaisonAnchorElements;
 }
@@ -342,7 +343,8 @@ export function buildLiaisonArcs(
             availableRise(left.x, right.x, left.lineTop, left.tipY),
             availableRise(left.x, right.x, right.lineTop, right.tipY)
           ),
-          clearancePoints
+          clearancePoints,
+          link
         )
       });
       return;

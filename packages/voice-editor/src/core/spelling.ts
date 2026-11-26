@@ -1,3 +1,4 @@
+import { liaisonAdjustment } from "./liaison";
 import type { RichTextV2V3 } from "@tsz/types";
 import { graphemes } from "../editor/next/tokens";
 import { normalizeRichTextV2 } from "./normalize";
@@ -48,7 +49,8 @@ export function spellingAnnotationsEqual(
               start: annotation.start,
               end: annotation.end,
               start_len: annotation.start_len ?? 1,
-              end_len: annotation.end_len ?? 1
+              end_len: annotation.end_len ?? 1,
+              ...liaisonAdjustment(annotation)
             };
           if (annotation.type === "italic")
             return {

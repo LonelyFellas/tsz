@@ -1,3 +1,8 @@
+import {
+  LIAISON_ADJUSTMENT_LIMITS,
+  liaisonAdjustment,
+  liaisonAnchorKey
+} from "./liaison";
 import type {
   RichText,
   RichTextAnnotation,
@@ -20,6 +25,7 @@ export interface RichTextValidationIssue {
     | "text_too_long"
     | "too_many_annotations"
     | "invalid_range"
+    | "invalid_liaison_adjustment"
     | "cross_paragraph"
     | "invalid_phoneme"
     | "overlapping_phoneme"
@@ -38,7 +44,6 @@ export class RichTextValidationError extends Error {
 }
 
 type RangeAnnotation = Exclude<RichTextAnnotation, { type: "pause" }>;
-type LiaisonAnnotation = Extract<RichTextAnnotation, { type: "liaison" }>;
 type MergeableAnnotation = Extract<
   RangeAnnotation,
   { type: "emphasis" | "highlight" | "italic" | "bold" | "underline" }
@@ -83,17 +88,14 @@ function sameMergeAttributes(
   return false;
 }
 
-/** 四个字段全同才是同一条连读；端宽缺省按 1 算，与后端反序列化口径一致。 */
-function sameLiaison(
-  left: LiaisonAnnotation,
-  right: LiaisonAnnotation
-): boolean {
-  return (
-    left.start === right.start &&
-    left.end === right.end &&
-    (left.start_len ?? 1) === (right.start_len ?? 1) &&
-    (left.end_len ?? 1) === (right.end_len ?? 1)
-  );
+function annotationOrderKey(annotation: RichTextAnnotation): string {
+  if (annotation.type !== "liaison") return JSON.stringify(annotation);
+  const {
+    left_offset_pct: _left,
+    right_offset_pct: _right,
+    ...anchors
+  } = annotation;
+  return JSON.stringify(anchors);
 }
 
 export function validateRichTextV2(
@@ -162,6 +164,22 @@ export function validateRichTextV2(
         path,
         message: "标注不能跨越段落换行"
       });
+    }
+    if (annotation.type === "liaison") {
+      for (const field of ["left_offset_pct", "right_offset_pct"] as const) {
+        const offset = annotation[field];
+        if (
+          offset !== undefined &&
+          (!Number.isInteger(offset) ||
+            Math.abs(offset) > LIAISON_ADJUSTMENT_LIMITS[field])
+        ) {
+          issues.push({
+            code: "invalid_liaison_adjustment",
+            path: `${path}.${field}`,
+            message: "连读形状偏移超出范围或不是整数"
+          });
+        }
+      }
     }
     if (
       (annotation.type === "sub" &&
@@ -278,17 +296,29 @@ export function normalizeRichTextV2(value: RichTextV2): RichTextV2 {
     Extract<RichTextAnnotation, { type: "pause" }>
   >();
   const ranges: RangeAnnotation[] = [];
+  const liaisonAnchors = new Set<string>();
   for (const annotation of value.annotations) {
-    if (annotation.type === "pause")
+    if (annotation.type === "pause") {
       pauses.set(annotation.at, { ...annotation });
-    else ranges.push({ ...annotation });
+    } else if (annotation.type === "liaison") {
+      const key = liaisonAnchorKey(annotation);
+      if (liaisonAnchors.has(key)) continue;
+      liaisonAnchors.add(key);
+      const { left_offset_pct, right_offset_pct, ...anchors } = annotation;
+      ranges.push({
+        ...anchors,
+        ...liaisonAdjustment({ left_offset_pct, right_offset_pct })
+      });
+    } else {
+      ranges.push({ ...annotation });
+    }
   }
   ranges.sort(
     (a, b) =>
       a.start - b.start ||
       a.end - b.end ||
       typeRank(a) - typeRank(b) ||
-      JSON.stringify(a).localeCompare(JSON.stringify(b))
+      annotationOrderKey(a).localeCompare(annotationOrderKey(b))
   );
 
   const merged: RangeAnnotation[] = [];
@@ -296,22 +326,10 @@ export function normalizeRichTextV2(value: RichTextV2): RichTextV2 {
     if (
       annotation.type === "phoneme" ||
       annotation.type === "say_as" ||
-      annotation.type === "sub"
+      annotation.type === "sub" ||
+      annotation.type === "liaison"
     ) {
       merged.push(annotation);
-      continue;
-    }
-    /*
-     * liaison 是「两点之间的一条连线」，不是一段文字的属性：连读链 pick‿it‿up 的
-     * [3,6) 与 [6,9) 首尾相接、hello 里 h‿l 与 e‿o 交叠，都是各自独立的弧。合并会让
-     * 保存后读回的弧线与编辑时画的对不上，所以只去掉完全相同的重复。
-     */
-    if (annotation.type === "liaison") {
-      const duplicate = merged.some(
-        (candidate) =>
-          candidate.type === "liaison" && sameLiaison(candidate, annotation)
-      );
-      if (!duplicate) merged.push(annotation);
       continue;
     }
     // emphasis / highlight 是「一段文字的属性」，重叠或首尾相接的同属性两段本就是同一段。
@@ -340,7 +358,7 @@ export function normalizeRichTextV2(value: RichTextV2): RichTextV2 {
     (a, b) =>
       positionOf(a) - positionOf(b) ||
       typeRank(a) - typeRank(b) ||
-      JSON.stringify(a).localeCompare(JSON.stringify(b))
+      annotationOrderKey(a).localeCompare(annotationOrderKey(b))
   );
   return { version: 2, text: value.text, annotations };
 }

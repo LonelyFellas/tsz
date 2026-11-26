@@ -4,7 +4,11 @@ import type {
   RichTextV2
 } from "@tsz/types";
 import type { TextLinkV3 } from "@tsz/types";
-import { liaisonAnchorSpans } from "../../core/liaison";
+import {
+  liaisonAdjustment,
+  liaisonAnchorSpans,
+  type LiaisonAdjustment
+} from "../../core/liaison";
 import { normalizeGrammarLevel } from "./roles";
 
 /** 一个词在码点序列中的位置，左闭右开。 */
@@ -63,7 +67,7 @@ export interface LiaisonAnchor {
 }
 
 /** 一条连读：起点锚点 → 终点锚点，终点在起点右侧且与它不交叠。 */
-export interface LiaisonLink {
+export interface LiaisonLink extends LiaisonAdjustment {
   start: LiaisonAnchor;
   end: LiaisonAnchor;
 }
@@ -322,7 +326,12 @@ function liaisonRange(
   length: number,
   link: LiaisonLink
 ):
-  | { start: number; end: number; start_len: number; end_len: number }
+  | (LiaisonAdjustment & {
+      start: number;
+      end: number;
+      start_len: number;
+      end_len: number;
+    })
   | undefined {
   const { start, end } = link;
   if (!isValidLiaison(link) || end.end > length) return undefined;
@@ -330,7 +339,8 @@ function liaisonRange(
     start: start.start,
     end: end.end,
     start_len: start.end - start.start,
-    end_len: end.end - end.start
+    end_len: end.end - end.start,
+    ...liaisonAdjustment(link)
   };
 }
 
@@ -430,7 +440,7 @@ export function annotationsToMarks(value: RichTextV2): MarkState {
        * 这样三分类落地之前存的老数据仍读得回来。
        */
       const spans = liaisonAnchorSpans(annotation);
-      const link = { start: spans.start, end: spans.end };
+      const link = { ...spans, ...liaisonAdjustment(annotation) };
       if (
         isValidLiaison(link) &&
         coversLetter(link.start) &&
@@ -529,7 +539,7 @@ export function remapMarks(
     const start = shiftAnchor(link.start);
     const end = shiftAnchor(link.end);
     if (!start || !end) continue;
-    const shifted = { start, end };
+    const shifted = { ...link, start, end };
     // 两端之间新插入了换行：这条连读在 wire 上已经非法，留着会卡住回写。
     if (crossesParagraph(nextText, shifted)) continue;
     liaisons.push(shifted);

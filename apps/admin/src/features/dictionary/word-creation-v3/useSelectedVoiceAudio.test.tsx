@@ -91,7 +91,11 @@ it("后台音频立即生成但不注册为保存等待任务", async () => {
   expect(tasks.has("background-field")).toBe(false);
   expect(tasks.size).toBe(0);
 });
-function setup(adapter: VoicePreviewAdapter, profile = initial) {
+function setup(
+  adapter: VoicePreviewAdapter,
+  profile = initial,
+  initialContent = content
+) {
   const audioTasks = new Map<string, () => Promise<boolean>>();
   const changed = vi.fn();
   const view = renderHook(
@@ -113,7 +117,7 @@ function setup(adapter: VoicePreviewAdapter, profile = initial) {
       return { ...generation, profile, setProfile };
     },
     {
-      initialProps: { content, enabled: true, defer: false },
+      initialProps: { content: initialContent, enabled: true, defer: false },
       wrapper: ({ children }: { children: ReactNode }) => (
         <VoiceSaveContext.Provider
           value={{ save: async () => true, audioTasks }}
@@ -561,6 +565,32 @@ it("英式正文变化只使英式继承资产失效，保留美式独立配置�
   );
   expect(view.result.current.profile.voices[1]).toEqual(american);
   expect(generate).toHaveBeenCalledTimes(1);
+});
+
+it("只微调连读弧时保留现有音频，不重新生成", async () => {
+  const generate = vi.fn().mockResolvedValue(asset("regenerated"));
+  const liaison = { type: "liaison", start: 0, end: 2 } as const;
+  const view = setup(
+    adapter(generate),
+    { voices: [{ ...setting, audio_asset_id: "existing-audio" }] },
+    { ...content, annotations: [liaison] }
+  );
+
+  view.rerender({
+    content: {
+      ...content,
+      annotations: [{ ...liaison, left_offset_pct: 15, right_offset_pct: -10 }]
+    },
+    enabled: true,
+    defer: false
+  });
+  await act(async () => {
+    await view.audioTasks.get("fixture-field")!();
+  });
+  expect(view.result.current.profile.voices[0]!.audio_asset_id).toBe(
+    "existing-audio"
+  );
+  expect(generate).not.toHaveBeenCalled();
 });
 
 it("逐侧解析拒绝局部配置时保留原池并阻止生成，不用缓存绕过后端拒绝", async () => {

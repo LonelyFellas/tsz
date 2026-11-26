@@ -3,7 +3,11 @@ import { useCallback, useMemo, useRef } from "react";
 import type { ReactNode } from "react";
 import type { RichText, RichTextAnnotation } from "@tsz/types";
 import type { TextRole } from "../types";
-import { RichTextValidationError, liaisonAnchorSpans } from "../core";
+import {
+  RichTextValidationError,
+  liaisonAnchorKey,
+  liaisonAnchorSpans
+} from "../core";
 import {
   LiaisonArcLayer,
   collectLiaisonGlyphs,
@@ -28,10 +32,7 @@ type LiaisonAnnotation = Extract<RichTextAnnotation, { type: "liaison" }>;
  * 连读不合并，同一区间可以有端宽不同的几条；归一化只去掉四个字段全同的重复，
  * 区间加两端宽度才能唯一标识一条。
  */
-const liaisonKey = (liaison: LiaisonAnnotation) =>
-  `${liaison.start}:${liaison.end}:${liaison.start_len ?? 1}:${liaison.end_len ?? 1}`;
 
-/** 这段文字落在连读的哪一端锚点上；落在两端之间（弧线中段）则为空。 */
 function liaisonAnchorEnd(
   segment: Pick<TextSegment, "start" | "end">,
   liaison: LiaisonAnnotation
@@ -83,7 +84,7 @@ function renderMarkedText(segment: TextSegment, key: string): ReactNode {
     node = (
       <span
         className="tsz-ve-liaison-anchor"
-        data-liaison={liaisonKey(liaison)}
+        data-liaison={liaisonAnchorKey(liaison)}
         data-end={end}
       >
         {node}
@@ -121,7 +122,7 @@ function collectLiaisons(
     if (segment.kind !== "text") continue;
     for (const annotation of segment.annotations) {
       if (annotation.type !== "liaison") continue;
-      const key = liaisonKey(annotation);
+      const key = liaisonAnchorKey(annotation);
       if (!seen.has(key)) seen.set(key, annotation);
     }
   }
@@ -154,7 +155,7 @@ export function RichTextReadOnly({
     ): LiaisonAnchorElements | undefined => {
       // 锚点可能被别的标注（语法结构、音标）切成几段，首尾两段之间就是整个锚点。
       const nodes = container.querySelectorAll(
-        `.tsz-ve-liaison-anchor[data-liaison="${liaisonKey(liaison)}"][data-end="${end}"]`
+        `.tsz-ve-liaison-anchor[data-liaison="${liaisonAnchorKey(liaison)}"][data-end="${end}"]`
       );
       const glyphs = Array.from(nodes).flatMap(collectLiaisonGlyphs);
       return glyphs.length ? { glyphs } : undefined;
@@ -162,7 +163,7 @@ export function RichTextReadOnly({
     return liaisons.map((liaison) => {
       const start = anchorOf(liaison, "start");
       const end = anchorOf(liaison, "end");
-      return start && end ? { start, end } : undefined;
+      return start && end ? { ...liaison, start, end } : undefined;
     });
   }, [liaisons, text]);
 

@@ -1,13 +1,58 @@
-import type { RichTextAnnotation } from "@tsz/types";
+import type { RichTextAnnotation, RichTextV2 } from "@tsz/types";
 
 type LiaisonRange = Pick<
   Extract<RichTextAnnotation, { type: "liaison" }>,
   "start" | "end" | "start_len" | "end_len"
 >;
 
+export function liaisonAnchorKey(liaison: LiaisonRange): string {
+  return `${liaison.start}:${liaison.end}:${liaison.start_len ?? 1}:${liaison.end_len ?? 1}`;
+}
+
 export interface LiaisonAnchorSpans {
   start: { start: number; end: number };
   end: { start: number; end: number };
+}
+
+export type LiaisonAdjustment = Pick<
+  Extract<RichTextAnnotation, { type: "liaison" }>,
+  "left_offset_pct" | "right_offset_pct"
+>;
+
+export const LIAISON_ADJUSTMENT_LIMITS = {
+  left_offset_pct: 100,
+  right_offset_pct: 100
+} as const;
+
+export function liaisonAdjustment({
+  left_offset_pct,
+  right_offset_pct
+}: LiaisonAdjustment): LiaisonAdjustment {
+  return {
+    ...(left_offset_pct ? { left_offset_pct } : {}),
+    ...(right_offset_pct ? { right_offset_pct } : {})
+  };
+}
+
+/** 试听及正式配音保留连读锚点，省略只影响显示的偏移。 */
+export function withoutLiaisonAdjustments(content: RichTextV2): RichTextV2 {
+  let changed = false;
+  const annotations = content.annotations.map((annotation) => {
+    if (
+      annotation.type !== "liaison" ||
+      (annotation.left_offset_pct === undefined &&
+        annotation.right_offset_pct === undefined)
+    )
+      return annotation;
+    changed = true;
+    const {
+      left_offset_pct: _left,
+      right_offset_pct: _right,
+      ...anchors
+    } = annotation;
+    return anchors;
+  });
+  return changed ? { ...content, annotations } : content;
 }
 
 /**

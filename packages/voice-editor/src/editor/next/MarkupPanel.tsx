@@ -43,6 +43,7 @@ export interface MarkupPanelProps extends Pick<
   | "onCaretChange"
   | "onInspectPause"
   | "selectedPauseGap"
+  | "selectedLiaisonIndex"
 > {
   mode: VoiceEditorProps["mode"];
 
@@ -100,6 +101,7 @@ export function MarkupPanel({
   onGapClick,
   onLetterClick,
   onLiaisonClick,
+  selectedLiaisonIndex,
   onClearAll,
   inputLabel,
   inputDataAttributes,
@@ -167,7 +169,10 @@ export function MarkupPanel({
       formatOrder.indexOf(left.key) - formatOrder.indexOf(right.key)
   );
   const topTools = tools.filter(
-    (tool) => tool.key === "roles" || tool.key === "liaison"
+    (tool) =>
+      tool.key === "roles" ||
+      tool.key === "liaison" ||
+      tool.key === "liaison-adjust"
   );
   const bottomTools = tools.filter(
     (tool) =>
@@ -329,9 +334,13 @@ export function MarkupPanel({
                 className="tsz-ve-tool-row"
                 data-tool={tool.key}
               >
-                {trigger(tool, true)}
-                <span className="tsz-ve-toolbar-divider" aria-hidden />
-                <div className="tsz-ve-tool-content">{tool.content}</div>
+                {trigger(tool, tool.key !== "liaison-adjust")}
+                {tool.content && (
+                  <>
+                    <span className="tsz-ve-toolbar-divider" aria-hidden />
+                    <div className="tsz-ve-tool-content">{tool.content}</div>
+                  </>
+                )}
               </div>
             ))}
             {eraseTool && (
@@ -352,6 +361,7 @@ export function MarkupPanel({
               </div>
             )}
             {selectionMode &&
+              brush.kind !== "liaison-adjust" &&
               (!grammarMode || !!text.trim() || contentReadOnly) &&
               mode !== "spelling-settings" &&
               (mode !== "voice-trial" ||
@@ -437,6 +447,7 @@ export function MarkupPanel({
               onGapClick={onGapClick}
               onLetterClick={onLetterClick}
               onLiaisonClick={onLiaisonClick}
+              selectedLiaisonIndex={selectedLiaisonIndex}
             />
             {actions && <div className="tsz-ve-editor-actions">{actions}</div>}
           </div>
