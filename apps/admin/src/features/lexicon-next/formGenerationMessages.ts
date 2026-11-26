@@ -16,6 +16,16 @@ const messages = {
     "Previous dictionary"
   ],
   entry_ai_reference_next: ["下一个词典", "下一個詞典", "Next dictionary"],
+  entry_ai_reference_refresh: [
+    "刷新{{dictionary}}资料",
+    "重新整理{{dictionary}}資料",
+    "Refresh {{dictionary}} reference"
+  ],
+  entry_ai_reference_refresh_failed: [
+    "词典刷新失败，请重试。",
+    "詞典重新整理失敗，請重試。",
+    "Could not refresh the dictionary. Try again."
+  ],
   entry_ai_reference_open: ["打开原词条", "開啟原詞條", "Open original entry"],
   entry_ai_source_found: ["已取得参考", "已取得參考", "Reference found"],
   entry_ai_source_unavailable: [

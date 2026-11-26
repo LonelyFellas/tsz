@@ -75,6 +75,36 @@ function client(reply: unknown, status = 200) {
 }
 
 describe("lexicon-next authoritative wire contract", () => {
+  it("刷新单个词典时发送草稿版本，并拒绝其他来源的资料", async () => {
+    const input = {
+      base_revision: 2,
+      headword: "real estate",
+      source: "Cambridge Dictionary" as const
+    };
+    const reference = {
+      source: input.source,
+      locator:
+        "https://dictionary.cambridge.org/dictionary/english/real-estate",
+      excerpt: "real estate · 词性 noun",
+      status: "found"
+    };
+    const { api, fetch } = client(reference);
+    await expect(
+      api.refreshDictionaryReference(entry.id, input)
+    ).resolves.toEqual(reference);
+    const [url, request] = fetch.mock.calls[0]!;
+    expect(url).toBe(
+      `https://test.invalid/api/v1/admin/lexicon-next/entries/${entry.id}/generation/dictionary-reference`
+    );
+    expect(request.method).toBe("POST");
+    expect(JSON.parse(request.body)).toEqual(input);
+
+    const other = client({ ...reference, source: "Merriam-Webster" });
+    await expect(
+      other.api.refreshDictionaryReference(entry.id, input)
+    ).rejects.toThrow("词典参考响应不符合接口契约");
+  });
+
   it.each([undefined, "V-I"])(
     "生成和回读均接受可选的细分词性推荐 %s",
     async (subPos) => {

@@ -80,6 +80,8 @@ const RUNTIME_SCHEMA_ROOTS = [
   "NextPublicationState",
   "NextAgentInput",
   "NextAgentResult",
+  "NextAgentSource",
+  "NextDictionaryRefreshInput",
   "NextGenerationCandidates",
   "NextPublicationPreview",
   "NextPublication",

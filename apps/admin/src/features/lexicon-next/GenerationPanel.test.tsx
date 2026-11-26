@@ -1,4 +1,5 @@
 import { webcrypto } from "node:crypto";
+import { useState } from "react";
 import {
   fireEvent,
   render,
@@ -404,9 +405,95 @@ it("词义目录一并预览和配置有来源的方言建议", async () => {
   );
 });
 
+it("整词生成自动回填后仍能刷新同一词头的参考资料", async () => {
+  vi.stubGlobal("crypto", webcrypto);
+  const generate = vi.fn(async (_id: string, input: NextAgentInput) => {
+    const view = result(input);
+    view.steps = [{ section: "forms", state: "completed", error: "" }];
+    view.proposals.definitions = [];
+    view.proposals.forms = [
+      {
+        pos: "noun",
+        forms: [
+          {
+            form_type: "base",
+            is_regular: true,
+            uk: { spelling: "tomorrow", dict_phonetic: "təˈmɒrəʊ" },
+            us: { spelling: "tomorrow", dict_phonetic: "təˈmɑːroʊ" }
+          }
+        ]
+      }
+    ];
+    return view;
+  });
+  const refreshReference = vi.fn().mockResolvedValue({
+    source: "Cambridge Dictionary",
+    status: "found",
+    locator: "https://dictionary.cambridge.org/dictionary/english/tomorrow",
+    excerpt: "tomorrow · 英 [təˈmɒrəʊ] · 词性 noun"
+  });
+  function Editor() {
+    const [value, setDraft] = useState(draft);
+    return (
+      <GenerationPanel
+        entryId="entry"
+        revision={1}
+        draft={value}
+        medium="zh-Hans"
+        target="en-GB"
+        sections={["forms"]}
+        contextVersion="1"
+        examples={[]}
+        disabled={false}
+        generate={generate}
+        refreshReference={refreshReference}
+        onFill={(generated) => {
+          setDraft({
+            ...value,
+            forms: [
+              {
+                id: "form",
+                locale: "en-GB",
+                text: generated.proposals.forms[0]!.forms[0]!.uk.spelling
+              }
+            ]
+          });
+          return true;
+        }}
+      >
+        <EntryAssistantButton />
+        <output>{value.forms.length ? "已回填词形" : ""}</output>
+      </GenerationPanel>
+    );
+  }
+  render(<Editor />);
+  fireEvent.click(screen.getByRole("button", { name: "词条助手" }));
+  fireEvent.click(await screen.findByRole("button", { name: "生成整个词条" }));
+  expect(await screen.findByText("已回填词形")).toBeVisible();
+  const references = within(screen.getByRole("region", { name: "词典参考" }));
+  fireEvent.click(references.getByRole("button", { name: "剑桥" }));
+  fireEvent.click(references.getByRole("button", { name: "刷新剑桥资料" }));
+  expect(await references.findByText("[təˈmɒrəʊ]")).toBeVisible();
+  expect(refreshReference).toHaveBeenCalledWith(
+    "entry",
+    { base_revision: 1, headword: "tomorrow", source: "Cambridge Dictionary" },
+    expect.any(AbortSignal)
+  );
+  expect(generate).toHaveBeenCalledOnce();
+});
+
 it("用参考轮播和紧凑词形表展示同一批生成结果", async () => {
   vi.stubGlobal("crypto", webcrypto);
   const onFill = vi.fn(() => false);
+  const refreshReference = vi
+    .fn()
+    .mockRejectedValueOnce(new Error("network"))
+    .mockResolvedValueOnce({
+      source: "Merriam-Webster",
+      locator: "https://www.merriam-webster.com/dictionary/center",
+      excerpt: "center · 读音标记 ˈsen-tər · 词性 noun",
+      status: "found"
+    });
   const generate = vi.fn(
     async (_id: string, input: NextAgentInput): Promise<NextAgentResult> => {
       const view = result(input);
@@ -487,6 +574,7 @@ it("用参考轮播和紧凑词形表展示同一批生成结果", async () => {
       examples={[]}
       disabled={false}
       generate={generate}
+      refreshReference={refreshReference}
       onFill={onFill}
     >
       <SectionAI section="forms" />
@@ -537,6 +625,23 @@ it("用参考轮播和紧凑词形表展示同一批生成结果", async () => {
   ).toBeVisible();
   expect(candidates.getByText("centre")).toBeVisible();
   expect(candidates.getByText("center")).toBeVisible();
+  expect(candidates.getByText("/ˈsentər/")).toBeVisible();
+  fireEvent.click(switcher.getByRole("button", { name: "韦氏" }));
+  const refresh = references.getByRole("button", { name: "刷新韦氏资料" });
+  fireEvent.click(refresh);
+  expect(await references.findByRole("alert")).toHaveTextContent(
+    "词典刷新失败"
+  );
+  expect(references.getByText("未能取得资料")).toBeVisible();
+  fireEvent.click(refresh);
+  expect(await references.findByText("ˈsen-tər")).toBeVisible();
+  expect(references.queryByRole("alert")).toBeNull();
+  expect(refreshReference).toHaveBeenCalledTimes(2);
+  expect(refreshReference).toHaveBeenLastCalledWith(
+    "entry",
+    { base_revision: 1, headword: "center", source: "Merriam-Webster" },
+    expect.any(AbortSignal)
+  );
   expect(candidates.getByText("/ˈsentər/")).toBeVisible();
   expect(onFill).toHaveBeenCalledOnce();
   expect(generate).toHaveBeenCalledOnce();

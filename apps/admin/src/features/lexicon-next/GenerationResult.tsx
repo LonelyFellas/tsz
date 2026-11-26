@@ -1,12 +1,18 @@
-import { useId, useRef, useState } from "react";
-import { ArrowUpRight, ChevronLeft, ChevronRight } from "lucide-react";
-import { Button, Card, Empty, Space, Tag } from "@tsz/ui/admin/display";
+import { useEffect, useId, useRef, useState } from "react";
+import {
+  ArrowUpRight,
+  ChevronLeft,
+  ChevronRight,
+  RefreshCw
+} from "lucide-react";
+import { Alert, Button, Card, Empty, Space, Tag } from "@tsz/ui/admin/display";
 import type {
   AssistantCandidatePos,
   NextAgentGrammar,
   NextAgentGroup,
   NextAgentInput,
-  NextAgentSource
+  NextAgentSource,
+  NextDictionarySource
 } from "@tsz/types";
 import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
 import { useFormTypeLabel } from "@/features/dictionary/part-of-speech/FormTypeLabels";
@@ -24,20 +30,40 @@ import { dictionaryReferenceEntry } from "./referenceEntryModel";
 import { useFormGenerationTranslation } from "./formGenerationMessages";
 import "./GenerationResult.css";
 
+type RefreshReference = (
+  source: NextDictionarySource,
+  signal: AbortSignal
+) => Promise<NextAgentSource>;
+
 function ReferenceSlider({
   sources,
   headword,
-  showGrammar
+  showGrammar,
+  refreshReference
 }: {
   sources: NextAgentSource[];
   headword: string;
   showGrammar: boolean;
+  refreshReference?: RefreshReference;
 }) {
   const { t } = useFormGenerationTranslation();
   const titleId = useId();
   const [selectedIndex, setSelectedIndex] = useState<number>();
-  const references = dictionaries.map(({ source }) =>
-    sources.find((item) => item.source === source)
+  const [refreshed, setRefreshed] = useState<
+    Partial<
+      Record<
+        NextDictionarySource,
+        { reference?: NextAgentSource; failed: boolean }
+      >
+    >
+  >({});
+  const [pendingSource, setPendingSource] = useState<NextDictionarySource>();
+  const activeRefresh = useRef<AbortController | undefined>(undefined);
+  useEffect(() => () => activeRefresh.current?.abort(), []);
+  const references = dictionaries.map(
+    ({ source }) =>
+      refreshed[source]?.reference ??
+      sources.find((item) => item.source === source)
   );
   const grammarIndex = showGrammar
     ? references.findIndex((reference) => {
@@ -81,6 +107,43 @@ function ReferenceSlider({
             ? "entry_ai_source_not_configured"
             : "entry_ai_source_missing";
   const slideId = useId();
+  const refreshLabel = t("entry_ai_reference_refresh", {
+    dictionary: t(dictionary.label)
+  });
+  const refreshing = pendingSource === dictionary.source;
+
+  async function refresh() {
+    if (!refreshReference || activeRefresh.current) return;
+    const source = dictionary.source;
+    const controller = new AbortController();
+    activeRefresh.current = controller;
+    setSelectedIndex(index);
+    setPendingSource(source);
+    try {
+      const reference = await refreshReference(source, controller.signal);
+      if (controller.signal.aborted) return;
+      const failed = reference.status === "unavailable";
+      setRefreshed((current) => ({
+        ...current,
+        [source]: {
+          reference: failed && row?.status === "found" ? row : reference,
+          failed
+        }
+      }));
+    } catch {
+      if (!controller.signal.aborted) {
+        setRefreshed((current) => ({
+          ...current,
+          [source]: { ...current[source], failed: true }
+        }));
+      }
+    } finally {
+      if (!controller.signal.aborted) {
+        activeRefresh.current = undefined;
+        setPendingSource(undefined);
+      }
+    }
+  }
 
   return (
     <Card
@@ -91,6 +154,17 @@ function ReferenceSlider({
       title={<h2 id={titleId}>{t("entry_ai_dictionary_references")}</h2>}
       extra={
         <Space size="small">
+          {refreshReference && (
+            <Button
+              type="text"
+              aria-label={refreshLabel}
+              title={refreshLabel}
+              icon={<RefreshCw aria-hidden="true" size={16} />}
+              loading={refreshing}
+              disabled={pendingSource !== undefined && !refreshing}
+              onClick={() => void refresh()}
+            />
+          )}
           <Button
             type="text"
             aria-label={t("entry_ai_reference_previous")}
@@ -129,6 +203,7 @@ function ReferenceSlider({
         id={slideId}
         role="group"
         aria-label={t(dictionary.label)}
+        aria-busy={refreshing}
         className="lexicon-reference-slide"
         onTouchStart={(event) => {
           const point = event.touches[0];
@@ -175,6 +250,9 @@ function ReferenceSlider({
             </a>
           )}
         </div>
+        {!refreshing && refreshed[dictionary.source]?.failed && (
+          <Alert type="error" title={t("entry_ai_reference_refresh_failed")} />
+        )}
         <ReferenceEntryContent
           source={row}
           headword={headword}
@@ -305,6 +383,7 @@ function GrammarCandidateTable({
 type GenerationResultProps = {
   headword: string;
   sources: NextAgentSource[];
+  refreshReference?: RefreshReference;
 } & (
   | { section: "forms"; forms: AssistantCandidatePos[] }
   | { section: "grammar"; grammar: NextAgentGrammar[]; target: string }
@@ -419,6 +498,7 @@ export function GenerationResult(props: GenerationResultProps) {
         sources={props.sources}
         headword={props.headword}
         showGrammar={props.section === "grammar"}
+        refreshReference={props.refreshReference}
       />
       <Card
         size="small"
