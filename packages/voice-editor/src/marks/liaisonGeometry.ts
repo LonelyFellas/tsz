@@ -274,10 +274,17 @@ export function buildLiaisonArcs(
     };
     return {
       ...anchorTip(box, fontSize, measure(chosen.text, chosen.element)),
-      lineTop: box.top
+      lineTop: box.top,
+      box
     };
   };
 
+  let textGlyphs:
+    | (LiaisonGlyph & {
+        box: ReturnType<typeof localBox>;
+        maxY?: number | null;
+      })[]
+    | undefined;
   const arcs: LiaisonArc[] = [];
   links.forEach((link, index) => {
     if (!link) return;
@@ -288,6 +295,42 @@ export function buildLiaisonArcs(
       Math.abs(left.lineTop - right.lineTop) <
       fontSize * SAME_LINE_TOLERANCE_EM;
     if (sameLine && right.x > left.x) {
+      const clearancePoints: { x: number; maxY: number }[] = [];
+      if (left.box.right < right.box.left) {
+        // 仅避让两端之间的同一行正文；锚点端和停顿标签各有自己的规则。
+        textGlyphs ??= collectLiaisonGlyphs(container)
+          .filter(
+            ({ element }) =>
+              !element.closest(".tsz-ve-pause, .tsz-ve-gap-pause")
+          )
+          .map((glyph) => ({
+            ...glyph,
+            box: localBox(glyph.source.getBoundingClientRect())
+          }));
+        for (const glyph of textGlyphs) {
+          const { box } = glyph;
+          const x = (box.left + box.right) / 2;
+          if (
+            box.width <= 0 ||
+            x <= left.box.right ||
+            x >= right.box.left ||
+            Math.abs(box.top - left.lineTop) >=
+              fontSize * SAME_LINE_TOLERANCE_EM
+          ) {
+            continue;
+          }
+          // 重叠的连读在同一轮布局内复用墨迹，避免重复读取样式与量字。
+          if (glyph.maxY === undefined) {
+            const metrics = measure(glyph.text, glyph.element);
+            glyph.maxY = metrics
+              ? box.top + metrics.fontAscent - metrics.inkAscent - clearance
+              : null;
+          }
+          if (glyph.maxY !== null) {
+            clearancePoints.push({ x, maxY: glyph.maxY });
+          }
+        }
+      }
       arcs.push({
         key: `${index}`,
         index,
@@ -298,7 +341,8 @@ export function buildLiaisonArcs(
           Math.min(
             availableRise(left.x, right.x, left.lineTop, left.tipY),
             availableRise(left.x, right.x, right.lineTop, right.tipY)
-          )
+          ),
+          clearancePoints
         )
       });
       return;
