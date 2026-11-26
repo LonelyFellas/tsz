@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/dictionary-reference-refresh-4714/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-11-26T00:13:22.325Z",
+  "_source": "/Users/darwish/.codex/worktrees/zentao-232-form-eligibility-api/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-11-26T01:47:01.000Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -36,6 +36,7 @@
     "/admin/lexicon-next/draft-schema": ["get"],
     "/admin/lexicon-next/entries": ["get", "post"],
     "/admin/lexicon-next/entries/{id}": ["get", "put"],
+    "/admin/lexicon-next/entries/{id}/assessment": ["get", "put"],
     "/admin/lexicon-next/entries/{id}/generation": ["post"],
     "/admin/lexicon-next/entries/{id}/generation/candidates": ["post"],
     "/admin/lexicon-next/entries/{id}/generation/dictionary-reference": [
@@ -354,6 +355,12 @@
         "schema": { "type": ["string", "null"] }
       },
       {
+        "name": "x-tsz-next-form-questions",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "x-tsz-next-generation",
         "in": "header",
         "required": false,
@@ -424,6 +431,12 @@
         "schema": { "type": ["string", "null"] }
       },
       {
+        "name": "x-tsz-next-form-questions",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "x-tsz-next-relations",
         "in": "header",
         "required": false,
@@ -462,6 +475,12 @@
         "schema": { "type": ["string", "null"] }
       },
       {
+        "name": "x-tsz-next-form-questions",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
         "name": "x-tsz-next-relations",
         "in": "header",
         "required": false,
@@ -489,6 +508,12 @@
       },
       {
         "name": "x-tsz-next-dialect-pairs",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "x-tsz-next-form-questions",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -537,6 +562,20 @@
     "get /admin/lexicon-next/entries/{id}/publication": [
       {
         "name": "x-tsz-next-dialect-pairs",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "x-tsz-next-form-questions",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
+    "post /admin/lexicon-next/entries/{id}/publications": [
+      {
+        "name": "x-tsz-next-form-questions",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -2248,6 +2287,22 @@
         "schema": { "type": ["string", "null"] }
       }
     ],
+    "post /wordlists/import-matches": [
+      {
+        "name": "X-TSZ-Wordlist-Source",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
+    "get /wordlists/suggestions": [
+      {
+        "name": "X-TSZ-Wordlist-Source",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      }
+    ],
     "get /wordlists/{id}/availability": [
       {
         "name": "X-TSZ-Wordlist-Custom-Items",
@@ -3568,6 +3623,24 @@
       "responses": {
         "200": { "$ref": "#/components/schemas/NextEntry" },
         "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "get /admin/lexicon-next/entries/{id}/assessment": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/NextAssessmentState" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "put /admin/lexicon-next/entries/{id}/assessment": {
+      "request": { "$ref": "#/components/schemas/ReviewNextPublication" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/NextAssessmentState" },
         "403": { "$ref": "#/components/schemas/ProblemDetails" },
         "404": { "$ref": "#/components/schemas/ProblemDetails" },
         "409": { "$ref": "#/components/schemas/ProblemDetails" },
@@ -5980,6 +6053,7 @@
         "full_name_en",
         "sort_order",
         "is_default",
+        "default_question_eligible",
         "usage_count",
         "revision",
         "created_by",
@@ -5991,6 +6065,7 @@
         "code": { "type": "string" },
         "created_at": { "type": "string", "format": "date-time" },
         "created_by": { "$ref": "#/components/schemas/Actor" },
+        "default_question_eligible": { "type": "boolean" },
         "full_name_en": { "type": "string" },
         "id": { "type": "string", "format": "uuid" },
         "is_default": { "type": "boolean" },
@@ -6025,11 +6100,13 @@
         "abbreviation",
         "full_name_en",
         "sort_order",
-        "is_default"
+        "is_default",
+        "default_question_eligible"
       ],
       "properties": {
         "abbreviation": { "type": "string" },
         "code": { "type": "string" },
+        "default_question_eligible": { "type": "boolean" },
         "full_name_en": { "type": "string" },
         "id": { "type": "string", "format": "uuid" },
         "is_default": {
@@ -8500,6 +8577,7 @@
           "minLength": 1,
           "pattern": "^[a-z][a-z0-9_]{0,31}$"
         },
+        "default_question_eligible": { "type": "boolean" },
         "full_name_en": { "type": "string", "maxLength": 200, "minLength": 1 },
         "is_default": {
           "type": "boolean",
@@ -9594,6 +9672,13 @@
           "$ref": "#/components/schemas/SharedFormsStepContentV3",
           "description": "V1 editor content, with independent lexicon-next identities."
         },
+        "form_question_eligibility": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/NextFormQuestionEligibility"
+          },
+          "description": "Per concrete form binding, independent of shared spelling and pronunciation."
+        },
         "forms": {
           "type": "array",
           "items": { "$ref": "#/components/schemas/NextForm" }
@@ -9702,6 +9787,15 @@
           "description": "Actual content locale, never the editor's current selection."
         },
         "text": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "NextFormQuestionEligibility": {
+      "type": "object",
+      "required": ["form_id", "eligible"],
+      "properties": {
+        "eligible": { "type": "boolean" },
+        "form_id": { "type": "string", "format": "uuid" }
       },
       "additionalProperties": false
     },
@@ -10382,6 +10476,22 @@
       "required": ["base_revision"],
       "properties": {
         "base_revision": { "type": "integer", "format": "int64" }
+      },
+      "additionalProperties": false
+    },
+    "ReviewNextPublication": {
+      "type": "object",
+      "required": [
+        "publication_id",
+        "lifecycle_revision",
+        "expected_version",
+        "approved"
+      ],
+      "properties": {
+        "approved": { "type": "boolean" },
+        "expected_version": { "type": "integer", "format": "int64" },
+        "lifecycle_revision": { "type": "integer", "format": "int64" },
+        "publication_id": { "type": "string", "format": "uuid" }
       },
       "additionalProperties": false
     },
@@ -11246,6 +11356,7 @@
       "properties": {
         "abbreviation": { "type": "string", "maxLength": 16, "minLength": 1 },
         "base_revision": { "type": "integer", "format": "int64" },
+        "default_question_eligible": { "type": ["boolean", "null"] },
         "full_name_en": { "type": "string", "maxLength": 200, "minLength": 1 },
         "is_default": {
           "type": ["boolean", "null"],

@@ -15,6 +15,7 @@ export const ADMIN_PERMISSION_DEPENDENCIES = {
   "words.edit": ["words.access"],
   "words.associate": ["words.access"],
   "words.edit_others": ["words.access"],
+  "words.review_assessment": ["words.access"],
   "words.publish": ["words.access"],
   "words.archive": ["words.access"],
   "words.restore": ["words.access"],

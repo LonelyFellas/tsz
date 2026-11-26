@@ -199,13 +199,19 @@ export function createWordlistEndpoints(http: HttpClient) {
         .then((v) => decodeWordlistResponse<WordlistItems>("WordlistItems", v)),
     suggestions: (q: WordlistSuggestionQuery, o?: Options) =>
       http
-        .get<unknown>(`/wordlists/suggestions${query(q)}`, o)
+        .get<unknown>(`/wordlists/suggestions${query(q)}`, {
+          ...o,
+          headers: { "X-TSZ-Wordlist-Source": "v1" }
+        })
         .then((v) =>
           decodeWordlistResponse<WordlistSuggestions>("WordlistSuggestions", v)
         ),
     matchImport: (data: WordlistImportMatchRequest, o?: Options) =>
       http
-        .post<unknown>("/wordlists/import-matches", data, o)
+        .post<unknown>("/wordlists/import-matches", data, {
+          ...o,
+          headers: { "X-TSZ-Wordlist-Source": "v1" }
+        })
         .then((v) =>
           decodeWordlistResponse<WordlistImportMatches>(
             "WordlistImportMatches",

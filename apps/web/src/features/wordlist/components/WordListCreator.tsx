@@ -1,4 +1,5 @@
 "use client";
+import { CandidateSourceLabel } from "./CandidateSourceLabel";
 import { EmptyState } from "@tsz/ui/components/empty-state";
 import {
   lookupWebNotice,
@@ -1512,6 +1513,10 @@ function WordRow({
               <span className="tsz-words min-w-0 break-words font-medium">
                 {candidate.label}
               </span>
+              <CandidateSourceLabel
+                candidate={candidate}
+                candidates={suggestions}
+              />
               <span className="ml-3 min-w-0 break-words text-sm font-normal text-foreground-muted">
                 {candidate.glosses.join("；")}
               </span>

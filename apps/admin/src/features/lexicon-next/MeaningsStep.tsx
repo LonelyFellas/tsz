@@ -62,6 +62,7 @@ export function MeaningsStep({
   relationsAvailable = false,
   kind,
   formEditorAvailable,
+  formQuestionsAvailable = false,
   target,
   medium,
   partOfSpeechCodes,
@@ -90,6 +91,7 @@ export function MeaningsStep({
   relationsAvailable?: boolean;
   kind: "word" | "phrase";
   formEditorAvailable: boolean;
+  formQuestionsAvailable?: boolean;
   target: string;
   medium: string;
   partOfSpeechCodes: string[];
@@ -220,7 +222,13 @@ export function MeaningsStep({
       catalog.data,
       new Set(filled.pos.at(-1)!.forms.map((form) => form.id))
     );
-    onChange((current) => replaceFormEditor(current, shared));
+    onChange((current) =>
+      replaceFormEditor(
+        current,
+        shared,
+        formQuestionsAvailable ? catalog.data?.form_types : undefined
+      )
+    );
     setSelectedPos(item.code);
   }
   function removePos(posId: string) {

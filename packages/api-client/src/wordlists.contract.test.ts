@@ -49,7 +49,7 @@ it("批量导入发送可取消的 POST，严格校验匹配状态、候选和�
   expect(http.post).toHaveBeenCalledWith(
     "/wordlists/import-matches",
     { words: ["apple"] },
-    { signal }
+    { signal, headers: { "X-TSZ-Wordlist-Source": "v1" } }
   );
   expect(snapshot.paths["/wordlists/import-matches"]).toEqual(["post"]);
   expect(() =>
@@ -416,6 +416,7 @@ it("autocomplete has a bounded response, no pagination and forwards cancellation
   const signal = new AbortController().signal;
   await createWordlistEndpoints(http).suggestions({ q: "appl" }, { signal });
   expect(http.get).toHaveBeenLastCalledWith("/wordlists/suggestions?q=appl", {
+    headers: { "X-TSZ-Wordlist-Source": "v1" },
     signal
   });
   await createWordlistEndpoints(http).suggestions(
@@ -424,7 +425,7 @@ it("autocomplete has a bounded response, no pagination and forwards cancellation
   );
   expect(http.get).toHaveBeenLastCalledWith(
     "/wordlists/suggestions?q=look+forward",
-    { signal }
+    { signal, headers: { "X-TSZ-Wordlist-Source": "v1" } }
   );
   expect(() =>
     decodeWordlistResponse("WordlistSuggestions", {

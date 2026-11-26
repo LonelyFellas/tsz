@@ -496,6 +496,11 @@ export const contentMessages = {
     "開啟後，新建詞條或新增詞性時自動產生此詞形的輸入框",
     "When enabled, an input for this form is added automatically to new entries or parts of speech"
   ],
+  default_question_eligible: [
+    "默认参与出题",
+    "預設參與出題",
+    "Eligible for questions by default"
+  ],
   default_template: ["默认模版", "預設範本", "Default template"],
   base_all_parts: [
     "原形对所有基本词性通用，不归属某一个词性。",

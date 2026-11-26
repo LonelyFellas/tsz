@@ -1,3 +1,6 @@
+import { useContext } from "react";
+import { Switch } from "@tsz/ui/admin/forms";
+import { FormQuestionContext } from "./formQuestionContext";
 import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
 import { regionalVariants } from "@tsz/shared";
 import { AdminTable as Table } from "@/components/AdminTable";
@@ -184,6 +187,7 @@ export function V3FormContentOverview({
   onFixedOverflowChange?: (overflow: boolean) => void;
 }) {
   const { t } = useLexiconEditorTranslation();
+  const questions = useContext(FormQuestionContext);
   const overviewColumnLabels = {
     edit: t("actions"),
     label: t("form_name"),
@@ -516,7 +520,31 @@ export function V3FormContentOverview({
             render: (_, row) => (
               <VoiceSettingsCell reading={row} column="volume" />
             )
-          }
+          },
+          ...(questions
+            ? [
+                {
+                  title: t("question_eligible"),
+                  key: "question_eligible",
+                  width: 92,
+                  onCell: (row: OverviewReading) => ({
+                    rowSpan: row.formRowSpan
+                  }),
+                  render: (_: unknown, row: OverviewReading) => (
+                    <Switch
+                      checked={questions.settings.get(row.form.id) ?? true}
+                      disabled={questions.disabled}
+                      aria-label={t("question_eligible_for", {
+                        form: label(row.form.form_type)
+                      })}
+                      onChange={(enabled) =>
+                        questions.change(row.form.id, enabled)
+                      }
+                    />
+                  )
+                }
+              ]
+            : [])
         ]}
       />
     </div>
