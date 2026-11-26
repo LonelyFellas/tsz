@@ -78,6 +78,18 @@ export interface NextAgentTranslation {
   text: string;
 }
 
+export type NextDictionarySource =
+  | "有道"
+  | "Oxford Learner’s Dictionaries"
+  | "Merriam-Webster"
+  | "Cambridge Dictionary";
+
+export interface NextDictionaryRefreshInput {
+  base_revision: number;
+  headword: string;
+  source: NextDictionarySource;
+}
+
 export interface NextAgentSource {
   source: string;
   locator: string;

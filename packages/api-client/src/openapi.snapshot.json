@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/grammar-sub-pos-recommendation/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-11-25T05:57:56.793Z",
+  "_source": "/Users/darwish/.codex/worktrees/dictionary-reference-refresh-4714/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-11-26T00:13:22.325Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -38,6 +38,9 @@
     "/admin/lexicon-next/entries/{id}": ["get", "put"],
     "/admin/lexicon-next/entries/{id}/generation": ["post"],
     "/admin/lexicon-next/entries/{id}/generation/candidates": ["post"],
+    "/admin/lexicon-next/entries/{id}/generation/dictionary-reference": [
+      "post"
+    ],
     "/admin/lexicon-next/entries/{id}/publication": ["get"],
     "/admin/lexicon-next/entries/{id}/publication-preview": ["post"],
     "/admin/lexicon-next/entries/{id}/publications": ["post"],
@@ -340,6 +343,12 @@
       },
       {
         "name": "x-tsz-next-dialect-pairs",
+        "in": "header",
+        "required": false,
+        "schema": { "type": ["string", "null"] }
+      },
+      {
+        "name": "x-tsz-next-dictionary-refresh",
         "in": "header",
         "required": false,
         "schema": { "type": ["string", "null"] }
@@ -3587,6 +3596,19 @@
         "404": { "$ref": "#/components/schemas/ProblemDetails" },
         "409": { "$ref": "#/components/schemas/ProblemDetails" },
         "422": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/lexicon-next/entries/{id}/generation/dictionary-reference": {
+      "request": { "$ref": "#/components/schemas/NextDictionaryRefreshInput" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/NextAgentSource" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" },
+        "429": { "$ref": "#/components/schemas/ProblemDetails" },
         "503": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
@@ -9544,6 +9566,25 @@
         "tags": { "type": "array", "items": { "type": "string" } }
       },
       "additionalProperties": false
+    },
+    "NextDictionaryRefreshInput": {
+      "type": "object",
+      "required": ["base_revision", "headword", "source"],
+      "properties": {
+        "base_revision": { "type": "integer", "format": "int64" },
+        "headword": { "type": "string" },
+        "source": { "$ref": "#/components/schemas/NextDictionarySource" }
+      },
+      "additionalProperties": false
+    },
+    "NextDictionarySource": {
+      "type": "string",
+      "enum": [
+        "有道",
+        "Oxford Learner’s Dictionaries",
+        "Merriam-Webster",
+        "Cambridge Dictionary"
+      ]
     },
     "NextDraft": {
       "type": "object",

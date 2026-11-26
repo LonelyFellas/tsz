@@ -211,6 +211,11 @@ function LexiconNextWorkspace({ requests }: { requests: LexiconNextRequests }) {
               sectionCandidatesAvailable={
                 capability.data?.section_generation_candidates === true
               }
+              refreshReference={
+                capability.data?.dictionary_refresh === true
+                  ? requests.refreshDictionaryReference
+                  : undefined
+              }
               publishingAvailable={capability.data?.publishing === true}
               relationsAvailable={capability.data?.relations === true}
               formEditorAvailable={capability.data?.form_editor === true}
@@ -257,6 +262,7 @@ function EntryLoader({
   generationAvailable,
   generationCandidatesAvailable,
   sectionCandidatesAvailable,
+  refreshReference,
   formEditorAvailable,
   senseGroupsAvailable,
   senseMetadataAvailable,
@@ -289,6 +295,7 @@ function EntryLoader({
   generationAvailable: boolean;
   generationCandidatesAvailable: boolean;
   sectionCandidatesAvailable: boolean;
+  refreshReference?: LexiconNextRequests["refreshDictionaryReference"];
   id: string;
   requests: LexiconNextRequests;
   language: NextLanguageCapability;
@@ -405,6 +412,7 @@ function EntryLoader({
       generationAvailable={generationAvailable}
       generationCandidatesAvailable={generationCandidatesAvailable}
       sectionCandidatesAvailable={sectionCandidatesAvailable}
+      refreshReference={refreshReference}
       archived={metadata.data.status === "archived"}
       publishingAvailable={publishingAvailable}
       relationsAvailable={relationsAvailable}
@@ -427,6 +435,7 @@ function EntryEditor({
   generationAvailable,
   generationCandidatesAvailable,
   sectionCandidatesAvailable,
+  refreshReference,
   initial,
   suggestedPartOfSpeech,
   entryMedium,
@@ -465,6 +474,7 @@ function EntryEditor({
   generationAvailable: boolean;
   generationCandidatesAvailable: boolean;
   sectionCandidatesAvailable: boolean;
+  refreshReference?: LexiconNextRequests["refreshDictionaryReference"];
   archived: boolean;
   initial: NextEntry;
   suggestedPartOfSpeech?: readonly SuggestedPartOfSpeech[];
@@ -1873,6 +1883,7 @@ function EntryEditor({
             : undefined
         }
         sectionCandidatesAvailable={sectionCandidatesAvailable}
+        refreshReference={refreshReference}
         onFill={(result, binding, exampleIds) => {
           if (!grammarCatalog.data) return false;
           const next = fillGeneratedDraft(

@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/grammar-sub-pos-recommendation/tsz-rust/docs/openapi.json",
-  "_source_sha256": "b27b3e48d0b5c70d4fd360ffa624db53d6cfec4767875da90521851207e12b83",
+  "_source": "/Users/darwish/.codex/worktrees/dictionary-reference-refresh-4714/tsz-rust/docs/openapi.json",
+  "_source_sha256": "3a50b9ee5a57599a5d951c7696ca315e0006e5896dce36231e5870fef355d2ed",
   "roots": [
     "LexiconTaxonomy",
     "LexiconTaxonomyKind",
@@ -19,6 +19,8 @@
     "NextPublicationState",
     "NextAgentInput",
     "NextAgentResult",
+    "NextAgentSource",
+    "NextDictionaryRefreshInput",
     "NextGenerationCandidates",
     "NextPublicationPreview",
     "NextPublication",
@@ -3882,6 +3884,7 @@
         "creation_snapshot": { "type": "boolean" },
         "definition_details": { "type": "boolean" },
         "dialect_pairs": { "type": ["boolean", "null"] },
+        "dictionary_refresh": { "type": "boolean" },
         "equivalent_metadata": { "type": "boolean" },
         "form_editor": { "type": "boolean" },
         "generation": { "type": "boolean" },
@@ -4086,6 +4089,25 @@
         "sub_pos": { "type": "string" }
       },
       "additionalProperties": false
+    },
+    "NextDictionaryRefreshInput": {
+      "type": "object",
+      "required": ["base_revision", "headword", "source"],
+      "properties": {
+        "base_revision": { "type": "integer" },
+        "headword": { "type": "string" },
+        "source": { "$ref": "#/$defs/NextDictionarySource" }
+      },
+      "additionalProperties": false
+    },
+    "NextDictionarySource": {
+      "type": "string",
+      "enum": [
+        "有道",
+        "Oxford Learner’s Dictionaries",
+        "Merriam-Webster",
+        "Cambridge Dictionary"
+      ]
     },
     "NextDraft": {
       "type": "object",

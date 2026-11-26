@@ -51,6 +51,8 @@ const ROOTS = [
   "NextPublicationState",
   "NextAgentInput",
   "NextAgentResult",
+  "NextAgentSource",
+  "NextDictionaryRefreshInput",
   "NextGenerationCandidates",
   "NextPublicationPreview",
   "NextPublication",
