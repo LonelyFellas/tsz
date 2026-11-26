@@ -19,7 +19,7 @@ describe("语雀统一音标规则", () => {
   it("音节及重音标记不把后接元音的 r 变成卷舌韵尾", () => {
     for (const [input, expected] of [
       ["ˈvɛr.i", "ˈvɛr.ɪ"],
-      ["vɛrˈi", "vɛrˈi"],
+      ["vɛrˈi", "vɛrˈɪ"],
       ["ˈvɪr.əl", "ˈvɪr.əl"],
       ["ˈvɛrɚ", "ˈvɛrər"]
     ])
@@ -54,7 +54,8 @@ describe("语雀统一音标规则", () => {
     ["car", "kɑr", "kɑr"],
     ["father", "ˈfɑːðə", "ˈfɑːðə"],
     ["happy", "ˈhæpi", "ˈhæpɪ"],
-    ["machine", "məˈʃin", "məˈʃin"],
+    ["machine", "məˈʃin", "məˈʃɪn"],
+    ["machine", "məˈʃiːn", "məˈʃiːn"],
     ["go", "goʊ", "gəʊ"],
     ["day", "deɪ", "deɪ"],
     ["near", "nɪr", "nɪʲər"],
@@ -93,6 +94,29 @@ describe("语雀统一音标规则", () => {
       value: expected
     });
   });
+
+  it.each([
+    ["uk", "en-GB", "ði ə.ˈkjuːzd"],
+    ["us", "en-US", "ði ə.ˈkjuzd"]
+  ] as const)(
+    "the accused 的短 i 仅在 %s 实际发音中转成 ɪ",
+    (dialect, locale, ipa) => {
+      const input = "ði əˈkjuːzd";
+      const spelling = "the accused";
+      expect(
+        convertDictionaryToUnified(input, spelling, dialect)
+      ).toMatchObject({
+        ok: true,
+        value: "ðɪ əˈkjuːzd"
+      });
+      expect(
+        convertDictionaryToAzureIpa(input, spelling, locale)
+      ).toMatchObject({
+        ok: true,
+        value: ipa
+      });
+    }
+  );
 
   it.each([
     ["spies", "spaɪz", "sbaɪz"],
