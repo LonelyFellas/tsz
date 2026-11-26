@@ -67,7 +67,7 @@ it("已发布同名原形在各自词性和变化组内核对出题资格", asyn
   for (const [label, status] of [
     ["名词", "参与出题"],
     ["动词", "不参与出题"]
-  ]) {
+  ] as const) {
     const part = screen.getByRole("region", { name: label });
     const group = within(part).getByRole("region", { name: /第 1 组/ });
     expect(within(group).getByText("fish")).toBeVisible();
