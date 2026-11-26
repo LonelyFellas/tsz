@@ -44,6 +44,7 @@ export interface MarkupPanelProps extends Pick<
   | "onInspectPause"
   | "selectedPauseGap"
   | "selectedLiaisonIndex"
+  | "bowlEdit"
 > {
   mode: VoiceEditorProps["mode"];
 
@@ -59,7 +60,7 @@ export interface MarkupPanelProps extends Pick<
   roleAnchorStart?: number;
   onGapClick: (gapIndex: number) => void;
   onLetterClick: (anchor: LiaisonAnchor) => void;
-  onLiaisonClick: (index: number) => void;
+  onLiaisonClick: AnnotationStripProps["onLiaisonClick"];
   onClearAll: () => void;
   inputLabel: string;
   inputDataAttributes?: Record<string, string>;
@@ -101,6 +102,7 @@ export function MarkupPanel({
   onGapClick,
   onLetterClick,
   onLiaisonClick,
+  bowlEdit,
   selectedLiaisonIndex,
   onClearAll,
   inputLabel,
@@ -447,6 +449,7 @@ export function MarkupPanel({
               onGapClick={onGapClick}
               onLetterClick={onLetterClick}
               onLiaisonClick={onLiaisonClick}
+              bowlEdit={bowlEdit}
               selectedLiaisonIndex={selectedLiaisonIndex}
             />
             {actions && <div className="tsz-ve-editor-actions">{actions}</div>}

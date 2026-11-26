@@ -1269,7 +1269,22 @@ it("旧纯文本词形与新 V2 拼写标注均能读取，严格拒绝 null/V1 
   });
   Object.assign(variant, { spelling_rich: withOffsets(-100, 100) });
   expect(decodeAdminWordV3Envelope({ word })).toEqual({ word });
+  const withBowl = (bowl: unknown) => ({
+    ...rich,
+    annotations: [{ ...rich.annotations[1], bowl }]
+  });
+  for (const bowl of [
+    {},
+    { curve_pct: 40, left_tip_pct: -100, right_tip_pct: 100 }
+  ]) {
+    Object.assign(variant, { spelling_rich: withBowl(bowl) });
+    expect(decodeAdminWordV3Envelope({ word })).toEqual({ word });
+  }
   for (const invalid of [
+    withBowl(null),
+    withBowl({ left_tip_pct: -101 }),
+    withBowl({ curve_pct: 1.5 }),
+    withBowl({ unexpected: 0 }),
     withOffsets(101, 0),
     withOffsets(0, -101),
     withOffsets(null, 0),

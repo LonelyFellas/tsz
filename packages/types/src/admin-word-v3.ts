@@ -1,5 +1,5 @@
 import type { EntryAnnotationUpdate } from "./entry-annotation";
-import type { RichTextEmphasisLevel } from "./rich-text";
+import type { LiaisonBowl, RichTextEmphasisLevel } from "./rich-text";
 import type {
   AdminWordListPage,
   AdminWordStatus,
@@ -338,6 +338,7 @@ export type RichTextAnnotationV3 =
       left_offset_pct?: number;
       /** 右半弧在可调高度内的偏移百分比，正值向上。 */
       right_offset_pct?: number;
+      bowl?: LiaisonBowl;
     }
   | {
       type: "highlight";

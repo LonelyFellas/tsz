@@ -51,7 +51,7 @@ it("拼写选区可叠加斜体和多字符连读，清除连读保留斜体且�
   fireEvent.click(button("连读终点"));
   expect(button("完成")).toBeEnabled();
   expect(changed.mock.lastCall?.[0].annotations).toEqual([
-    { type: "liaison", start: 3, end: 9, start_len: 3, end_len: 2 },
+    { type: "liaison", bowl: {}, start: 3, end: 9, start_len: 3, end_len: 2 },
     { type: "italic", start: 3, end: 6 }
   ]);
   fireEvent.click(button("清除模式"));
@@ -81,7 +81,7 @@ it.each(["spelling", "actual-pron"] as const)(
     select(5, 8);
     fireEvent.click(button("一次性添加"));
     expect(changed.mock.lastCall?.[0].annotations).toEqual([
-      { type: "liaison", start: 5, end: 8, start_len: 1, end_len: 1 }
+      { type: "liaison", bowl: {}, start: 5, end: 8, start_len: 1, end_len: 1 }
     ]);
     fireEvent.click(button("清除模式"));
     fireEvent.keyDown(button("清除模式"), { key: "Escape" });
@@ -93,7 +93,14 @@ it.each(["spelling", "actual-pron"] as const)(
       version: 2,
       text: "boiled potatoes today",
       annotations: [
-        { type: "liaison", start: 5, end: 8, start_len: 1, end_len: 1 }
+        {
+          type: "liaison",
+          bowl: {},
+          start: 5,
+          end: 8,
+          start_len: 1,
+          end_len: 1
+        }
       ]
     });
   }

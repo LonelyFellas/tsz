@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/fix-ai-related-words/docs/openapi.json",
-  "_generatedAt": "2026-11-26T06:30:14.884Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/liaison-arc-adjustment/docs/openapi.json",
+  "_generatedAt": "2026-11-26T08:34:28.114Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -9363,6 +9363,34 @@
       },
       "additionalProperties": false
     },
+    "LiaisonBowl": {
+      "type": "object",
+      "description": "显式碗形布局。空对象表示推荐；缺少 bowl 的旧弧继续按原算法绘制。",
+      "properties": {
+        "curve_pct": {
+          "type": "integer",
+          "format": "int32",
+          "default": 0,
+          "maximum": 100,
+          "minimum": -100
+        },
+        "left_tip_pct": {
+          "type": "integer",
+          "format": "int32",
+          "default": 0,
+          "maximum": 100,
+          "minimum": -100
+        },
+        "right_tip_pct": {
+          "type": "integer",
+          "format": "int32",
+          "default": 0,
+          "maximum": 100,
+          "minimum": -100
+        }
+      },
+      "additionalProperties": false
+    },
     "LibraryAction": {
       "type": "string",
       "enum": ["move", "trash", "restore", "purge"]
@@ -10556,6 +10584,7 @@
           "type": "object",
           "required": ["start", "end", "type"],
           "properties": {
+            "bowl": { "$ref": "#/components/schemas/LiaisonBowl" },
             "end": { "type": "integer", "minimum": 0 },
             "end_len": {
               "type": "integer",
@@ -10694,6 +10723,7 @@
           "type": "object",
           "required": ["start", "end", "type"],
           "properties": {
+            "bowl": { "$ref": "#/components/schemas/LiaisonBowl" },
             "end": { "type": "integer", "minimum": 0 },
             "end_len": {
               "type": "integer",

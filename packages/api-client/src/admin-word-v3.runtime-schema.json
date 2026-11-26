@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/fix-ai-related-words/docs/openapi.json",
-  "_source_sha256": "11f03258172d7ae4c4ae361b99b64973c03201989f60fae6f59638cf8b2f912e",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/liaison-arc-adjustment/docs/openapi.json",
+  "_source_sha256": "909def3559dc2713800994909ee8efc7a67ece04b81bb5d0e9829e5358a083d9",
   "roots": [
     "LexiconTaxonomy",
     "LexiconTaxonomyKind",
@@ -3267,6 +3267,15 @@
       "type": "string",
       "enum": ["registers", "domains"]
     },
+    "LiaisonBowl": {
+      "type": "object",
+      "properties": {
+        "curve_pct": { "type": "integer", "maximum": 100, "minimum": -100 },
+        "left_tip_pct": { "type": "integer", "maximum": 100, "minimum": -100 },
+        "right_tip_pct": { "type": "integer", "maximum": 100, "minimum": -100 }
+      },
+      "additionalProperties": false
+    },
     "LibraryCrumb": {
       "type": "object",
       "required": ["id", "name"],
@@ -6053,6 +6062,7 @@
           "type": "object",
           "required": ["start", "end", "type"],
           "properties": {
+            "bowl": { "$ref": "#/$defs/LiaisonBowl" },
             "end": { "type": "integer", "minimum": 0 },
             "end_len": { "type": "integer", "minimum": 1 },
             "left_offset_pct": {
@@ -6169,6 +6179,7 @@
           "type": "object",
           "required": ["start", "end", "type"],
           "properties": {
+            "bowl": { "$ref": "#/$defs/LiaisonBowl" },
             "end": { "type": "integer", "minimum": 0 },
             "end_len": { "type": "integer", "minimum": 1 },
             "left_offset_pct": {

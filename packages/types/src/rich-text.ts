@@ -27,6 +27,13 @@ export type RichTextHighlightColor =
  */
 export type RichTextEmphasisLevel = "strong" | "function" | "core" | "grammar";
 
+/** 百分比均相对当前字形的可用范围；空对象保留碗形推荐态。 */
+export interface LiaisonBowl {
+  curve_pct?: number;
+  left_tip_pct?: number;
+  right_tip_pct?: number;
+}
+
 export type RichTextAnnotation =
   | {
       type: "italic";
@@ -82,6 +89,7 @@ export type RichTextAnnotation =
       left_offset_pct?: number;
       /** 右半弧在可调高度内的偏移百分比，正值向上。 */
       right_offset_pct?: number;
+      bowl?: LiaisonBowl;
     }
   | {
       type: "highlight";

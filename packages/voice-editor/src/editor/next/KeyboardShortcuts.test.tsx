@@ -98,7 +98,7 @@ it.each(["grammar", "spelling", "actual-pron", "pronunciation"] as const)(
     const input = select(3, 8);
     expect(shortcut(input, "l").defaultPrevented).toBe(true);
     expect(changed.mock.lastCall?.[0].annotations).toEqual([
-      { type: "liaison", start: 2, end: 7, start_len: 1, end_len: 1 }
+      { type: "liaison", bowl: {}, start: 2, end: 7, start_len: 1, end_len: 1 }
     ]);
     shortcut(input, "z");
     expect(changed.mock.lastCall?.[0]).toEqual(value);
@@ -191,7 +191,7 @@ it("撤销后原生选区未变时仍可继续格式和连读，收起选区后�
   shortcut(input, "z");
   shortcut(input, "l");
   expect(changed.mock.lastCall?.[0].annotations).toEqual([
-    { type: "liaison", start: 4, end: 7, start_len: 1, end_len: 1 }
+    { type: "liaison", bowl: {}, start: 4, end: 7, start_len: 1, end_len: 1 }
   ]);
   changed.mockClear();
   input.setSelectionRange(5, 5);
@@ -219,7 +219,7 @@ it("连读快捷键保留停顿冲突确认，取消不写入、确认后可完�
     await screen.findByRole("button", { name: "移除冲突停顿，添加连读" })
   );
   expect(changed.mock.lastCall?.[0].annotations).toEqual([
-    { type: "liaison", start: 0, end: 5, start_len: 1, end_len: 1 }
+    { type: "liaison", bowl: {}, start: 0, end: 5, start_len: 1, end_len: 1 }
   ]);
   shortcut(input, "z");
   expect(changed.mock.lastCall?.[0]).toEqual(paused);
@@ -391,7 +391,7 @@ it("按住 L 的自动重复不切换连读或产生多余历史，仍可一次�
   const input = select(3, 8);
   shortcut(input, "l");
   expect(changed.mock.lastCall?.[0].annotations).toEqual([
-    { type: "liaison", start: 2, end: 7, start_len: 1, end_len: 1 }
+    { type: "liaison", bowl: {}, start: 2, end: 7, start_len: 1, end_len: 1 }
   ]);
   changed.mockClear();
   shortcut(input, "l", { ctrlKey: true, repeat: true });

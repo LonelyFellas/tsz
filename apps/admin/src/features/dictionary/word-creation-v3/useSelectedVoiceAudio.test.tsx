@@ -606,8 +606,7 @@ it("只微调连读弧时保留现有音频，不重新生成", async () => {
           end: 4,
           start_len: 3,
           end_len: 1,
-          left_offset_pct: 15,
-          right_offset_pct: -10
+          bowl: { curve_pct: 15, right_tip_pct: -100 }
         }
       ]
     },

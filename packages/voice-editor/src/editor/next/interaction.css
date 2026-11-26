@@ -255,6 +255,49 @@
   stroke: var(--ui-color-primary);
 }
 
+.tsz-ve-arc-hit.is-adjustable {
+  fill: transparent;
+  pointer-events: all;
+}
+.tsz-ve-tip {
+  fill: var(--ui-color-bg-container);
+  stroke: var(--ui-color-primary);
+  stroke-width: 1.5;
+  pointer-events: none;
+}
+.tsz-ve-tip.is-active {
+  fill: var(--ui-color-primary);
+}
+.tsz-ve-tip-hit {
+  fill: transparent;
+  pointer-events: all;
+  cursor: pointer;
+}
+.tsz-ve-bowl-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-space-2);
+  flex: 1 1 23em;
+  min-width: 0;
+}
+.tsz-ve-bowl-range {
+  flex: 1 1 9em;
+  min-width: 8em;
+}
+.tsz-ve-bowl-value,
+.tsz-ve-bowl-scale {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--ui-space-2);
+  font-size: var(--ui-font-size-sm);
+  color: var(--ui-color-text-secondary);
+}
+.tsz-ve-bowl-note {
+  flex-basis: 100%;
+  font-size: var(--ui-font-size-sm);
+  color: var(--ui-color-text-secondary);
+}
 .tsz-ve-liaison-adjust-select {
   min-width: 9em;
   max-width: 16em;
