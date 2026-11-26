@@ -21,6 +21,7 @@ import {
   voicePreviewIsMock
 } from "@/features/dictionary/voice-editor/dataSource";
 import {
+  canonicalVoiceHash,
   toRichTextV2,
   voiceEffectKey,
   withDefaultVoiceProfile
@@ -88,7 +89,8 @@ export function sentenceChanges(
       // 配音可能失败或尚未轮到；文字保存不能把旧正文、旧参数的合成音频当作新录音。
       if (previous?.voice_profile && next.voice_profile) {
         const textChanged =
-          JSON.stringify(previous.content) !== JSON.stringify(next.content);
+          canonicalVoiceHash(previous.content) !==
+          canonicalVoiceHash(next.content);
         const oldVoices = previous.voice_profile.voices;
         next.voice_profile = {
           ...next.voice_profile,
@@ -188,6 +190,22 @@ export function useSentenceDrafts(
   );
   const refs = word.senses.flatMap((v) => v.sentence_ids ?? []);
   const changes = sentenceChanges(allBase, drafts, refs, medium);
+  const [pendingAudio, setPendingAudio] = useState<
+    Pick<NextSentenceDraftChange, "id" | "target_locale">[]
+  >([]);
+  const audioQueue = [...changes];
+  for (const { id, target_locale } of pendingAudio) {
+    if (
+      !refs.includes(id) ||
+      changes.some((c) => c.id === id && c.target_locale === target_locale)
+    )
+      continue;
+    const variant = resources[id]?.draft.variants.find(
+      (v) => v.locale === target_locale
+    );
+    if (variant)
+      audioQueue.push({ id, target_locale, medium_locale: medium, variant });
+  }
   const prepareTasks = useRef(new Map<string, () => Promise<boolean>>());
   const latest = useRef(changes);
   useLayoutEffect(() => {
@@ -254,7 +272,10 @@ export function useSentenceDrafts(
     importResource(source: NextSentence) {
       setImported((current) => ({ ...current, [source.id]: source }));
     },
-    reset() {
+    audioQueue,
+    hasPendingAudio: pendingAudio.some((p) => refs.includes(p.id)),
+    reset(remaining: typeof pendingAudio = []) {
+      setPendingAudio(remaining);
       setAttempted(false);
       setImported({});
       setDrafts({});
@@ -262,14 +283,19 @@ export function useSentenceDrafts(
     async prepare() {
       const error = draftSentenceError(latest.current);
       if (error) throw new Error(error);
-      for (const change of latest.current) {
+      for (const [index, change] of audioQueue.entries()) {
         const task = prepareTasks.current.get(
           `${change.id}:${change.target_locale}`
         );
         if (task && !(await task()))
-          return { changes: latest.current, audioPending: true };
+          return {
+            changes: latest.current,
+            pendingAudio: audioQueue
+              .slice(index)
+              .map(({ id, target_locale }) => ({ id, target_locale }))
+          };
       }
-      return { changes: latest.current, audioPending: false };
+      return { changes: latest.current, pendingAudio: [] };
     },
     prepareTasks
   };
@@ -331,7 +357,7 @@ export function SentenceDraftAudioTasks({
 }) {
   return (
     <>
-      {workspace.changes.map((change) => (
+      {workspace.audioQueue.map((change) => (
         <SentenceAudioTask
           key={`${change.id}:${change.target_locale}`}
           change={change}

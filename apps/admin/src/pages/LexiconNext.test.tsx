@@ -5358,7 +5358,38 @@ it("例句配音不可用时仍保存词条、例句文字和译文", async () =
       (voice: { audio_asset_id?: string }) => voice.audio_asset_id
     )
   ).not.toBe(true);
-  expect(await screen.findByText("草稿已保存，例句配音待补。")).toBeVisible();
+  const retry = await screen.findByRole("button", { name: "重试例句配音" });
+  expect(retry).toBeEnabled();
+  fireEvent.click(retry);
+  await waitFor(() => expect(generate).toHaveBeenCalledTimes(2));
+  await waitFor(() => expect(retry).toBeEnabled());
+  expect(api.save).toHaveBeenCalledOnce();
+  generate.mockResolvedValue({
+    id: "new-audio",
+    locale: "en-GB",
+    gender: "female",
+    content_type: "audio/mpeg",
+    original_name: "generated.mp3",
+    size_bytes: 128,
+    created_at: entry.updated_at
+  });
+  fireEvent.click(retry);
+  await waitFor(() => expect(api.save).toHaveBeenCalledTimes(2));
+  expect(api.save.mock.calls[1]![1]).toMatchObject({
+    expected_revision: 2,
+    sentence_changes: [
+      {
+        expected_revision: 4,
+        variant: {
+          content: { text: "The farmer led the horses." },
+          voice_profile: {
+            voices: [expect.objectContaining({ audio_asset_id: "new-audio" })]
+          }
+        }
+      }
+    ]
+  });
+  await waitFor(() => expect(retry).not.toBeInTheDocument());
 });
 
 it("统一保存冲突保留本地例句，可比较服务器例句，明确确认后才重载", async () => {

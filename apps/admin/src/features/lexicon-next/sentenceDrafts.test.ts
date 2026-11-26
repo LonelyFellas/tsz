@@ -194,6 +194,12 @@ it("提交文字时只解除与新正文不匹配的旧合成音频，保留新�
   const payload = () =>
     sentenceChanges([saved], { sentence: edited }, [saved.id], "zh-Hant")[0]!
       .variant;
+  uk.content = {
+    version: 1,
+    text: variant.content.text,
+    spans: [],
+    liaisons: []
+  };
   expect(payload().voice_profile).toEqual(uk.voice_profile);
   variant.content.text = "New text.";
   variant.voice_profile!.voices[0]!.audio_asset_id = "new-first";
