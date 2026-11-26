@@ -579,7 +579,15 @@ it("只微调连读弧时保留现有音频，不重新生成", async () => {
   view.rerender({
     content: {
       ...content,
-      annotations: [{ ...liaison, left_offset_pct: 15, right_offset_pct: -10 }]
+      annotations: [
+        {
+          ...liaison,
+          start_len: 1,
+          end_len: 1,
+          left_offset_pct: 15,
+          right_offset_pct: -10
+        }
+      ]
     },
     enabled: true,
     defer: false

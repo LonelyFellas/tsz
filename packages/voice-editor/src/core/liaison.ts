@@ -34,23 +34,31 @@ export function liaisonAdjustment({
   };
 }
 
-/** 试听及正式配音保留连读锚点，省略只影响显示的偏移。 */
-export function withoutLiaisonAdjustments(content: RichTextV2): RichTextV2 {
+/** 试听及正式配音只取连读锚点，缺省宽度与显式 1 等价。 */
+export function normalizeSpeechLiaisons(content: RichTextV2): RichTextV2 {
   let changed = false;
   const annotations = content.annotations.map((annotation) => {
     if (
       annotation.type !== "liaison" ||
       (annotation.left_offset_pct === undefined &&
-        annotation.right_offset_pct === undefined)
+        annotation.right_offset_pct === undefined &&
+        annotation.start_len !== 1 &&
+        annotation.end_len !== 1)
     )
       return annotation;
     changed = true;
     const {
       left_offset_pct: _left,
       right_offset_pct: _right,
+      start_len,
+      end_len,
       ...anchors
     } = annotation;
-    return anchors;
+    return {
+      ...anchors,
+      ...(start_len !== undefined && start_len !== 1 ? { start_len } : {}),
+      ...(end_len !== undefined && end_len !== 1 ? { end_len } : {})
+    };
   });
   return changed ? { ...content, annotations } : content;
 }

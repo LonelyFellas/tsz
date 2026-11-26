@@ -716,6 +716,40 @@ describe("PronunciationPreview", () => {
     );
   });
 
+  it("只调整连读弧形状时保留可播放的试听结果", async () => {
+    const dispose = vi.fn();
+    preview.synthesize.mockResolvedValue(result({ dispose }));
+    const liaison = { type: "liaison", start: 2, end: 5 } as const;
+    const content: RichTextV2 = {
+      version: 2,
+      text: "a record",
+      annotations: [liaison]
+    };
+    const view = render(<PreviewHarness content={content} dialect="uk" />);
+    await waitFor(() =>
+      expect(screen.getByLabelText("获取语音")).toBeEnabled()
+    );
+    fireEvent.click(screen.getByLabelText("获取语音"));
+    await waitFor(() =>
+      expect(screen.getByLabelText("播放语音")).toBeEnabled()
+    );
+
+    view.rerender(
+      <PreviewHarness
+        content={{
+          ...content,
+          annotations: [
+            { ...liaison, start_len: 1, end_len: 1, left_offset_pct: 10 }
+          ]
+        }}
+        dialect="uk"
+      />
+    );
+    expect(screen.getByLabelText("播放语音")).toBeEnabled();
+    expect(dispose).not.toHaveBeenCalled();
+    expect(preview.synthesize).toHaveBeenCalledTimes(1);
+  });
+
   it("失败后恢复按钮并允许重试", async () => {
     const failed = deferred<VoicePreviewResult>();
     const succeeded = deferred<VoicePreviewResult>();

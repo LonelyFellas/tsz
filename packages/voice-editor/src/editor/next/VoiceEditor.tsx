@@ -28,7 +28,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   LIAISON_ADJUSTMENT_LIMITS,
   liaisonAdjustment,
-  withoutLiaisonAdjustments,
+  normalizeSpeechLiaisons,
   type LiaisonAdjustment
 } from "../../core/liaison";
 import type {
@@ -714,7 +714,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     onVoiceProfileChange?.(profile);
   };
 
-  const auditionContent = withoutLiaisonAdjustments(
+  const auditionContent = normalizeSpeechLiaisons(
     mode === "synthesis" ? toRichTextV2(value) : workingValue
   );
   const {

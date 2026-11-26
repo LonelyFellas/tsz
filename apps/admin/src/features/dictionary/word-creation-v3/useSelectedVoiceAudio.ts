@@ -21,7 +21,7 @@ import {
   retainResolvedAudio,
   voiceEffectKey,
   voiceSettingKey,
-  withoutLiaisonAdjustments
+  normalizeSpeechLiaisons
 } from "@tsz/voice-editor/core";
 import { VoiceAudioTasksContext, useVoiceAudioTasks } from "./voiceSaveContext";
 import { v3ContentFingerprint } from "./saveFlow";
@@ -137,14 +137,14 @@ export function useSelectedVoiceAudio({
   onChange?: (profile: VoiceProfileV3) => void;
 }) {
   const content = useMemo(
-    () => withoutLiaisonAdjustments(richContent),
+    () => normalizeSpeechLiaisons(richContent),
     [richContent]
   );
   const contentByAccent = useMemo(() => {
     const { uk, us } = richContentByAccent ?? {};
     return {
-      uk: uk && withoutLiaisonAdjustments(uk),
-      us: us && withoutLiaisonAdjustments(us)
+      uk: uk && normalizeSpeechLiaisons(uk),
+      us: us && normalizeSpeechLiaisons(us)
     };
   }, [richContentByAccent]);
   const audioTasks = useVoiceAudioTasks();
