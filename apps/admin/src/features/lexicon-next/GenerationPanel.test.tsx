@@ -139,7 +139,8 @@ it.each([true, false])(
         proposals: expect.objectContaining({ groups: expect.any(Array) })
       }),
       expect.objectContaining({ section: "groups" }),
-      []
+      [],
+      currentRunId
     );
   }
 );
@@ -285,7 +286,8 @@ it.each(["single", "all"])(
     expect(onFill.mock.calls[0]).toEqual([
       expect.anything(),
       expect.anything(),
-      selected.map((s) => s.id)
+      selected.map((s) => s.id),
+      generate.mock.calls[0]![1].run_id
     ]);
   }
 );
@@ -344,8 +346,75 @@ it("从第二个词义的中文解释发起时，只提交该词义并保留目�
       senseId: "second",
       locale: "zh-Hans"
     }),
-    []
+    [],
+    generate.mock.calls[0]![1].run_id
   );
+});
+
+it("重开同一例句时读回候选，编辑界面变化不改变候选范围", async () => {
+  vi.stubGlobal("crypto", webcrypto);
+  const lookup = vi.fn(async (_id: string, input: NextAgentInput) => {
+    const view = result(input);
+    view.steps = [{ section: "translations", state: "completed", error: "" }];
+    view.proposals.translations = [{ example: 0, text: "明天见。" }];
+    return {
+      candidate: {
+        source_run_id: "colleague-run",
+        generated_at: "2026-11-25T01:00:00Z",
+        result: view
+      }
+    };
+  });
+  const generate = vi.fn();
+  const props = {
+    entryId: "entry",
+    revision: 1,
+    draft,
+    medium: "zh-Hans",
+    target: "en-GB",
+    sections: ["translations" as const],
+    contextVersion: "1",
+    examples: [
+      { id: "first", text: "See you tomorrow." },
+      { id: "other", text: "See you tomorrow." }
+    ],
+    disabled: false,
+    generate,
+    lookup,
+    sectionCandidatesAvailable: true,
+    onFill: vi.fn()
+  };
+  const panel = (sentenceId: string, contextVersion: string) => (
+    <GenerationPanel {...props} contextVersion={contextVersion}>
+      <SectionAI section="translations" sentenceId={sentenceId} label="译文" />
+    </GenerationPanel>
+  );
+  const open = () =>
+    fireEvent.click(screen.getByRole("button", { name: "AI 生成译文" }));
+  const view = render(panel("first", "1"));
+  open();
+  expect(await screen.findByText("明天见。")).toBeVisible();
+  const first = lookup.mock.calls[0]![1].snapshot_id;
+  view.unmount();
+
+  const otherEditor = render(panel("first", "2"));
+  open();
+  expect(await screen.findByText("明天见。")).toBeVisible();
+  expect(lookup.mock.calls[1]![1].snapshot_id).toBe(first);
+  fireEvent.click(screen.getByRole("button", { name: "一键配置" }));
+  expect(props.onFill).toHaveBeenCalledWith(
+    expect.objectContaining({ run_id: lookup.mock.calls[1]![1].run_id }),
+    expect.objectContaining({ section: "translations", sentenceId: "first" }),
+    ["first"],
+    "colleague-run"
+  );
+  otherEditor.unmount();
+
+  render(panel("other", "2"));
+  open();
+  await waitFor(() => expect(lookup).toHaveBeenCalledTimes(3));
+  expect(lookup.mock.calls[2]![1].snapshot_id).not.toBe(first);
+  expect(generate).not.toHaveBeenCalled();
 });
 
 it("词义目录一并预览和配置有来源的方言建议", async () => {
@@ -401,7 +470,8 @@ it("词义目录一并预览和配置有来源的方言建议", async () => {
   expect(onFill).toHaveBeenCalledWith(
     expect.objectContaining({ proposals: expect.objectContaining(proposals) }),
     expect.objectContaining({ section: "senses" }),
-    []
+    [],
+    generate.mock.calls[0]![1].run_id
   );
 });
 

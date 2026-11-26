@@ -141,7 +141,8 @@ export function fillGeneratedDraft(
   existingExamples: NextSentence[] = [],
   sentenceResources: Record<string, NextSentence> = {},
   existingDialect: NextDialectSense[] = [],
-  binding?: GenerationTarget
+  binding?: GenerationTarget,
+  sourceRunId = result.run_id
 ) {
   const draft = structuredClone(current);
   // Only the clicked section may write, even when the supervisor returns prerequisites.
@@ -406,7 +407,7 @@ export function fillGeneratedDraft(
           source_type: "ai_composed",
           title: "智能词库 Agent",
           url: "",
-          locator: result.run_id
+          locator: sourceRunId
         }
       ];
     variant.level = row.level;

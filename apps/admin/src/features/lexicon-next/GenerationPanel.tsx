@@ -61,6 +61,7 @@ type Generation = {
   result: NextAgentResult;
   run: Run;
   generatedAt?: string;
+  sourceRunId?: string;
 };
 
 function matches(result: NextAgentResult, run: Run) {
@@ -131,7 +132,8 @@ export function GenerationPanel({
   onFill: (
     result: NextAgentResult,
     binding: GenerationTarget,
-    exampleIds: string[]
+    exampleIds: string[],
+    sourceRunId: string
   ) => boolean;
 }) {
   const { t } = useLexiconEditorTranslation();
@@ -188,6 +190,10 @@ export function GenerationPanel({
     ) {
       if (!sectionCandidatesAvailable) return false;
       if (binding.section === "senses" && binding.pos) return true;
+      if (binding.section === "translations")
+        return examples.some(
+          (example) => !binding.sentenceId || example.id === binding.sentenceId
+        );
       return generationSenses(draft, medium, binding).length > 0;
     }
     return (
@@ -253,9 +259,21 @@ export function GenerationPanel({
             : t("entry_ai_groups_need_senses")
       );
     }
+    const scope =
+      section === "all"
+        ? [snapshot, binding]
+        : [
+            section,
+            binding.pos,
+            binding.senseId,
+            binding.sentenceId,
+            binding.locale,
+            senses.map((sense) => sense.id),
+            requestedExamples.map((example) => example.id)
+          ];
     const digest = await crypto.subtle.digest(
       "SHA-256",
-      new TextEncoder().encode(JSON.stringify([snapshot, binding]))
+      new TextEncoder().encode(JSON.stringify(scope))
     );
     return {
       entryId,
@@ -305,7 +323,8 @@ export function GenerationPanel({
           setLastCandidate({
             result: candidate.result,
             run,
-            generatedAt: candidate.generated_at
+            generatedAt: candidate.generated_at,
+            sourceRunId: candidate.source_run_id
           });
         }
       } catch {
@@ -334,7 +353,7 @@ export function GenerationPanel({
     lookupAttempt
   ]);
 
-  function fill({ result, run }: Generation) {
+  function fill({ result, run, sourceRunId = result.run_id }: Generation) {
     setError("");
     setFeedback("");
     if (
@@ -349,7 +368,8 @@ export function GenerationPanel({
       const changed = latest.current.onFill(
         result,
         run.binding,
-        run.exampleIds
+        run.exampleIds,
+        sourceRunId
       );
       setFeedback(
         changed

@@ -69,7 +69,12 @@ describe("智能补全回填", () => {
       partOfSpeechCatalogFixture,
       "en-GB",
       "zh-Hans",
-      "editor"
+      "editor",
+      [],
+      {},
+      [],
+      undefined,
+      "colleague-source-run"
     );
     expect(dialect[draft.senses[1]!.id]).toMatchObject({
       usage: "en-GB",
@@ -105,6 +110,12 @@ describe("智能补全回填", () => {
       "zh-Hans"
     );
     expect(changes).toHaveLength(1);
+    expect(changes[0]?.variant.metadata?.sources).toEqual([
+      expect.objectContaining({
+        source_type: "ai_composed",
+        locator: "colleague-source-run"
+      })
+    ]);
     expect(changes[0]?.variant.translations[0]?.content.text).toBe(
       "我明天来。"
     );

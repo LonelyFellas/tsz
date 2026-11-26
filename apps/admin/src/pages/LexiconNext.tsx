@@ -1951,7 +1951,7 @@ function EntryEditor({
         }
         sectionCandidatesAvailable={sectionCandidatesAvailable}
         refreshReference={refreshReference}
-        onFill={(result, binding, exampleIds) => {
+        onFill={(result, binding, exampleIds, sourceRunId) => {
           if (!grammarCatalog.data) return false;
           const next = fillGeneratedDraft(
             draft,
@@ -1963,7 +1963,8 @@ function EntryEditor({
             existingExamples.filter((s) => exampleIds.includes(s.id)),
             sentenceWorkspace.resources,
             dialectSenses,
-            binding
+            binding,
+            sourceRunId
           );
           const nextCount = draftNodeCount(next.draft);
           if (nextCount > 500 && nextCount > draftNodeCount(draft))
