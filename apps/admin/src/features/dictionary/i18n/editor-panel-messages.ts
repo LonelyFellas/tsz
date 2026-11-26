@@ -2025,6 +2025,11 @@ export const lexiconEditorPanelMessages = {
     "音色口音不明確，無法合併英美音色或保留跳過側，請先明確音色口音或將目標切換為英美區分",
     "Voice accents are unclear. Specify accents or split the target before merging British and American voices or keeping skipped sides."
   ],
+  copy_legacy_voice_pool_conflict: [
+    "同一官方音色有多个旧版本。请先在来源保留一个版本，再复制到局部配音。",
+    "同一官方音色有多個舊版本。請先在來源保留一個版本，再複製到局部配音。",
+    "The same official voice has multiple legacy versions. Keep one source version before copying it to local dubbing."
+  ],
   copy_target_text_mismatch: [
     "目标合成正文与拼写不一致，请先修正后再复制音色",
     "目標合成正文與拼寫不一致，請先修正後再複製音色",

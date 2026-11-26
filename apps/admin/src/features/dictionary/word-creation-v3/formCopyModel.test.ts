@@ -168,7 +168,7 @@ describe("词形内容定向复制", () => {
     expect(to.spelling_speech).toBeUndefined();
   });
 
-  it.each(["skip", "different", "same"] as const)(
+  it.each(["skip", "skip-default", "different", "same"] as const)(
     "共享拼写音色按整个variant核对读法映射（%s）",
     (mapping) => {
       const { forms, sourceId, targetId } = setup(
@@ -210,13 +210,14 @@ describe("词形内容定向复制", () => {
       );
       const to = variant(forms.contents[1]!);
       to.spelling_speech = speech(to.spelling, profile("original"));
+      if (mapping === "skip-default") delete to.pronunciations[1]!.synthesis;
       const skipped = to.pronunciations[1]!.id;
       const plan = planFormCopy(
         forms,
         sourceId,
         targetId,
         "voices",
-        mapping === "skip"
+        mapping === "skip" || mapping === "skip-default"
           ? { uk: { [skipped]: null }, us: { [skipped]: null } }
           : {}
       );
