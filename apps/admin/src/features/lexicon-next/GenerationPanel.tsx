@@ -51,6 +51,7 @@ const sourceStatus: Record<string, string> = {
   not_configured: "未配置"
 };
 type Run = {
+  entryId: string;
   snapshot: string;
   input: NextAgentInput;
   binding: GenerationTarget;
@@ -107,6 +108,7 @@ export function GenerationPanel({
   generate,
   lookup,
   sectionCandidatesAvailable = false,
+  refreshReference,
   onFill
 }: {
   children: ReactNode;
@@ -125,6 +127,7 @@ export function GenerationPanel({
   generate: LexiconNextRequests["generate"];
   lookup?: LexiconNextRequests["generationCandidates"];
   sectionCandidatesAvailable?: boolean;
+  refreshReference?: LexiconNextRequests["refreshDictionaryReference"];
   onFill: (
     result: NextAgentResult,
     binding: GenerationTarget,
@@ -255,6 +258,7 @@ export function GenerationPanel({
       new TextEncoder().encode(JSON.stringify([snapshot, binding]))
     );
     return {
+      entryId,
       snapshot,
       binding,
       exampleIds: requestedExamples.map((ex) => ex.id),
@@ -614,6 +618,25 @@ export function GenerationPanel({
                     key={generation.result.run_id}
                     headword={generation.run.input.headword}
                     sources={generation.result.sources}
+                    refreshReference={
+                      refreshReference &&
+                      generation.run.entryId === entryId &&
+                      generation.run.input.base_revision === revision &&
+                      generation.run.input.headword === draft.headword &&
+                      !locked
+                        ? (source, signal) =>
+                            refreshReference(
+                              entryId,
+                              {
+                                base_revision:
+                                  generation.run.input.base_revision,
+                                headword: generation.run.input.headword,
+                                source
+                              },
+                              signal
+                            )
+                        : undefined
+                    }
                     {...(previewSection === "grammar"
                       ? {
                           section: "grammar",

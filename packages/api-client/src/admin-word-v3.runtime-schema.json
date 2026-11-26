@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/grammar-sub-pos-recommendation/tsz-rust/docs/openapi.json",
-  "_source_sha256": "b27b3e48d0b5c70d4fd360ffa624db53d6cfec4767875da90521851207e12b83",
+  "_source": "/Users/darwish/.codex/worktrees/zentao-232-form-eligibility-api/tsz-rust/docs/openapi.json",
+  "_source_sha256": "2fcf7a2f98287e9bb93f2099c582bd7e48488aa71d7e84c29e76b23b65ea6a44",
   "roots": [
     "LexiconTaxonomy",
     "LexiconTaxonomyKind",
@@ -14,11 +14,15 @@
     "NextListCommandResult",
     "NextAnnotationInput",
     "NextAnnotationResult",
+    "NextAssessmentState",
+    "ReviewNextPublication",
     "NextPublicationBase",
     "NextPublishInput",
     "NextPublicationState",
     "NextAgentInput",
     "NextAgentResult",
+    "NextAgentSource",
+    "NextDictionaryRefreshInput",
     "NextGenerationCandidates",
     "NextPublicationPreview",
     "NextPublication",
@@ -3868,6 +3872,22 @@
       },
       "additionalProperties": false
     },
+    "NextAssessmentState": {
+      "type": "object",
+      "required": [
+        "publication_id",
+        "lifecycle_revision",
+        "version",
+        "approved"
+      ],
+      "properties": {
+        "approved": { "type": "boolean" },
+        "lifecycle_revision": { "type": "integer" },
+        "publication_id": { "type": ["string", "null"], "format": "uuid" },
+        "version": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
     "NextCapabilities": {
       "type": "object",
       "required": [
@@ -3882,8 +3902,10 @@
         "creation_snapshot": { "type": "boolean" },
         "definition_details": { "type": "boolean" },
         "dialect_pairs": { "type": ["boolean", "null"] },
+        "dictionary_refresh": { "type": "boolean" },
         "equivalent_metadata": { "type": "boolean" },
         "form_editor": { "type": "boolean" },
+        "form_question_eligibility": { "type": ["boolean", "null"] },
         "generation": { "type": "boolean" },
         "generation_candidates": { "type": "boolean" },
         "grammar_audio": { "type": "boolean" },
@@ -4087,11 +4109,34 @@
       },
       "additionalProperties": false
     },
+    "NextDictionaryRefreshInput": {
+      "type": "object",
+      "required": ["base_revision", "headword", "source"],
+      "properties": {
+        "base_revision": { "type": "integer" },
+        "headword": { "type": "string" },
+        "source": { "$ref": "#/$defs/NextDictionarySource" }
+      },
+      "additionalProperties": false
+    },
+    "NextDictionarySource": {
+      "type": "string",
+      "enum": [
+        "有道",
+        "Oxford Learner’s Dictionaries",
+        "Merriam-Webster",
+        "Cambridge Dictionary"
+      ]
+    },
     "NextDraft": {
       "type": "object",
       "required": ["schema_version", "headword", "forms", "senses"],
       "properties": {
         "form_editor": { "$ref": "#/$defs/SharedFormsStepContentV3" },
+        "form_question_eligibility": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextFormQuestionEligibility" }
+        },
         "forms": { "type": "array", "items": { "$ref": "#/$defs/NextForm" } },
         "grammar_structures": {
           "type": "array",
@@ -4335,6 +4380,15 @@
         "id": { "type": "string", "format": "uuid" },
         "locale": { "type": "string" },
         "text": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "NextFormQuestionEligibility": {
+      "type": "object",
+      "required": ["form_id", "eligible"],
+      "properties": {
+        "eligible": { "type": "boolean" },
+        "form_id": { "type": "string", "format": "uuid" }
       },
       "additionalProperties": false
     },
@@ -5877,6 +5931,22 @@
           "type": ["array", "null"],
           "items": { "type": "string" }
         }
+      },
+      "additionalProperties": false
+    },
+    "ReviewNextPublication": {
+      "type": "object",
+      "required": [
+        "publication_id",
+        "lifecycle_revision",
+        "expected_version",
+        "approved"
+      ],
+      "properties": {
+        "approved": { "type": "boolean" },
+        "expected_version": { "type": "integer" },
+        "lifecycle_revision": { "type": "integer" },
+        "publication_id": { "type": "string", "format": "uuid" }
       },
       "additionalProperties": false
     },
@@ -7551,7 +7621,8 @@
         "entry_id": { "type": "string", "format": "uuid" },
         "glosses": { "type": "array", "items": { "type": "string" } },
         "label": { "type": "string" },
-        "publication_id": { "type": "string", "format": "uuid" }
+        "publication_id": { "type": "string", "format": "uuid" },
+        "source_library": { "$ref": "#/$defs/WordlistSourceLibrary" }
       },
       "additionalProperties": false
     },
@@ -7905,6 +7976,10 @@
         "sub_pos_label": { "type": "string" }
       },
       "additionalProperties": false
+    },
+    "WordlistSourceLibrary": {
+      "type": "string",
+      "enum": ["legacy", "lexicon_next"]
     },
     "WordlistState": {
       "type": "string",

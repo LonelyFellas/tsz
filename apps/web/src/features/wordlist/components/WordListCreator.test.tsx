@@ -49,6 +49,41 @@ it("选定候选后焦点保留在词条输入框", async () => {
   expect(input).toHaveFocus();
 });
 
+it("同名候选显示词库来源，选择新版时保存对应词条 ID", async () => {
+  vi.mocked(api.wordList.suggestions).mockResolvedValue({
+    items: [
+      { ...candidate, source_library: "legacy" },
+      {
+        ...candidate,
+        entry_id: "reviewed-id",
+        publication_id: "reviewed-version",
+        source_library: "lexicon_next"
+      }
+    ]
+  });
+  renderWithProviders(<WordListCreator />);
+  fireEvent.change(screen.getByLabelText("词表名称"), {
+    target: { value: "苹果" }
+  });
+  fireEvent.change(screen.getByPlaceholderText("输入单词或短语"), {
+    target: { value: "apple" }
+  });
+  expect(
+    await screen.findByRole("button", { name: /apple.*旧版词库/ })
+  ).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: /apple.*新版词库/ }));
+  fireEvent.click(screen.getByRole("button", { name: "保存" }));
+  await waitFor(() =>
+    expect(api.wordList.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        items: expect.arrayContaining([
+          expect.objectContaining({ entry_id: "reviewed-id" })
+        ])
+      })
+    )
+  );
+});
+
 it("删除词条后聚焦相邻词条", async () => {
   const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
   try {

@@ -34,6 +34,7 @@ type Values = Omit<CreatePartOfSpeechInput, "code"> & {
   /** 原形没有归属，wire 上是 null；表单里按未选处理。 */
   part_of_speech_id?: string | null;
   is_default?: boolean;
+  default_question_eligible?: boolean;
 };
 
 function deriveFormTypeCode(
@@ -63,6 +64,10 @@ export function FormTypeSettings({ kind }: { kind: AdminWordKind }) {
   const client = useQueryClient();
   const catalog = usePartOfSpeechCatalog();
   const ready = !catalog.isError && !!catalog.data?.form_types;
+  const supportsQuestionEligibility =
+    catalog.data?.form_types?.some(
+      (item) => typeof item.default_question_eligible === "boolean"
+    ) === true;
   const supportsDefaultTemplate =
     catalog.data?.form_types?.every(
       (item) => typeof item.is_default === "boolean"
@@ -95,10 +100,12 @@ export function FormTypeSettings({ kind }: { kind: AdminWordKind }) {
     mutationFn: ({
       part_of_speech_id: partId,
       is_default,
+      default_question_eligible,
       ...fields
     }: Values) => {
       const values = {
         ...fields,
+        ...(supportsQuestionEligibility ? { default_question_eligible } : {}),
         ...(supportsDefaultTemplate ? { is_default } : {})
       };
       if (editing) {
@@ -138,12 +145,14 @@ export function FormTypeSettings({ kind }: { kind: AdminWordKind }) {
     if (editing) {
       form.setFieldsValue({
         ...editing,
+        default_question_eligible: editing.default_question_eligible ?? true,
         is_default: editing.is_default ?? true
       });
       return;
     }
     form.resetFields();
     form.setFieldValue("is_default", true);
+    form.setFieldValue("default_question_eligible", true);
     form.setFieldValue("sort_order", nextSortOrderRef.current);
     // 「全部」视图下留空由管理员选；已经筛到某个词性时直接带上，少点一次。
     if (query.part_of_speech_id) {
@@ -414,6 +423,19 @@ export function FormTypeSettings({ kind }: { kind: AdminWordKind }) {
                 />
               </Form.Item>
             </Tooltip>
+            {supportsQuestionEligibility && (
+              <Form.Item
+                name="default_question_eligible"
+                label={t("default_question_eligible")}
+                valuePropName="checked"
+                layout="horizontal"
+              >
+                <Switch
+                  aria-label={t("default_question_eligible")}
+                  disabled={!canEdit || save.isPending}
+                />
+              </Form.Item>
+            )}
           </Flex>
           {editing?.code === "base" ? (
             <Alert

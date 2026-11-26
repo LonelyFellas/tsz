@@ -373,6 +373,7 @@ function setupRareFormType() {
     code: "rare",
     part_of_speech_id: "pos-verb",
     name_zh: "罕见词形",
+    default_question_eligible: true,
     revision: 4
   });
   mock.update.mockImplementation(async (id, input) => {
@@ -398,6 +399,30 @@ async function openFormType(name: string) {
   await waitFor(() => expect(dialog).toBeVisible());
   return dialog;
 }
+
+it("词形类型可保留默认模板并独立关闭出题，重开后仍关闭", async () => {
+  setupRareFormType();
+  const dialog = await openFormType("罕见词形");
+  fireEvent.click(within(dialog).getByRole("switch", { name: "默认参与出题" }));
+  fireEvent.click(
+    within(dialog)
+      .getByText(/^保\s*存$/)
+      .closest("button")!
+  );
+  await waitFor(() => expect(dialog).not.toBeInTheDocument());
+  expect(mock.update).toHaveBeenCalledWith(
+    "rare-id",
+    expect.objectContaining({
+      is_default: true,
+      default_question_eligible: false
+    })
+  );
+  expect(
+    within(await openFormType("罕见词形")).getByRole("switch", {
+      name: "默认参与出题"
+    })
+  ).not.toBeChecked();
+}, 10000);
 
 it("关闭默认模版后保存，并在重新打开时回显", async () => {
   setupRareFormType();

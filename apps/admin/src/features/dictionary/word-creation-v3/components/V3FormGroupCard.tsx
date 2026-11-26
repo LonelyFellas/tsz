@@ -1,3 +1,4 @@
+import { FormQuestionContext } from "./formQuestionContext";
 import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
 import { useFormTypeLabel } from "../../part-of-speech/FormTypeLabels";
 import { createFormTypeComparator } from "../../part-of-speech/catalog";
@@ -22,7 +23,7 @@ import type {
   WordFormGroupV3,
   WordPosFormsV3
 } from "@tsz/types";
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import {
   addConcreteForm,
@@ -211,17 +212,27 @@ export function V3FormGroupCard({
   const [collapsed, setCollapsed] = useState(false);
   const [columnsOpen, setColumnsOpen] = useState(false);
   const [columnsOverflow, setColumnsOverflow] = useState(false);
-  const columns = useColumnSettings(
-    formOverviewTableId,
-    formOverviewColumnSettings.map((column) => ({
+  const questions = useContext(FormQuestionContext);
+  const columns = useColumnSettings(formOverviewTableId, [
+    ...formOverviewColumnSettings.map((column) => ({
       ...column,
       label: t(
         formOverviewColumnMessages[
           column.key as keyof typeof formOverviewColumnMessages
         ]
       )
-    }))
-  );
+    })),
+    ...(questions
+      ? [
+          {
+            key: "question_eligible",
+            label: t("question_eligible"),
+            visible: true,
+            fixed: false as const
+          }
+        ]
+      : [])
+  ]);
   const hasOverview = !!(onEditContent && sharedCounts);
   const compareTypes = createFormTypeComparator(formTypes, posCatalog);
   const formTypeOptions = posCatalog

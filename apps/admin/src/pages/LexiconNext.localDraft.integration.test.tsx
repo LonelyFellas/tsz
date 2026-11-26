@@ -95,6 +95,8 @@ const entry: NextEntry = {
 
 function requests() {
   return {
+    assessment: vi.fn(),
+    reviewAssessment: vi.fn(),
     publication: vi.fn(),
     publicationPreview: vi.fn(),
     publish: vi.fn(),
@@ -137,6 +139,7 @@ function requests() {
     }),
     generate: vi.fn(),
     generationCandidates: vi.fn(),
+    refreshDictionaryReference: vi.fn(),
     capabilities: vi.fn().mockResolvedValue(caps),
     draftSchema: vi.fn().mockResolvedValue({
       draft_schema_version: 1,

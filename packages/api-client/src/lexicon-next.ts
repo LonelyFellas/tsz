@@ -1,8 +1,12 @@
 import type {
   NextAgentInput,
   NextAgentResult,
+  NextAgentSource,
+  NextDictionaryRefreshInput,
   NextGenerationCandidates,
   NextPublicationBase,
+  NextAssessmentState,
+  ReviewNextPublication,
   NextPublishInput,
   NextPublicationPreview,
   NextPublication,
@@ -80,6 +84,7 @@ export function createLexiconNextEndpoints(http: HttpClient) {
   let dialectPairs = false;
   let grammarFormLinks = false;
   let sentenceAssociations = false;
+  let formQuestions = false;
   let creationSnapshot = false;
   const editorOptions = {
     headers: {
@@ -89,9 +94,11 @@ export function createLexiconNextEndpoints(http: HttpClient) {
       "x-tsz-next-relations": "v1",
       "x-tsz-next-definitions": "v1",
       "x-tsz-next-forms": "v1",
+      "x-tsz-next-form-questions": "v1",
       "x-tsz-next-generation": "v1",
       "x-tsz-next-generation-candidates": "v1",
       "x-tsz-next-section-candidates": "v1",
+      "x-tsz-next-dictionary-refresh": "v1",
       "x-tsz-next-sentences": "v1",
       "x-tsz-next-sentence-details": "v1",
       "x-tsz-next-sentence-drafts": "v1",
@@ -151,10 +158,42 @@ export function createLexiconNextEndpoints(http: HttpClient) {
         .then((value) =>
           decode<NextGenerationCandidates>("NextGenerationCandidates", value)
         ),
+    assessment: (id: string) =>
+      http
+        .get<unknown>(`${entry(id)}/assessment`)
+        .then((value) =>
+          decode<NextAssessmentState>("NextAssessmentState", value)
+        ),
+    reviewAssessment: (id: string, input: ReviewNextPublication) =>
+      http
+        .put<unknown>(`${entry(id)}/assessment`, input)
+        .then((value) =>
+          decode<NextAssessmentState>("NextAssessmentState", value)
+        ),
+    refreshDictionaryReference: (
+      id: string,
+      input: NextDictionaryRefreshInput,
+      signal?: AbortSignal
+    ) =>
+      http
+        .post<unknown>(`${entry(id)}/generation/dictionary-reference`, input, {
+          signal
+        })
+        .then((value) => {
+          if (
+            !validateRuntimeSchema("NextAgentSource", value).valid ||
+            (value as NextAgentSource).source !== input.source
+          )
+            throw new ClientResponseError("词典参考响应不符合接口契约");
+          return value as NextAgentSource;
+        }),
     publication: (id: string) =>
       http
         .get<unknown>(`${entry(id)}/publication`, {
-          headers: { "x-tsz-next-dialect-pairs": "v1" }
+          headers: {
+            "x-tsz-next-dialect-pairs": "v1",
+            "x-tsz-next-form-questions": "v1"
+          }
         })
         .then((value) =>
           decode<NextPublicationState>("NextPublicationState", value)
@@ -167,7 +206,9 @@ export function createLexiconNextEndpoints(http: HttpClient) {
         ),
     publish: (id: string, input: NextPublishInput) =>
       http
-        .post<unknown>(`${entry(id)}/publications`, input)
+        .post<unknown>(`${entry(id)}/publications`, input, {
+          headers: { "x-tsz-next-form-questions": "v1" }
+        })
         .then((value) => decode<NextPublication>("NextPublication", value)),
     sentences: (query: NextSentenceQuery) =>
       http
@@ -274,6 +315,7 @@ export function createLexiconNextEndpoints(http: HttpClient) {
     capabilities: () =>
       http.get<unknown>(`${root}/capabilities`, editorOptions).then((value) => {
         const capabilities = decodeNextCapabilities(value);
+        formQuestions = capabilities.form_question_eligibility === true;
         creationSnapshot = capabilities.creation_snapshot === true;
         definitionDetails = capabilities.definition_details === true;
         sentenceDrafts = capabilities.sentence_drafts === true;
@@ -323,6 +365,10 @@ export function createLexiconNextEndpoints(http: HttpClient) {
     get: (id: string) =>
       http.get<unknown>(entry(id), editorOptions).then(decodeNextEntry),
     save: (id: string, input: SaveNextDraft) => {
+      if (!formQuestions && input.draft.form_question_eligibility?.length)
+        return Promise.reject(
+          new ClientResponseError("当前服务尚未支持词形出题设置，请更新后保存")
+        );
       if (input.dialect_changes?.length && !dialectPairs)
         return Promise.reject(
           new ClientResponseError("当前服务未开放方言配对，请重新打开词条")
