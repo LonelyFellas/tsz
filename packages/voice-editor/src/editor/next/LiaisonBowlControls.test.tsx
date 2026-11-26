@@ -53,7 +53,21 @@ it("拖动只预览，松开一次回写；Esc 后直到松开都不回写", () 
       clientY: 12
     });
   const thumb = screen.getByRole("slider", { name: "整弧" });
+  fireEvent.pointerDown(track, {
+    button: 2,
+    pointerId: 1,
+    isPrimary: true,
+    clientX: 140
+  });
+  expect(commit).not.toHaveBeenCalled();
   move("pointerDown", 112);
+  fireEvent.pointerDown(track, {
+    button: 0,
+    pointerId: 2,
+    isPrimary: false,
+    clientX: 140
+  });
+  fireEvent.pointerCancel(track, { pointerId: 2 });
   move("pointerMove", 135);
   move("pointerMove", 170);
   expect(thumb).toHaveAttribute("aria-valuenow", "70");

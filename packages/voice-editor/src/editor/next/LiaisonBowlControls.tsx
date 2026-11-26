@@ -75,17 +75,23 @@ export function LiaisonBowlControls({
       <div
         className="tsz-ve-bowl-range"
         onPointerDownCapture={(e) => {
-          if (
-            !blocked &&
-            e.button === 0 &&
-            e.isPrimary !== false &&
-            (e.target as Element).closest(".ui-slider")
-          )
-            slide.current = { id: e.pointerId };
+          if (!(e.target as Element).closest(".ui-slider")) return;
+          if (blocked || e.button !== 0 || !e.isPrimary || slide.current) {
+            e.stopPropagation();
+            return;
+          }
+          slide.current = { id: e.pointerId };
+        }}
+        onPointerMoveCapture={(e) => {
+          if (slide.current?.id !== e.pointerId) e.stopPropagation();
         }}
         onPointerUp={(e) => end(e.pointerId)}
-        onLostPointerCapture={cancel}
-        onPointerCancel={cancel}
+        onLostPointerCapture={(e) => {
+          if (slide.current?.id === e.pointerId) cancel();
+        }}
+        onPointerCancel={(e) => {
+          if (slide.current?.id === e.pointerId) cancel();
+        }}
         onKeyDown={(e) => {
           if (slide.current && e.key === "Escape") {
             e.stopPropagation();
