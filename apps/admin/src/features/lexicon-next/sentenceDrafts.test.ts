@@ -201,6 +201,17 @@ it("提交文字时只解除与新正文不匹配的旧合成音频，保留新�
     liaisons: []
   };
   expect(payload().voice_profile).toEqual(uk.voice_profile);
+  uk.content = {
+    version: 2,
+    text: variant.content.text,
+    annotations: [{ at: 2, duration_ms: 250, type: "pause" }]
+  };
+  variant.content = {
+    version: 2,
+    text: uk.content.text,
+    annotations: [{ type: "pause", at: 2, duration_ms: 250 }]
+  };
+  expect(payload().voice_profile).toEqual(uk.voice_profile);
   variant.content.text = "New text.";
   variant.voice_profile!.voices[0]!.audio_asset_id = "new-first";
   const voices = payload().voice_profile!.voices;

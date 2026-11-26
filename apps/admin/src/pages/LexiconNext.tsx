@@ -310,6 +310,7 @@ function EntryLoader({
   language: NextLanguageCapability;
 }) {
   const { medium, search: languageSearch } = useLexiconLanguages();
+  const editorAccount = useAuthStore((state) => state.profile?.id);
   const location = useLocation();
   const navigate = useNavigate();
   const query = useQuery({
@@ -412,7 +413,7 @@ function EntryLoader({
   }
   return (
     <EntryEditor
-      key={`${id}:${medium}`}
+      key={`${editorAccount}:${id}:${medium}`}
       initial={query.data}
       suggestedPartOfSpeech={creationState?.lexiconNextSuggestedPartOfSpeech}
       entryMedium={query.data.medium_locale ?? medium}
@@ -593,10 +594,14 @@ function EntryEditor({
     cancelLanguageChange
   } = useLexiconLanguages();
   const medium = entryMedium;
+  const profile = useAuthStore((state) => state.profile);
   const sentenceWorkspace = useSentenceDrafts(
     saved.sentence_resources ?? [],
     draft,
-    medium
+    medium,
+    (profile &&
+      `tsz:admin:sentence-audio-pending:v1:${profile.id}:${saved.id}:${medium}`) ||
+      undefined
   );
   const [saving, setBusy] = useState(false);
   const [publicationBusy, setPublicationBusy] = useState(false);
@@ -616,7 +621,6 @@ function EntryEditor({
   const [conflict, setConflict] = useState(false);
   const [peerConflict, setPeerConflict] = useState(false);
   const [remote, setRemote] = useState<NextEntry>();
-  const profile = useAuthStore((state) => state.profile);
   const localDraftKey = useMemo<NextLocalDraftKey | undefined>(
     () =>
       profile?.id
@@ -1029,7 +1033,9 @@ function EntryEditor({
         const problem = draftProblem(normalized, equivalentMetadataAvailable);
         if (problem) throw new Error(problem);
         const { changes, pendingAudio } = sentenceDraftsAvailable
-          ? await sentenceWorkspace.prepare()
+          ? await sentenceWorkspace.prepare(
+              !dirty && sentenceWorkspace.hasPendingAudio
+            )
           : { changes: [], pendingAudio: [] };
         if (sentenceWorkspace.hasPendingAudio && !dirty && !changes.length) {
           sentenceWorkspace.reset(pendingAudio);

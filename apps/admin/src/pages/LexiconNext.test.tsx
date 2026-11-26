@@ -5170,8 +5170,11 @@ function unifiedSentenceRequests() {
       sentence_resources: [current]
     };
   });
-  mount(api, `/lexicon-next/${id}?target_locale=en-GB&medium_locale=zh-Hans`);
-  return { api, source, saved };
+  const { unmount } = mount(
+    api,
+    `/lexicon-next/${id}?target_locale=en-GB&medium_locale=zh-Hans`
+  );
+  return { api, source, saved, unmount };
 }
 it("英文例句点击进入编辑器，未应用时锁住宿主操作，取消保留原文", async () => {
   const { api } = unifiedSentenceRequests();
@@ -5319,7 +5322,7 @@ it("例句配音不可用时仍保存词条、例句文字和译文", async () =
   onTestFinished(() => {
     env.VOICE_PREVIEW = previous;
   });
-  const { api } = unifiedSentenceRequests();
+  const { api, unmount } = unifiedSentenceRequests();
   const profile = useAuthStore.getState().profile!;
   act(() =>
     useAuthStore.setState({
@@ -5358,6 +5361,10 @@ it("例句配音不可用时仍保存词条、例句文字和译文", async () =
       (voice: { audio_asset_id?: string }) => voice.audio_asset_id
     )
   ).not.toBe(true);
+  await screen.findByText("草稿已保存，例句配音待补。");
+  api.get.mockResolvedValue(await api.save.mock.results[0]!.value);
+  unmount();
+  mount(api);
   const retry = await screen.findByRole("button", { name: "重试例句配音" });
   expect(retry).toBeEnabled();
   fireEvent.click(retry);

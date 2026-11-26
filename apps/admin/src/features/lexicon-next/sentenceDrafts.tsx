@@ -15,13 +15,14 @@ import type {
   NextSentenceVariant
 } from "@tsz/types";
 import { normalizeTranslationFreedom, sentenceError } from "./sentenceModel";
+import { v3ContentFingerprint } from "@/features/dictionary/word-creation-v3/saveFlow";
 import { useSelectedVoiceAudio } from "@/features/dictionary/word-creation-v3/useSelectedVoiceAudio";
 import {
   adminVoicePreviewAdapter,
   voicePreviewIsMock
 } from "@/features/dictionary/voice-editor/dataSource";
 import {
-  canonicalVoiceHash,
+  normalizeSpeechLiaisons,
   toRichTextV2,
   voiceEffectKey,
   withDefaultVoiceProfile
@@ -89,8 +90,12 @@ export function sentenceChanges(
       // 配音可能失败或尚未轮到；文字保存不能把旧正文、旧参数的合成音频当作新录音。
       if (previous?.voice_profile && next.voice_profile) {
         const textChanged =
-          canonicalVoiceHash(previous.content) !==
-          canonicalVoiceHash(next.content);
+          v3ContentFingerprint(
+            normalizeSpeechLiaisons(toRichTextV2(previous.content))
+          ) !==
+          v3ContentFingerprint(
+            normalizeSpeechLiaisons(toRichTextV2(next.content))
+          );
         const oldVoices = previous.voice_profile.voices;
         next.voice_profile = {
           ...next.voice_profile,
@@ -129,10 +134,14 @@ export function draftSentenceError(changes: NextSentenceDraftChange[]) {
     if (error) return error;
   }
 }
+const audioKey = (c: Pick<NextSentenceDraftChange, "id" | "target_locale">) =>
+  `${c.id}:${c.target_locale}`;
+
 export function useSentenceDrafts(
   base: NextSentence[],
   word: NextDraft,
-  medium: string
+  medium: string,
+  pendingStorageKey?: string
 ) {
   const [attempted, setAttempted] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, NextSentence>>({});
@@ -190,22 +199,35 @@ export function useSentenceDrafts(
   );
   const refs = word.senses.flatMap((v) => v.sentence_ids ?? []);
   const changes = sentenceChanges(allBase, drafts, refs, medium);
-  const [pendingAudio, setPendingAudio] = useState<
-    Pick<NextSentenceDraftChange, "id" | "target_locale">[]
-  >([]);
+  const [pendingAudio, setPendingAudio] = useState<string[]>(() => {
+    try {
+      const keys = JSON.parse(
+        (pendingStorageKey && localStorage.getItem(pendingStorageKey)) || "[]"
+      );
+      return Array.isArray(keys)
+        ? keys.filter((k) => typeof k === "string")
+        : [];
+    } catch {
+      return [];
+    }
+  });
+  // 本机只记 ID 和语言。重开后从当前词条读取正文、音色与修订号，不重放旧草稿。
+  const pendingKeys = new Set(pendingAudio);
   const audioQueue = [...changes];
-  for (const { id, target_locale } of pendingAudio) {
-    if (
-      !refs.includes(id) ||
-      changes.some((c) => c.id === id && c.target_locale === target_locale)
-    )
-      continue;
-    const variant = resources[id]?.draft.variants.find(
-      (v) => v.locale === target_locale
-    );
-    if (variant)
-      audioQueue.push({ id, target_locale, medium_locale: medium, variant });
-  }
+  const changedKeys = new Set(changes.map(audioKey));
+  if (pendingKeys.size)
+    for (const id of new Set(refs)) {
+      for (const variant of resources[id]?.draft.variants ?? []) {
+        const key = `${id}:${variant.locale}`;
+        if (pendingKeys.has(key) && !changedKeys.has(key))
+          audioQueue.push({
+            id,
+            target_locale: variant.locale,
+            medium_locale: medium,
+            variant
+          });
+      }
+    }
   const prepareTasks = useRef(new Map<string, () => Promise<boolean>>());
   const latest = useRef(changes);
   useLayoutEffect(() => {
@@ -273,29 +295,43 @@ export function useSentenceDrafts(
       setImported((current) => ({ ...current, [source.id]: source }));
     },
     audioQueue,
-    hasPendingAudio: pendingAudio.some((p) => refs.includes(p.id)),
-    reset(remaining: typeof pendingAudio = []) {
-      setPendingAudio(remaining);
+    hasPendingAudio: audioQueue.some((c) => pendingKeys.has(audioKey(c))),
+    reset(remaining?: string[]) {
+      if (remaining) {
+        setPendingAudio(remaining);
+        try {
+          if (pendingStorageKey) {
+            if (remaining.length)
+              localStorage.setItem(
+                pendingStorageKey,
+                JSON.stringify(remaining)
+              );
+            else localStorage.removeItem(pendingStorageKey);
+          }
+        } catch {
+          /* 禁用本地存储不影响服务器保存和当前页重试。 */
+        }
+      }
       setAttempted(false);
       setImported({});
       setDrafts({});
     },
-    async prepare() {
+    async prepare(retryPending: boolean) {
       const error = draftSentenceError(latest.current);
       if (error) throw new Error(error);
-      for (const [index, change] of audioQueue.entries()) {
-        const task = prepareTasks.current.get(
-          `${change.id}:${change.target_locale}`
-        );
+      const queue = retryPending ? audioQueue : changes;
+      for (const [index, change] of queue.entries()) {
+        const task = prepareTasks.current.get(audioKey(change));
         if (task && !(await task()))
           return {
             changes: latest.current,
-            pendingAudio: audioQueue
-              .slice(index)
-              .map(({ id, target_locale }) => ({ id, target_locale }))
+            pendingAudio: audioQueue.slice(index).map(audioKey)
           };
       }
-      return { changes: latest.current, pendingAudio: [] };
+      return {
+        changes: latest.current,
+        pendingAudio: audioQueue.slice(queue.length).map(audioKey)
+      };
     },
     prepareTasks
   };
