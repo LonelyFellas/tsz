@@ -122,6 +122,7 @@ function requests() {
     }),
     generate: vi.fn(),
     generationCandidates: vi.fn(),
+    refreshDictionaryReference: vi.fn(),
     capabilities: vi.fn().mockResolvedValue(caps),
     draftSchema: vi.fn().mockResolvedValue({
       draft_schema_version: 1,

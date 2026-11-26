@@ -249,6 +249,7 @@ export interface NextCapabilities {
   generation: boolean;
   generation_candidates?: boolean;
   section_generation_candidates?: boolean;
+  dictionary_refresh?: boolean;
   publishing: boolean;
   form_editor?: boolean;
   form_question_eligibility?: boolean;

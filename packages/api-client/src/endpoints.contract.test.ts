@@ -1390,7 +1390,12 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
           schema: { type: ["string", "null"] }
         },
         dialectPairsHeader,
-        { ...dialectPairsHeader, name: "x-tsz-next-dictionary-refresh" },
+        {
+          name: "x-tsz-next-dictionary-refresh",
+          in: "header",
+          required: false,
+          schema: { type: ["string", "null"] }
+        },
         formQuestionsHeader,
         {
           name: "x-tsz-next-generation",

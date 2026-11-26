@@ -1,6 +1,8 @@
 import type {
   NextAgentInput,
   NextAgentResult,
+  NextAgentSource,
+  NextDictionaryRefreshInput,
   NextGenerationCandidates,
   NextPublicationBase,
   NextAssessmentState,
@@ -96,6 +98,7 @@ export function createLexiconNextEndpoints(http: HttpClient) {
       "x-tsz-next-generation": "v1",
       "x-tsz-next-generation-candidates": "v1",
       "x-tsz-next-section-candidates": "v1",
+      "x-tsz-next-dictionary-refresh": "v1",
       "x-tsz-next-sentences": "v1",
       "x-tsz-next-sentence-details": "v1",
       "x-tsz-next-sentence-drafts": "v1",
@@ -167,6 +170,23 @@ export function createLexiconNextEndpoints(http: HttpClient) {
         .then((value) =>
           decode<NextAssessmentState>("NextAssessmentState", value)
         ),
+    refreshDictionaryReference: (
+      id: string,
+      input: NextDictionaryRefreshInput,
+      signal?: AbortSignal
+    ) =>
+      http
+        .post<unknown>(`${entry(id)}/generation/dictionary-reference`, input, {
+          signal
+        })
+        .then((value) => {
+          if (
+            !validateRuntimeSchema("NextAgentSource", value).valid ||
+            (value as NextAgentSource).source !== input.source
+          )
+            throw new ClientResponseError("词典参考响应不符合接口契约");
+          return value as NextAgentSource;
+        }),
     publication: (id: string) =>
       http
         .get<unknown>(`${entry(id)}/publication`, {

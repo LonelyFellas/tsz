@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/.codex/worktrees/zentao-232-form-eligibility-api/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-11-26T00:59:44.320Z",
+  "_generatedAt": "2026-11-26T01:47:01.000Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
