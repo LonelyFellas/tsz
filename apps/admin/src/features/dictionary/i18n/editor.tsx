@@ -262,6 +262,39 @@ export const lexiconEditorMessages = {
   ],
   add_form_group: ["增加一组词性变化", "新增一組詞性變化", "Add form group"],
   actions: ["操作", "操作", "Actions"],
+  assessment_review: ["测评审核", "測評審核", "Assessment review"],
+  assessment_approved: [
+    "已获测评资格",
+    "已獲測評資格",
+    "Approved for assessment"
+  ],
+  assessment_pending: [
+    "未获测评资格",
+    "未獲測評資格",
+    "Not approved for assessment"
+  ],
+  assessment_approve: [
+    "通过此版本测评审核",
+    "通過此版本測評審核",
+    "Approve this version for assessment"
+  ],
+  assessment_revoke: [
+    "撤销测评资格",
+    "撤銷測評資格",
+    "Revoke assessment approval"
+  ],
+  assessment_excluded: ["不参与出题", "不參與出題", "Excluded from questions"],
+  assessment_changed: [
+    "发布版本已变化，请重新读取后审核。",
+    "發布版本已變更，請重新讀取後審核。",
+    "The published version has changed. Reload before reviewing."
+  ],
+  question_eligible: ["参与出题", "參與出題", "Use in questions"],
+  question_eligible_for: [
+    "{{form}}参与出题",
+    "{{form}}參與出題",
+    "Use {{form}} in questions"
+  ],
   form_name: ["词形名称", "詞形名稱", "Form name"],
   voice: ["音色", "音色", "Voice"],
   voice_source: ["配音", "配音", "Speech"],

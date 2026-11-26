@@ -135,9 +135,47 @@ export function ensureMeaningTemplates(
   };
 }
 
+export function withFormQuestionSettings(
+  draft: NextDraft,
+  updated: NextDraft,
+  types: PartOfSpeechCatalogResponse["form_types"]
+): NextDraft {
+  if (
+    !updated.form_editor ||
+    (!types && !draft.form_question_eligibility?.length)
+  )
+    return updated;
+  const before = new Set(
+    draft.form_editor?.pos.flatMap((p) => p.forms.map((f) => f.id))
+  );
+  const defaults = new Map(
+    types?.map((type) => [type.code, type.default_question_eligible])
+  );
+  const previous = new Map(
+    draft.form_question_eligibility?.map((row) => [row.form_id, row.eligible])
+  );
+  const settings: NonNullable<NextDraft["form_question_eligibility"]> = [];
+  for (const pos of updated.form_editor.pos) {
+    for (const form of pos.forms) {
+      const enabled =
+        previous.get(form.id) ??
+        (before.has(form.id) ? undefined : defaults.get(form.form_type));
+      if (enabled !== undefined)
+        settings.push({ form_id: form.id, eligible: enabled });
+    }
+  }
+  if (settings.length)
+    return { ...updated, form_question_eligibility: settings };
+  if (!updated.form_question_eligibility) return updated;
+  const clean = { ...updated };
+  delete clean.form_question_eligibility;
+  return clean;
+}
+
 export function replaceFormEditor(
   draft: NextDraft,
-  form_editor: SharedFormsStepContentV3
+  form_editor: SharedFormsStepContentV3,
+  types?: PartOfSpeechCatalogResponse["form_types"]
 ): NextDraft {
   const newBaseContents = new Set(
     form_editor.pos
@@ -169,20 +207,24 @@ export function replaceFormEditor(
       .filter((pos) => !form_editor.pos.some((next) => next.pos === pos.pos))
       .map((pos) => pos.pos)
   );
-  return {
-    ...draft,
-    form_editor,
-    ...(draft.grammar_structures
-      ? {
-          grammar_structures: draft.grammar_structures.filter(
-            (grammar) => !removed.has(grammar.part_of_speech)
-          )
-        }
-      : {}),
-    senses: draft.senses.filter(
-      (sense) => !removed.has(sense.part_of_speech ?? "")
-    )
-  };
+  return withFormQuestionSettings(
+    draft,
+    {
+      ...draft,
+      form_editor,
+      ...(draft.grammar_structures
+        ? {
+            grammar_structures: draft.grammar_structures.filter(
+              (grammar) => !removed.has(grammar.part_of_speech)
+            )
+          }
+        : {}),
+      senses: draft.senses.filter(
+        (sense) => !removed.has(sense.part_of_speech ?? "")
+      )
+    },
+    types
+  );
 }
 
 export function draftForms(draft: NextDraft): NextForm[] {

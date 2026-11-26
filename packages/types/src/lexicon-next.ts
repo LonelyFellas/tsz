@@ -88,6 +88,8 @@ export interface NextGrammarIssue {
   message: string;
 }
 export interface NextDraft {
+  /** 按具体词形 ID 保存，历史词形缺省允许。 */
+  form_question_eligibility?: { form_id: string; eligible: boolean }[];
   grammar_structures?: NextGrammarStructure[];
   sense_groups?: NextSenseGroup[];
   schema_version: 1;
@@ -249,6 +251,7 @@ export interface NextCapabilities {
   section_generation_candidates?: boolean;
   publishing: boolean;
   form_editor?: boolean;
+  form_question_eligibility?: boolean;
   sense_groups?: boolean;
 }
 export interface NextDraftSchemaCompatibility {
@@ -485,6 +488,19 @@ export interface NextPublication {
     }[];
   };
 }
+export interface NextAssessmentState {
+  publication_id: string | null;
+  lifecycle_revision: number;
+  version: number;
+  approved: boolean;
+}
+export interface ReviewNextPublication {
+  publication_id: string;
+  lifecycle_revision: number;
+  expected_version: number;
+  approved: boolean;
+}
+
 export interface NextPublicationState {
   dialect_senses?: NextDialectSense[];
   entry_id: string;

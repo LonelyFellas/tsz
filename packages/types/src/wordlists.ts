@@ -164,6 +164,7 @@ export interface MyWordlistItems {
   pagination: CoinEntryPage["pagination"];
 }
 export interface WordlistCandidate {
+  source_library?: "legacy" | "lexicon_next";
   entry_id: string;
   publication_id: string;
   label: string;

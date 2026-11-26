@@ -46,6 +46,8 @@ const ROOTS = [
   "NextListCommandResult",
   "NextAnnotationInput",
   "NextAnnotationResult",
+  "NextAssessmentState",
+  "ReviewNextPublication",
   "NextPublicationBase",
   "NextPublishInput",
   "NextPublicationState",

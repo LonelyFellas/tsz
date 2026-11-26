@@ -12,6 +12,8 @@ export const RUNTIME_SCHEMA_ROOTS = [
   "NextListCommandResult",
   "NextAnnotationInput",
   "NextAnnotationResult",
+  "NextAssessmentState",
+  "ReviewNextPublication",
   "NextPublicationBase",
   "NextPublishInput",
   "NextPublicationState",

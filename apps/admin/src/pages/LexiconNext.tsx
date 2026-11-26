@@ -1,3 +1,5 @@
+import { FormQuestionContext } from "@/features/dictionary/word-creation-v3/components/formQuestionContext";
+
 import {
   SentenceDraftContext,
   SentenceDraftAudioTasks,
@@ -71,7 +73,8 @@ import {
   localeLabels,
   normalizeGrammarVariants,
   previewDraft,
-  replaceFormEditor
+  replaceFormEditor,
+  withFormQuestionSettings
 } from "@/features/lexicon-next/model";
 import {
   LexiconLanguages,
@@ -85,6 +88,7 @@ import {
   publicationIssueLocation,
   focusPublicationIssue
 } from "@/features/lexicon-next/publicationIssueFocus";
+import { AssessmentReview } from "@/features/lexicon-next/AssessmentReview";
 import { PublicationPanel } from "@/features/lexicon-next/PublicationPanel";
 import {
   EntryStart,
@@ -213,6 +217,9 @@ function LexiconNextWorkspace({ requests }: { requests: LexiconNextRequests }) {
               }
               publishingAvailable={capability.data?.publishing === true}
               relationsAvailable={capability.data?.relations === true}
+              formQuestionsAvailable={
+                capability.data?.form_question_eligibility === true
+              }
               formEditorAvailable={capability.data?.form_editor === true}
               senseGroupsAvailable={capability.data?.sense_groups === true}
               senseMetadataAvailable={capability.data?.sense_metadata === true}
@@ -258,6 +265,7 @@ function EntryLoader({
   generationCandidatesAvailable,
   sectionCandidatesAvailable,
   formEditorAvailable,
+  formQuestionsAvailable,
   senseGroupsAvailable,
   senseMetadataAvailable,
   equivalentMetadataAvailable,
@@ -272,6 +280,7 @@ function EntryLoader({
   relationsAvailable,
   publishingAvailable
 }: {
+  formQuestionsAvailable: boolean;
   formEditorAvailable: boolean;
   senseGroupsAvailable: boolean;
   senseMetadataAvailable: boolean;
@@ -409,6 +418,7 @@ function EntryLoader({
       publishingAvailable={publishingAvailable}
       relationsAvailable={relationsAvailable}
       formEditorAvailable={formEditorAvailable}
+      formQuestionsAvailable={formQuestionsAvailable}
       senseGroupsAvailable={senseGroupsAvailable}
       senseMetadataAvailable={senseMetadataAvailable}
       equivalentMetadataAvailable={equivalentMetadataAvailable}
@@ -434,6 +444,7 @@ function EntryEditor({
   language,
   archived,
   formEditorAvailable,
+  formQuestionsAvailable,
   senseGroupsAvailable,
   senseMetadataAvailable,
   equivalentMetadataAvailable,
@@ -448,6 +459,7 @@ function EntryEditor({
   relationsAvailable,
   publishingAvailable
 }: {
+  formQuestionsAvailable: boolean;
   formEditorAvailable: boolean;
   senseGroupsAvailable: boolean;
   senseMetadataAvailable: boolean;
@@ -644,7 +656,15 @@ function EntryEditor({
       grammarCatalog.data
     );
     if (seeded === draft) return;
-    setDraft(seeded);
+    setDraft(
+      formQuestionsAvailable
+        ? withFormQuestionSettings(
+            draft,
+            seeded,
+            grammarCatalog.data.form_types
+          )
+        : seeded
+    );
     setSelectedPos(seeded.form_editor?.pos[0]?.pos);
     const state = (routeLocation.state ?? {}) as Record<string, unknown>;
     const restState = { ...state };
@@ -657,6 +677,7 @@ function EntryEditor({
     currentLocalSnapshot,
     draft,
     formEditorAvailable,
+    formQuestionsAvailable,
     grammarCatalog.data,
     initial.draft.form_editor?.pos.length,
     initial.draft.forms.length,
@@ -1320,21 +1341,53 @@ function EntryEditor({
                   value={{ edit: writable, associate: false }}
                 >
                   <AdminControls componentDisabled={disabled}>
-                    <FormsStep
-                      selectedPos={activePos}
-                      onSelectedPosChange={setSelectedPos}
-                      value={draft.form_editor ?? emptyEditor}
-                      saved={saved.draft.form_editor}
-                      kind={saved.kind}
-                      locale={target === "en-US" ? "en-US" : "en-GB"}
-                      issues={formIssues}
-                      onChange={(form_editor) =>
-                        setDraft((current) =>
-                          replaceFormEditor(current, form_editor)
-                        )
+                    <FormQuestionContext.Provider
+                      value={
+                        formQuestionsAvailable
+                          ? {
+                              settings: new Map(
+                                draft.form_question_eligibility?.map((row) => [
+                                  row.form_id,
+                                  row.eligible
+                                ])
+                              ),
+                              disabled,
+                              change: (id, enabled) =>
+                                setDraft((current) => ({
+                                  ...current,
+                                  form_question_eligibility: [
+                                    ...(
+                                      current.form_question_eligibility ?? []
+                                    ).filter((row) => row.form_id !== id),
+                                    { form_id: id, eligible: enabled }
+                                  ]
+                                }))
+                            }
+                          : null
                       }
-                      registerLeaveGuard={registerContentLeaveGuard}
-                    />
+                    >
+                      <FormsStep
+                        selectedPos={activePos}
+                        onSelectedPosChange={setSelectedPos}
+                        value={draft.form_editor ?? emptyEditor}
+                        saved={saved.draft.form_editor}
+                        kind={saved.kind}
+                        locale={target === "en-US" ? "en-US" : "en-GB"}
+                        issues={formIssues}
+                        onChange={(form_editor) =>
+                          setDraft((current) =>
+                            replaceFormEditor(
+                              current,
+                              form_editor,
+                              formQuestionsAvailable
+                                ? grammarCatalog.data?.form_types
+                                : undefined
+                            )
+                          )
+                        }
+                        registerLeaveGuard={registerContentLeaveGuard}
+                      />
+                    </FormQuestionContext.Provider>
                   </AdminControls>
                 </ContentEditPermissions.Provider>
               </VoiceSaveContext.Provider>
@@ -1438,6 +1491,7 @@ function EntryEditor({
             registerLeaveGuard={registerContentLeaveGuard}
             kind={saved.kind}
             formEditorAvailable={formEditorAvailable}
+            formQuestionsAvailable={formQuestionsAvailable}
             target={target}
             medium={medium}
             partOfSpeechCodes={language.part_of_speech_codes}
@@ -1553,6 +1607,19 @@ function EntryEditor({
               />
             </>
           )}
+          {step === "preview" &&
+            formQuestionsAvailable &&
+            publishedVersion &&
+            publication.data?.status === "published" && (
+              <AssessmentReview
+                key={publishedVersion.id}
+                publication={publishedVersion}
+                lifecycle={publication.data.lifecycle_revision}
+                types={grammarCatalog.data?.form_types}
+                requests={requests}
+                onRefresh={publication.refetch}
+              />
+            )}
           {viewingSnapshot && !publishedVersion ? (
             <Card
               title={<h2>{t("review_published")}</h2>}
@@ -1906,7 +1973,15 @@ function EntryEditor({
               ...current,
               ...next.dialect
             }));
-          replaceDraft(next.draft);
+          replaceDraft(
+            formQuestionsAvailable
+              ? withFormQuestionSettings(
+                  draft,
+                  next.draft,
+                  grammarCatalog.data.form_types
+                )
+              : next.draft
+          );
           return true;
         }}
       >

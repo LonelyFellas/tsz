@@ -856,7 +856,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "b27b3e48d0b5c70d4fd360ffa624db53d6cfec4767875da90521851207e12b83"
+      "2fcf7a2f98287e9bb93f2099c582bd7e48488aa71d7e84c29e76b23b65ea6a44"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -1160,6 +1160,10 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       required: false,
       schema: { type: ["string", "null"] }
     };
+    const formQuestionsHeader = {
+      ...dialectPairsHeader,
+      name: "x-tsz-next-form-questions"
+    };
     const creationSnapshotHeader = {
       name: "x-tsz-next-creation-snapshot",
       in: "header",
@@ -1190,7 +1194,13 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       required: false,
       schema: { type: ["string", "null"] }
     };
+    const wordlistSourceHeader = {
+      ...dialectPairsHeader,
+      name: "X-TSZ-Wordlist-Source"
+    };
     expect(snapshot.operationHeaders).toEqual({
+      "get /wordlists/suggestions": [wordlistSourceHeader],
+      "post /wordlists/import-matches": [wordlistSourceHeader],
       "post /admin/lexicon-next/entries/{id}/generation": [
         grammarSubPosHeader,
         sectionCandidatesHeader
@@ -1207,7 +1217,13 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
           schema: { type: ["string", "null"] }
         }
       ],
-      "get /admin/lexicon-next/entries/{id}/publication": [dialectPairsHeader],
+      "get /admin/lexicon-next/entries/{id}/publication": [
+        dialectPairsHeader,
+        formQuestionsHeader
+      ],
+      "post /admin/lexicon-next/entries/{id}/publications": [
+        formQuestionsHeader
+      ],
       ...Object.fromEntries(
         [
           "get /admin/lexicon-next/workspace/entries",
@@ -1318,6 +1334,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
               schema: { type: ["string", "null"] }
             },
             dialectPairsHeader,
+            formQuestionsHeader,
             {
               name: "x-tsz-next-relations",
               in: "header",
@@ -1373,6 +1390,8 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
           schema: { type: ["string", "null"] }
         },
         dialectPairsHeader,
+        { ...dialectPairsHeader, name: "x-tsz-next-dictionary-refresh" },
+        formQuestionsHeader,
         {
           name: "x-tsz-next-generation",
           in: "header",

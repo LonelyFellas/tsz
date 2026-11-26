@@ -1,4 +1,5 @@
 "use client";
+import { CandidateSourceLabel } from "./CandidateSourceLabel";
 import { EmptyState } from "@tsz/ui/components/empty-state";
 import {
   LocalWebError,
@@ -467,7 +468,12 @@ export function ExcelImport({
                           )
                         }
                       >
-                        {candidate.label} · {candidate.glosses.join("；")}
+                        {candidate.label}
+                        <CandidateSourceLabel
+                          candidate={candidate}
+                          candidates={row.match?.candidates ?? []}
+                        />{" "}
+                        · {candidate.glosses.join("；")}
                       </Button>
                     ))}
                     <Button

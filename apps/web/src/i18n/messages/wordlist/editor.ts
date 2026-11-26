@@ -2,6 +2,8 @@ import { defineWebMessages } from "../../catalog";
 export const webWordlistEditor = /* @__PURE__ */ defineWebMessages(
   "webWordlistEditor",
   {
+    new_lexicon: ["新版词库", "新版詞庫", "New lexicon"],
+    legacy_lexicon: ["旧版词库", "舊版詞庫", "Legacy lexicon"],
     pending_save_unreadable: [
       "待确认的词表保存记录无法读取，请保留此页面并联系支持。",
       "無法讀取待確認的詞表儲存記錄，請保留此頁面並聯絡支援。",

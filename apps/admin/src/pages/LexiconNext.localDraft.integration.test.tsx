@@ -95,6 +95,8 @@ const entry: NextEntry = {
 
 function requests() {
   return {
+    assessment: vi.fn(),
+    reviewAssessment: vi.fn(),
     publication: vi.fn(),
     publicationPreview: vi.fn(),
     publish: vi.fn(),
