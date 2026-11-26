@@ -1615,7 +1615,7 @@ function EntryEditor({
                 key={publishedVersion.id}
                 publication={publishedVersion}
                 lifecycle={publication.data.lifecycle_revision}
-                types={grammarCatalog.data?.form_types}
+                catalog={grammarCatalog.data}
                 requests={requests}
                 onRefresh={publication.refetch}
               />
