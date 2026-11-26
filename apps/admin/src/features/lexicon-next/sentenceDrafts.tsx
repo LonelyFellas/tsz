@@ -15,12 +15,18 @@ import type {
   NextSentenceVariant
 } from "@tsz/types";
 import { normalizeTranslationFreedom, sentenceError } from "./sentenceModel";
+import { v3ContentFingerprint } from "@/features/dictionary/word-creation-v3/saveFlow";
 import { useSelectedVoiceAudio } from "@/features/dictionary/word-creation-v3/useSelectedVoiceAudio";
 import {
   adminVoicePreviewAdapter,
   voicePreviewIsMock
 } from "@/features/dictionary/voice-editor/dataSource";
-import { toRichTextV2, withDefaultVoiceProfile } from "@tsz/voice-editor/core";
+import {
+  normalizeSpeechLiaisons,
+  toRichTextV2,
+  voiceEffectKey,
+  withDefaultVoiceProfile
+} from "@tsz/voice-editor/core";
 import { env } from "@/lib/env";
 import { usePermission } from "@/lib/auth";
 
@@ -81,6 +87,33 @@ export function sentenceChanges(
           )
       )
         return [];
+      // 配音可能失败或尚未轮到；文字保存不能把旧正文、旧参数的合成音频当作新录音。
+      if (previous?.voice_profile && next.voice_profile) {
+        const textChanged =
+          v3ContentFingerprint(
+            normalizeSpeechLiaisons(toRichTextV2(previous.content))
+          ) !==
+          v3ContentFingerprint(
+            normalizeSpeechLiaisons(toRichTextV2(next.content))
+          );
+        const oldVoices = previous.voice_profile.voices;
+        next.voice_profile = {
+          ...next.voice_profile,
+          voices: next.voice_profile.voices.map((voice) => {
+            if (!voice.audio_asset_id) return voice;
+            const old = oldVoices.find(
+              (v) => v.audio_asset_id === voice.audio_asset_id
+            );
+            if (
+              !old ||
+              (!textChanged && voiceEffectKey(old) === voiceEffectKey(voice))
+            )
+              return voice;
+            const { audio_asset_id: _oldAudio, ...settings } = voice;
+            return settings;
+          })
+        };
+      }
       return [
         {
           id,
@@ -101,10 +134,14 @@ export function draftSentenceError(changes: NextSentenceDraftChange[]) {
     if (error) return error;
   }
 }
+const audioKey = (c: Pick<NextSentenceDraftChange, "id" | "target_locale">) =>
+  `${c.id}:${c.target_locale}`;
+
 export function useSentenceDrafts(
   base: NextSentence[],
   word: NextDraft,
-  medium: string
+  medium: string,
+  pendingStorageKey?: string
 ) {
   const [attempted, setAttempted] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, NextSentence>>({});
@@ -162,6 +199,35 @@ export function useSentenceDrafts(
   );
   const refs = word.senses.flatMap((v) => v.sentence_ids ?? []);
   const changes = sentenceChanges(allBase, drafts, refs, medium);
+  const [pendingAudio, setPendingAudio] = useState<string[]>(() => {
+    try {
+      const keys = JSON.parse(
+        (pendingStorageKey && localStorage.getItem(pendingStorageKey)) || "[]"
+      );
+      return Array.isArray(keys)
+        ? keys.filter((k) => typeof k === "string")
+        : [];
+    } catch {
+      return [];
+    }
+  });
+  // 本机只记 ID 和语言。重开后从当前词条读取正文、音色与修订号，不重放旧草稿。
+  const pendingKeys = new Set(pendingAudio);
+  const audioQueue = [...changes];
+  const changedKeys = new Set(changes.map(audioKey));
+  if (pendingKeys.size)
+    for (const id of new Set(refs)) {
+      for (const variant of resources[id]?.draft.variants ?? []) {
+        const key = `${id}:${variant.locale}`;
+        if (pendingKeys.has(key) && !changedKeys.has(key))
+          audioQueue.push({
+            id,
+            target_locale: variant.locale,
+            medium_locale: medium,
+            variant
+          });
+      }
+    }
   const prepareTasks = useRef(new Map<string, () => Promise<boolean>>());
   const latest = useRef(changes);
   useLayoutEffect(() => {
@@ -228,22 +294,44 @@ export function useSentenceDrafts(
     importResource(source: NextSentence) {
       setImported((current) => ({ ...current, [source.id]: source }));
     },
-    reset() {
+    audioQueue,
+    hasPendingAudio: audioQueue.some((c) => pendingKeys.has(audioKey(c))),
+    reset(remaining?: string[]) {
+      if (remaining) {
+        setPendingAudio(remaining);
+        try {
+          if (pendingStorageKey) {
+            if (remaining.length)
+              localStorage.setItem(
+                pendingStorageKey,
+                JSON.stringify(remaining)
+              );
+            else localStorage.removeItem(pendingStorageKey);
+          }
+        } catch {
+          /* 禁用本地存储不影响服务器保存和当前页重试。 */
+        }
+      }
       setAttempted(false);
       setImported({});
       setDrafts({});
     },
-    async prepare() {
+    async prepare(retryPending: boolean) {
       const error = draftSentenceError(latest.current);
       if (error) throw new Error(error);
-      for (const change of latest.current) {
-        const task = prepareTasks.current.get(
-          `${change.id}:${change.target_locale}`
-        );
+      const queue = retryPending ? audioQueue : changes;
+      for (const [index, change] of queue.entries()) {
+        const task = prepareTasks.current.get(audioKey(change));
         if (task && !(await task()))
-          throw new Error("例句配音处理未完成，草稿已保留，请重试。 ");
+          return {
+            changes: latest.current,
+            pendingAudio: audioQueue.slice(index).map(audioKey)
+          };
       }
-      return latest.current;
+      return {
+        changes: latest.current,
+        pendingAudio: audioQueue.slice(queue.length).map(audioKey)
+      };
     },
     prepareTasks
   };
@@ -305,7 +393,7 @@ export function SentenceDraftAudioTasks({
 }) {
   return (
     <>
-      {workspace.changes.map((change) => (
+      {workspace.audioQueue.map((change) => (
         <SentenceAudioTask
           key={`${change.id}:${change.target_locale}`}
           change={change}

@@ -310,6 +310,7 @@ function EntryLoader({
   language: NextLanguageCapability;
 }) {
   const { medium, search: languageSearch } = useLexiconLanguages();
+  const editorAccount = useAuthStore((state) => state.profile?.id);
   const location = useLocation();
   const navigate = useNavigate();
   const query = useQuery({
@@ -412,7 +413,7 @@ function EntryLoader({
   }
   return (
     <EntryEditor
-      key={`${id}:${medium}`}
+      key={`${editorAccount}:${id}:${medium}`}
       initial={query.data}
       suggestedPartOfSpeech={creationState?.lexiconNextSuggestedPartOfSpeech}
       entryMedium={query.data.medium_locale ?? medium}
@@ -593,10 +594,14 @@ function EntryEditor({
     cancelLanguageChange
   } = useLexiconLanguages();
   const medium = entryMedium;
+  const profile = useAuthStore((state) => state.profile);
   const sentenceWorkspace = useSentenceDrafts(
     saved.sentence_resources ?? [],
     draft,
-    medium
+    medium,
+    (profile &&
+      `tsz:admin:sentence-audio-pending:v1:${profile.id}:${saved.id}:${medium}`) ||
+      undefined
   );
   const [saving, setBusy] = useState(false);
   const [publicationBusy, setPublicationBusy] = useState(false);
@@ -616,7 +621,6 @@ function EntryEditor({
   const [conflict, setConflict] = useState(false);
   const [peerConflict, setPeerConflict] = useState(false);
   const [remote, setRemote] = useState<NextEntry>();
-  const profile = useAuthStore((state) => state.profile);
   const localDraftKey = useMemo<NextLocalDraftKey | undefined>(
     () =>
       profile?.id
@@ -705,6 +709,7 @@ function EntryEditor({
   const canCreate = usePermission("words.create");
   const canCreateSentence = usePermission("sentences.create");
   const canAccessSentence = usePermission("sentences.access");
+  const canGenerateAudio = usePermission("speech.generate");
   // Translate only local or singly referenced sentences this editor can modify.
   const referencedSentenceIds = new Set(
     draft.senses.flatMap((s) => s.sentence_ids ?? [])
@@ -1027,9 +1032,17 @@ function EntryEditor({
         }
         const problem = draftProblem(normalized, equivalentMetadataAvailable);
         if (problem) throw new Error(problem);
-        const changes = sentenceDraftsAvailable
-          ? await sentenceWorkspace.prepare()
-          : [];
+        const { changes, pendingAudio } = sentenceDraftsAvailable
+          ? await sentenceWorkspace.prepare(
+              !dirty && sentenceWorkspace.hasPendingAudio
+            )
+          : { changes: [], pendingAudio: [] };
+        if (sentenceWorkspace.hasPendingAudio && !dirty && !changes.length) {
+          sentenceWorkspace.reset(pendingAudio);
+          if (pendingAudio.length)
+            void message.warning("例句配音仍未完成，请稍后重试。");
+          return;
+        }
         const result = await requests.save(saved.id, {
           expected_revision: saved.revision,
           ...(pairChanges.length ? { dialect_changes: pairChanges } : {}),
@@ -1039,7 +1052,7 @@ function EntryEditor({
         setEditedPairs({});
         setSaved(result);
         setDraft(result.draft);
-        sentenceWorkspace.reset();
+        sentenceWorkspace.reset(pendingAudio);
         setConflict(false);
         setRemote(undefined);
         if (localDraftKey)
@@ -1056,7 +1069,9 @@ function EntryEditor({
         void queryClient.invalidateQueries({
           queryKey: ["admin-lexicon-next", "publication", saved.id]
         });
-        void message.success("草稿已保存");
+        if (pendingAudio.length)
+          void message.warning("草稿已保存，例句配音待补。");
+        else void message.success("草稿已保存");
       },
       { preserveDraft: true }
     );
@@ -1281,6 +1296,24 @@ function EntryEditor({
             }
           />
         )}
+        {writable &&
+          !viewingSnapshot &&
+          canAccessSentence &&
+          canGenerateAudio &&
+          sentenceWorkspace.hasPendingAudio && (
+            <Alert
+              type="warning"
+              title="例句配音待补"
+              action={
+                <Button
+                  disabled={disabled || dirty || conflict || formContentOpen}
+                  onClick={() => void save()}
+                >
+                  重试例句配音
+                </Button>
+              }
+            />
+          )}
         {richTextRepairNotice && (
           <Alert
             type="warning"

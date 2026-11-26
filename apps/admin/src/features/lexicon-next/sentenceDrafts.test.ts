@@ -169,6 +169,64 @@ it("新引用的既有资源保留原版本，修改不能误认为新建或无�
   ).toBe("zh-Hant");
 });
 
+it("提交文字时只解除与新正文不匹配的旧合成音频，保留新生成的版本", () => {
+  const saved = structuredClone(source);
+  const uk = saved.draft.variants[0]!;
+  uk.voice_profile = {
+    voices: [
+      {
+        voice_id: "first",
+        enabled: true,
+        rate_percent: 0,
+        audio_asset_id: "old-first"
+      },
+      {
+        voice_id: "second",
+        enabled: true,
+        rate_percent: 0,
+        audio_asset_id: "old-second"
+      }
+    ]
+  };
+  const edited = structuredClone(saved);
+  const variant = edited.draft.variants[0]!;
+  variant.translations = [];
+  const payload = () =>
+    sentenceChanges([saved], { sentence: edited }, [saved.id], "zh-Hant")[0]!
+      .variant;
+  uk.content = {
+    version: 1,
+    text: variant.content.text,
+    spans: [],
+    liaisons: []
+  };
+  expect(payload().voice_profile).toEqual(uk.voice_profile);
+  uk.content = {
+    version: 2,
+    text: variant.content.text,
+    annotations: [{ at: 2, duration_ms: 250, type: "pause" }]
+  };
+  variant.content = {
+    version: 2,
+    text: uk.content.text,
+    annotations: [{ type: "pause", at: 2, duration_ms: 250 }]
+  };
+  expect(payload().voice_profile).toEqual(uk.voice_profile);
+  variant.content.text = "New text.";
+  variant.voice_profile!.voices[0]!.audio_asset_id = "new-first";
+  const voices = payload().voice_profile!.voices;
+  expect(voices[0]!.audio_asset_id).toBe("new-first");
+  expect(voices[1]).toEqual({
+    voice_id: "second",
+    enabled: true,
+    rate_percent: 0
+  });
+  expect(uk.voice_profile.voices[1]!.audio_asset_id).toBe("old-second");
+  variant.content = uk.content;
+  variant.voice_profile!.voices[1]!.rate_percent = 15;
+  expect(payload().voice_profile!.voices[1]!.audio_asset_id).toBeUndefined();
+});
+
 it("未保存的正文和配音变更不预览旧录音，原草稿绑定保留供保存复用", () => {
   const audioSource = structuredClone(source);
   audioSource.draft.variants[0]!.voice_profile = {
