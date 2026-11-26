@@ -1,4 +1,5 @@
 import {
+  BOWL_FIELDS,
   LIAISON_ADJUSTMENT_LIMITS,
   liaisonAdjustment,
   liaisonAnchorKey
@@ -93,6 +94,7 @@ function annotationOrderKey(annotation: RichTextAnnotation): string {
   const {
     left_offset_pct: _left,
     right_offset_pct: _right,
+    bowl: _bowl,
     ...anchors
   } = annotation;
   return JSON.stringify(anchors);
@@ -166,6 +168,26 @@ export function validateRichTextV2(
       });
     }
     if (annotation.type === "liaison") {
+      const bowl = annotation.bowl;
+      if (
+        bowl !== undefined &&
+        (!bowl ||
+          typeof bowl !== "object" ||
+          Array.isArray(bowl) ||
+          Object.entries(bowl).some(
+            ([k, v]) =>
+              !BOWL_FIELDS.some((f) => f === k) ||
+              typeof v !== "number" ||
+              !Number.isInteger(v) ||
+              Math.abs(v) > 100
+          ))
+      ) {
+        issues.push({
+          code: "invalid_liaison_adjustment",
+          path: `${path}.bowl`,
+          message: "碗形连读参数必须为 -100 至 100 的整数"
+        });
+      }
       for (const field of ["left_offset_pct", "right_offset_pct"] as const) {
         const offset = annotation[field];
         if (
@@ -304,10 +326,11 @@ export function normalizeRichTextV2(value: RichTextV2): RichTextV2 {
       const key = liaisonAnchorKey(annotation);
       if (liaisonAnchors.has(key)) continue;
       liaisonAnchors.add(key);
-      const { left_offset_pct, right_offset_pct, ...anchors } = annotation;
+      const { left_offset_pct, right_offset_pct, bowl, ...anchors } =
+        annotation;
       ranges.push({
         ...anchors,
-        ...liaisonAdjustment({ left_offset_pct, right_offset_pct })
+        ...liaisonAdjustment({ left_offset_pct, right_offset_pct, bowl })
       });
     } else {
       ranges.push({ ...annotation });

@@ -1,3 +1,7 @@
+import { LiaisonBowlControls } from "./LiaisonBowlControls";
+import type { BowlTarget } from "../../marks/liaisonBowl";
+import type { LiaisonArc } from "../../marks/liaisonGeometry";
+import type { LiaisonBowl } from "@tsz/types";
 import { AudioUploadError, VoiceEditorDisplayError } from "../../types";
 import {
   localVoiceEditorErrorText,
@@ -26,7 +30,6 @@ import { Input, Select } from "@tsz/ui/admin/forms";
 import { Modal, Tooltip } from "@tsz/ui/admin/overlays";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  LIAISON_ADJUSTMENT_LIMITS,
   liaisonAdjustment,
   normalizeSpeechLiaisons,
   type LiaisonAdjustment
@@ -339,6 +342,12 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   /** 接下来点的字母归哪一端；由面板上的「起点 / 终点」开关决定。 */
   const [liaisonEnd, setLiaisonEnd] = useState<LiaisonEnd>("start");
   const [selectedLiaisonIndex, setSelectedLiaisonIndex] = useState<number>();
+  const [bowlTarget, setBowlTarget] = useState<BowlTarget>("curve_pct");
+  const [bowlPreview, setBowlPreview] = useState<{
+    link: LiaisonLink;
+    bowl: LiaisonBowl;
+  }>();
+  const [measuredArc, setMeasuredArc] = useState<LiaisonArc>();
   const selectedLiaison =
     selectedLiaisonIndex === undefined
       ? undefined
@@ -366,6 +375,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     setDraft({});
     setRoleAnchor(undefined);
     setLiaisonEnd("start");
+    setBowlTarget("curve_pct");
+    setBowlPreview(undefined);
     setSelectedLiaisonIndex(undefined);
   }, []);
   const tokens = tokenize(text);
@@ -1498,6 +1509,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     if (key === "liaison-adjust") {
       if (readOnly || marks.liaisons.length === 0) return;
       changeBrush({ kind: "liaison-adjust" });
+      setSelectedLiaisonIndex(0);
       setOpenTool(key);
       return;
     }
@@ -1807,6 +1819,21 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     return false;
   };
 
+  const restoreAdjustmentSelection = (restored: MarkState) => {
+    resetTransient();
+    if (brush.kind !== "liaison-adjust" || !selectedLiaison) return;
+    const index = restored.liaisons.findIndex(
+      (link) =>
+        link.start.start === selectedLiaison.start.start &&
+        link.start.end === selectedLiaison.start.end &&
+        link.end.start === selectedLiaison.end.start &&
+        link.end.end === selectedLiaison.end.end
+    );
+    if (index >= 0) {
+      setSelectedLiaisonIndex(index);
+      setBowlTarget(bowlTarget);
+    } else if (restored.liaisons.length) setSelectedLiaisonIndex(0);
+  };
   const undo = () => {
     const previous = past[past.length - 1];
     if (!previous || !canApplySnapshot(previous)) return;
@@ -1836,7 +1863,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           )
         : ""
     );
-    resetTransient();
+    restoreAdjustmentSelection(previous.marks);
     setValidationMessage("");
   };
 
@@ -1868,7 +1895,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           )
         : ""
     );
-    resetTransient();
+    restoreAdjustmentSelection(next.marks);
     setValidationMessage("");
   };
 
@@ -2402,12 +2429,19 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       .filter((gap) => crossesGap(link, gap));
     if (gaps.length) {
       setOpenTool(undefined);
-      setPendingConflict({ kind: "liaison", link, gaps });
+      setPendingConflict({
+        kind: "liaison",
+        link: { ...link, bowl: {} },
+        gaps
+      });
       return;
     }
     commit((current) => ({
       ...current,
-      marks: { ...current.marks, liaisons: [...current.marks.liaisons, link] }
+      marks: {
+        ...current.marks,
+        liaisons: [...current.marks.liaisons, { ...link, bowl: {} }]
+      }
     }));
     resetTransient();
     setTextSelection(selection);
@@ -2426,10 +2460,15 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     );
   };
 
-  const handleLiaisonClick = (index: number) => {
+  const handleLiaisonClick = (
+    index: number,
+    target: BowlTarget = "curve_pct"
+  ) => {
     if (readOnly) return;
     if (brush.kind === "liaison-adjust") {
       setSelectedLiaisonIndex(index);
+      setBowlTarget(target);
+      setBowlPreview(undefined);
       return;
     }
     if (brush.kind !== "liaison" && brush.kind !== "erase") return;
@@ -2929,6 +2968,10 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     brush.kind === "liaison-adjust" ? Array.from(text) : [];
   const liaisonAnchorText = (anchor: LiaisonAnchor) =>
     liaisonLabelPoints.slice(anchor.start, anchor.end).join("");
+  const activeBowlPreview =
+    selectedLiaison && bowlPreview?.link === selectedLiaison
+      ? bowlPreview.bowl
+      : undefined;
   const tools = [
     ...(mode === "voice-trial"
       ? [
@@ -3423,59 +3466,48 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       content:
         brush.kind === "liaison-adjust" ? (
           <div className="tsz-ve-selection-liaison">
-            <Select<number>
-              size="small"
-              className="tsz-ve-liaison-adjust-select"
-              aria-label={t("select_liaison_arc")}
-              placeholder={t("select_liaison_arc")}
-              value={selectedLiaisonIndex}
-              disabled={readOnly || marks.liaisons.length === 0}
-              options={marks.liaisons.map(({ start, end }, index) => ({
-                value: index,
-                label: `${index + 1}. ${liaisonAnchorText(start)} → ${liaisonAnchorText(end)}`
-              }))}
-              onChange={setSelectedLiaisonIndex}
-            />
-            {(
-              [
-                ["left_offset_pct", 10, "raise_liaison_left"],
-                ["left_offset_pct", -10, "lower_liaison_left"],
-                ["right_offset_pct", 10, "raise_liaison_right"],
-                ["right_offset_pct", -10, "lower_liaison_right"]
-              ] as const
-            ).map(([field, step, label]) => {
-              const offset = selectedLiaison?.[field] ?? 0;
-              const limit = LIAISON_ADJUSTMENT_LIMITS[field];
-              const next = Math.max(-limit, Math.min(limit, offset + step));
-              return (
-                <Button
-                  key={label}
-                  size="small"
-                  disabled={readOnly || !selectedLiaison || next === offset}
-                  onClick={() =>
-                    updateLiaisonAdjustment({
-                      ...selectedLiaison,
-                      [field]: next
-                    })
-                  }
-                >
-                  {t(label)}
-                </Button>
-              );
-            })}
-            <Button
-              size="small"
-              disabled={
-                readOnly ||
-                !(
-                  selectedLiaison?.left_offset_pct ||
-                  selectedLiaison?.right_offset_pct
-                )
-              }
-              onClick={() => updateLiaisonAdjustment({})}
-            >
-              {t("reset_liaison_arc")}
-            </Button>
+            {marks.liaisons.length > 1 && (
+              <Select<number>
+                size="small"
+                className="tsz-ve-liaison-adjust-select"
+                aria-label={t("select_liaison_arc")}
+                placeholder={t("select_liaison_arc")}
+                value={selectedLiaisonIndex}
+                disabled={readOnly || marks.liaisons.length === 0}
+                options={marks.liaisons.map(({ start, end }, index) => ({
+                  value: index,
+                  label: `${index + 1}. ${liaisonAnchorText(start)} → ${liaisonAnchorText(end)}`
+                }))}
+                onChange={(index) => handleLiaisonClick(index)}
+              />
+            )}
+            {selectedLiaison && (
+              <LiaisonBowlControls
+                key={`${selectedLiaisonIndex}:${selectedLiaison.start.start}:${selectedLiaison.end.end}`}
+                bowl={selectedLiaison.bowl}
+                preview={activeBowlPreview}
+                arc={
+                  measuredArc?.index === selectedLiaisonIndex
+                    ? measuredArc
+                    : undefined
+                }
+                target={bowlTarget}
+                disabled={readOnly}
+                onTarget={(v) => {
+                  setBowlPreview(undefined);
+                  setBowlTarget(v);
+                }}
+                onPreview={(b) =>
+                  setBowlPreview(
+                    b ? { link: selectedLiaison, bowl: b } : undefined
+                  )
+                }
+                onCommit={(bowl) => {
+                  setBowlPreview(undefined);
+                  updateLiaisonAdjustment({ bowl });
+                }}
+              />
+            )}
           </div>
         ) : undefined
     },
@@ -4357,6 +4389,15 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         onLetterClick={handleLetterClick}
         onLiaisonClick={handleLiaisonClick}
         selectedLiaisonIndex={selectedLiaisonIndex}
+        bowlEdit={
+          brush.kind === "liaison-adjust"
+            ? {
+                target: bowlTarget,
+                preview: activeBowlPreview,
+                onGeometry: setMeasuredArc
+              }
+            : undefined
+        }
         onClearAll={clearAll}
         inputLabel={
           contextLabel === "语音编辑器" ? t("voice_editor") : contextLabel

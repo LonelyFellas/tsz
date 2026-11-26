@@ -1,4 +1,4 @@
-import type { RichTextAnnotation, RichTextV2 } from "@tsz/types";
+import type { LiaisonBowl, RichTextAnnotation, RichTextV2 } from "@tsz/types";
 
 type LiaisonRange = Pick<
   Extract<RichTextAnnotation, { type: "liaison" }>,
@@ -16,8 +16,14 @@ export interface LiaisonAnchorSpans {
 
 export type LiaisonAdjustment = Pick<
   Extract<RichTextAnnotation, { type: "liaison" }>,
-  "left_offset_pct" | "right_offset_pct"
+  "left_offset_pct" | "right_offset_pct" | "bowl"
 >;
+
+export const BOWL_FIELDS = [
+  "curve_pct",
+  "left_tip_pct",
+  "right_tip_pct"
+] as const satisfies readonly (keyof LiaisonBowl)[];
 
 export const LIAISON_ADJUSTMENT_LIMITS = {
   left_offset_pct: 100,
@@ -26,11 +32,19 @@ export const LIAISON_ADJUSTMENT_LIMITS = {
 
 export function liaisonAdjustment({
   left_offset_pct,
-  right_offset_pct
+  right_offset_pct,
+  bowl
 }: LiaisonAdjustment): LiaisonAdjustment {
   return {
     ...(left_offset_pct ? { left_offset_pct } : {}),
-    ...(right_offset_pct ? { right_offset_pct } : {})
+    ...(right_offset_pct ? { right_offset_pct } : {}),
+    ...(bowl
+      ? {
+          bowl: Object.fromEntries(
+            BOWL_FIELDS.filter((k) => bowl[k]).map((k) => [k, bowl[k]])
+          )
+        }
+      : {})
   };
 }
 

@@ -818,6 +818,31 @@ describe("VoiceEditor 标注带", () => {
     expect(letter(0, 0)).toHaveAttribute("aria-disabled", "true");
   });
 
+  it("打开微调不改旧弧，主动转换才保存碗形，撤销恢复旧偏移", () => {
+    const legacy = {
+      type: "liaison",
+      start: 2,
+      end: 7,
+      start_len: 1,
+      end_len: 1,
+      left_offset_pct: 30
+    } as const;
+    const view = props({
+      value: { version: 2, text: TEXT, annotations: [legacy] }
+    });
+    render(<VoiceEditor {...view} />);
+    view.onChange.mockClear();
+    fireEvent.click(button("微调连读弧"));
+    expect(view.onChange).not.toHaveBeenCalled();
+    fireEvent.click(button("使用推荐碗形"));
+    expect(applied(view).annotations).toEqual([
+      { type: "liaison", start: 2, end: 7, start_len: 1, end_len: 1, bowl: {} }
+    ]);
+    fireEvent.click(button("上一步"));
+    expect(applied(view).annotations).toEqual([legacy]);
+    expect(button("使用推荐碗形")).toBeEnabled();
+  });
+
   it("连读默认可用：选中整段文本直接添加首尾连读", () => {
     const view = props();
     render(<VoiceEditor {...view} />);
@@ -825,7 +850,7 @@ describe("VoiceEditor 标注带", () => {
     selectText(7, 10);
     fireEvent.click(button("一次性添加"));
     expect(applied(view).annotations).toEqual([
-      { type: "liaison", start: 7, end: 10, start_len: 1, end_len: 1 }
+      { type: "liaison", bowl: {}, start: 7, end: 10, start_len: 1, end_len: 1 }
     ]);
   });
 
@@ -839,7 +864,7 @@ describe("VoiceEditor 标注带", () => {
     selectText(9, 11);
     fireEvent.click(button("连读终点"));
     expect(applied(view).annotations).toEqual([
-      { type: "liaison", start: 6, end: 11, start_len: 2, end_len: 2 }
+      { type: "liaison", bowl: {}, start: 6, end: 11, start_len: 2, end_len: 2 }
     ]);
   });
 
@@ -853,7 +878,7 @@ describe("VoiceEditor 标注带", () => {
     selectText(9, 10);
     fireEvent.click(button("连读终点"));
     expect(applied(view).annotations).toEqual([
-      { type: "liaison", start: 4, end: 10, start_len: 1, end_len: 1 }
+      { type: "liaison", bowl: {}, start: 4, end: 10, start_len: 1, end_len: 1 }
     ]);
   });
 
@@ -862,7 +887,7 @@ describe("VoiceEditor 标注带", () => {
     render(<VoiceEditor {...view} />);
     connect(6, 12, 4);
     expect(applied(view).annotations).toEqual([
-      { type: "liaison", start: 6, end: 13, start_len: 4, end_len: 1 }
+      { type: "liaison", bowl: {}, start: 6, end: 13, start_len: 4, end_len: 1 }
     ]);
   });
 
@@ -886,7 +911,14 @@ describe("VoiceEditor 标注带", () => {
       connect(reverse ? 5 : 3, reverse ? 3 : 5);
       const saved = applied(view);
       expect(saved.annotations).toEqual([
-        { type: "liaison", start: 3, end: 6, start_len: 1, end_len: 1 }
+        {
+          type: "liaison",
+          bowl: {},
+          start: 3,
+          end: 6,
+          start_len: 1,
+          end_len: 1
+        }
       ]);
       mounted.unmount();
       const reopened = props({ value: saved });
@@ -908,14 +940,28 @@ describe("VoiceEditor 标注带", () => {
     expect(applied(view).annotations).toEqual(
       expect.arrayContaining([
         { type: "emphasis", start: 2, end: 8, level: "core" },
-        { type: "liaison", start: 2, end: 8, start_len: 1, end_len: 1 }
+        {
+          type: "liaison",
+          bowl: {},
+          start: 2,
+          end: 8,
+          start_len: 1,
+          end_len: 1
+        }
       ])
     );
     fireEvent.click(button("标记为词性提示符"));
     expect(applied(view).annotations).toEqual(
       expect.arrayContaining([
         { type: "emphasis", start: 2, end: 8, level: "grammar" },
-        { type: "liaison", start: 2, end: 8, start_len: 1, end_len: 1 }
+        {
+          type: "liaison",
+          bowl: {},
+          start: 2,
+          end: 8,
+          start_len: 1,
+          end_len: 1
+        }
       ])
     );
   });
@@ -930,6 +976,7 @@ describe("VoiceEditor 标注带", () => {
     expect(applied(view).annotations).toEqual([
       {
         type: "liaison",
+        bowl: {},
         start: 0,
         end: 20,
         start_len: 1,
@@ -1427,6 +1474,7 @@ describe("VoiceEditor 文本与落盘", () => {
     expect(applied(view).annotations).toEqual([
       {
         type: "liaison",
+        bowl: {},
         start: 3,
         end: 6,
         start_len: 1,
@@ -1434,6 +1482,7 @@ describe("VoiceEditor 文本与落盘", () => {
       },
       {
         type: "liaison",
+        bowl: {},
         start: 6,
         end: 9,
         start_len: 1,
@@ -1454,8 +1503,8 @@ describe("VoiceEditor 文本与落盘", () => {
     connect(1, 4);
 
     expect(applied(view).annotations).toEqual([
-      { type: "liaison", start: 0, end: 3, start_len: 1, end_len: 1 },
-      { type: "liaison", start: 1, end: 5, start_len: 1, end_len: 1 }
+      { type: "liaison", bowl: {}, start: 0, end: 3, start_len: 1, end_len: 1 },
+      { type: "liaison", bowl: {}, start: 1, end: 5, start_len: 1, end_len: 1 }
     ]);
   });
 
@@ -1489,7 +1538,7 @@ describe("VoiceEditor 文本与落盘", () => {
     connect(6, 9, 2, 2);
     const linked = applied(view);
     expect(linked.annotations).toEqual([
-      { type: "liaison", start: 6, end: 11, start_len: 2, end_len: 2 }
+      { type: "liaison", bowl: {}, start: 6, end: 11, start_len: 2, end_len: 2 }
     ]);
     connect(9, 6, 2, 2);
     expect(applied(view).annotations).toEqual([]);

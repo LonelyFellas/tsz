@@ -1,3 +1,6 @@
+import type { LiaisonBowl } from "@tsz/types";
+import type { BowlTarget } from "../../marks/liaisonBowl";
+import type { LiaisonArc } from "../../marks/liaisonGeometry";
 import {
   useVoiceEditorTranslation,
   defaultVoiceEditorTranslation,
@@ -95,7 +98,12 @@ export interface AnnotationStripProps {
   roleAnchorStart?: number;
   onGapClick: (gapIndex: number) => void;
   onLetterClick: (anchor: LiaisonAnchor) => void;
-  onLiaisonClick: (index: number) => void;
+  onLiaisonClick: (index: number, target?: BowlTarget) => void;
+  bowlEdit?: {
+    target: BowlTarget;
+    preview?: LiaisonBowl;
+    onGeometry: (arc: LiaisonArc | undefined) => void;
+  };
   selectedLiaisonIndex?: number;
 }
 
@@ -143,6 +151,7 @@ export function AnnotationStrip({
   onGapClick,
   onLetterClick,
   onLiaisonClick,
+  bowlEdit,
   selectedLiaisonIndex
 }: AnnotationStripProps) {
   const { t } = useVoiceEditorTranslation();
@@ -207,7 +216,27 @@ export function AnnotationStrip({
     text
   ]);
 
-  const { arcs, strokeWidth } = useLiaisonArcs(containerRef, collectLinks);
+  const editingIndex =
+    brush.kind === "liaison-adjust" && !readOnly
+      ? selectedLiaisonIndex
+      : undefined;
+  const { arcs, strokeWidth } = useLiaisonArcs(
+    containerRef,
+    collectLinks,
+    editingIndex
+  );
+  const selectedArc = arcs.find((arc) => arc.index === editingIndex);
+  const notifyGeometry = bowlEdit?.onGeometry;
+  useEffect(() => {
+    notifyGeometry?.(selectedArc);
+  }, [notifyGeometry, selectedArc]);
+  const displayArcs = useMemo(() => {
+    if (!bowlEdit?.preview || !selectedArc?.pose) return arcs;
+    const { d, view } = selectedArc.pose(bowlEdit.preview);
+    return arcs.map((arc) =>
+      arc === selectedArc ? { ...arc, d, tips: view } : arc
+    );
+  }, [arcs, bowlEdit?.preview, selectedArc]);
 
   /*
    * 语法结构按字母圈选：按下一个字母、拖过一段字母、松手落笔；只按一下就是
@@ -467,7 +496,10 @@ export function AnnotationStrip({
         aria-hidden
       >
         <LiaisonArcLayer
-          arcs={arcs}
+          arcs={displayArcs}
+          editTarget={
+            brush.kind === "liaison-adjust" ? bowlEdit?.target : undefined
+          }
           strokeWidth={strokeWidth}
           selectedIndex={
             brush.kind === "liaison-adjust" ? selectedLiaisonIndex : undefined
@@ -477,7 +509,8 @@ export function AnnotationStrip({
             brush.kind === "liaison" ||
             brush.kind === "erase" ||
             brush.kind === "liaison-adjust"
-              ? (index, event) => paint(() => onLiaisonClick(index))(event)
+              ? (index, event, target) =>
+                  paint(() => onLiaisonClick(index, target))(event)
               : undefined
           }
         />

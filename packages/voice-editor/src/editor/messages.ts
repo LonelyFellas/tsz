@@ -1088,11 +1088,37 @@ export const voiceEditorMessages = {
   liaison: ["连读", "連讀", "Liaison"],
   adjust_liaison_arc: ["微调连读弧", "微調連讀弧", "Adjust liaison arc"],
   select_liaison_arc: ["选择连读弧", "選擇連讀弧", "Select liaison arc"],
-  raise_liaison_left: ["左侧上调", "左側上調", "Raise left side"],
-  lower_liaison_left: ["左侧下调", "左側下調", "Lower left side"],
-  raise_liaison_right: ["右侧上调", "右側上調", "Raise right side"],
-  lower_liaison_right: ["右侧下调", "右側下調", "Lower right side"],
-  reset_liaison_arc: ["恢复自动", "恢復自動", "Restore automatic"],
+  bowl_curve: ["整弧", "整弧", "Whole arc"],
+  bowl_left: ["左端点", "左端點", "Left tip"],
+  bowl_right: ["右端点", "右端點", "Right tip"],
+  bowl_flatter: ["更平", "更平", "Flatter"],
+  bowl_rounder: ["更拱", "更拱", "Rounder"],
+  bowl_lower: ["下移", "下移", "Lower"],
+  bowl_raise: ["上移", "上移", "Raise"],
+  bowl_touch: ["贴字", "貼字", "Touch glyph"],
+  bowl_recommended: ["推荐", "推薦", "Recommended"],
+  bowl_reset: ["当前弧回到推荐", "目前弧線回到推薦", "Reset this arc"],
+  bowl_use: ["使用推荐碗形", "使用推薦碗形", "Use recommended arc"],
+  bowl_legacy: [
+    "原标注，调节后改用碗形。",
+    "原標註，調節後改用碗形。",
+    "Adjusting switches this legacy arc to the bowl shape."
+  ],
+  bowl_no_room: [
+    "当前排版没有可调空间。",
+    "目前排版沒有可調空間。",
+    "No clearance to adjust at this layout."
+  ],
+  bowl_wrap: [
+    "跨行显示默认半弧，原调整保留。",
+    "跨行顯示預設半弧，保留原調整。",
+    "Wrapped arcs use half arcs and retain their settings."
+  ],
+  bowl_retained: [
+    "已保留 · {{value}}",
+    "已保留 · {{value}}",
+    "Retained: {{value}}"
+  ],
   liaison_start: ["连读起点", "連讀起點", "Liaison start"],
   liaison_end: ["连读终点", "連讀終點", "Liaison end"],
   cancel_liaison: ["取消连读", "取消連讀", "Cancel liaison"],

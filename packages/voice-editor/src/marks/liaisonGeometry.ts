@@ -1,3 +1,4 @@
+import { contactOffset, prepareBowl, type InkZone } from "./liaisonBowl";
 import type { LiaisonAdjustment } from "../core/liaison";
 import {
   liaisonHalfPaths,
@@ -67,6 +68,10 @@ export interface LiaisonArc {
   key: string;
   index: number;
   d: string;
+  pose?: ReturnType<typeof prepareBowl>;
+  poseKey?: string;
+  tips?: Record<"left" | "right", { x: number; y: number; touching?: boolean }>;
+  split?: boolean;
 }
 
 export interface LiaisonLayout {
@@ -82,6 +87,10 @@ export interface LiaisonLayout {
 export interface GlyphMetrics {
   fontAscent: number;
   inkAscent: number;
+  inkLeft?: number;
+  inkRight?: number;
+  inkDescent?: number;
+  font?: string;
 }
 
 export type GlyphMeasurer = (
@@ -134,7 +143,11 @@ export function createGlyphMeasurer(container: Element): GlyphMeasurer {
     }
     return {
       fontAscent: fontBoundingBoxAscent,
-      inkAscent: actualBoundingBoxAscent
+      inkAscent: actualBoundingBoxAscent,
+      inkLeft: metrics.actualBoundingBoxLeft,
+      inkRight: metrics.actualBoundingBoxRight,
+      inkDescent: metrics.actualBoundingBoxDescent,
+      font: ready.font
     };
   };
 }
@@ -179,7 +192,8 @@ export function buildLiaisonArcs(
   container: Element,
   /** 按连读序号对位；量不到两端元素的位置留空，序号不能因此错位。 */
   links: Array<LiaisonLinkElements | undefined>,
-  measure: GlyphMeasurer
+  measure: GlyphMeasurer,
+  editingIndex?: number
 ): LiaisonLayout {
   // 没有任何连读就别碰布局：返回同一个空对象，调用方据此跳过重渲染。
   if (!links.some(Boolean)) return EMPTY_LIAISON_LAYOUT;
@@ -273,8 +287,11 @@ export function buildLiaisonArcs(
       top: chosen.box.top,
       bottom: chosen.box.bottom
     };
+    const metrics = measure(chosen.text, chosen.element);
     return {
-      ...anchorTip(box, fontSize, measure(chosen.text, chosen.element)),
+      ...anchorTip(box, fontSize, metrics),
+      metrics,
+      glyphs,
       lineTop: box.top,
       box
     };
@@ -284,8 +301,57 @@ export function buildLiaisonArcs(
     | (LiaisonGlyph & {
         box: ReturnType<typeof localBox>;
         maxY?: number | null;
+        metrics?: GlyphMetrics;
       })[]
     | undefined;
+  let mask: CanvasRenderingContext2D | null | undefined;
+  const stroke = liaisonStrokeWidth(fontSize);
+  const bowlAnchor = (
+    anchor: NonNullable<ReturnType<typeof geometryOf>>,
+    measureContact: boolean
+  ) => {
+    const m = anchor.metrics;
+    const tipY = m
+      ? anchor.box.top + m.fontAscent - m.inkAscent - clearance
+      : anchor.tipY;
+    if (!measureContact) return { x: anchor.x, tipY, contactY: undefined };
+    let contactY = Infinity;
+    for (const glyph of anchor.glyphs) {
+      if (
+        anchor.x < glyph.box.left - stroke / 2 ||
+        anchor.x > glyph.box.right + stroke / 2 ||
+        Math.abs(glyph.box.top - anchor.lineTop) >=
+          fontSize * SAME_LINE_TOLERANCE_EM
+      )
+        continue;
+      const metric = measure(glyph.text, glyph.element);
+      if (!metric?.font || metric.inkDescent === undefined) continue;
+      if (mask === undefined)
+        mask = document
+          .createElement("canvas")
+          .getContext("2d", { willReadFrequently: true });
+      if (!mask) break;
+      const offset = contactOffset(
+        mask,
+        metric.font,
+        glyph.text,
+        anchor.x - glyph.box.left,
+        metric.inkAscent,
+        metric.inkDescent,
+        stroke / 2
+      );
+      if (offset !== undefined)
+        contactY = Math.min(
+          contactY,
+          glyph.box.top + metric.fontAscent + offset
+        );
+    }
+    return {
+      x: anchor.x,
+      tipY,
+      contactY: Number.isFinite(contactY) ? contactY : undefined
+    };
+  };
   const arcs: LiaisonArc[] = [];
   links.forEach((link, index) => {
     if (!link) return;
@@ -297,7 +363,9 @@ export function buildLiaisonArcs(
       fontSize * SAME_LINE_TOLERANCE_EM;
     if (sameLine && right.x > left.x) {
       const clearancePoints: { x: number; maxY: number }[] = [];
-      if (left.box.right < right.box.left) {
+      const bowlMode = link.bowl !== undefined || index === editingIndex;
+      const zones: InkZone[] = [];
+      if (bowlMode || left.box.right < right.box.left) {
         // 仅避让两端之间的同一行正文；锚点端和停顿标签各有自己的规则。
         textGlyphs ??= collectLiaisonGlyphs(container)
           .filter(
@@ -323,19 +391,79 @@ export function buildLiaisonArcs(
           // 重叠的连读在同一轮布局内复用墨迹，避免重复读取样式与量字。
           if (glyph.maxY === undefined) {
             const metrics = measure(glyph.text, glyph.element);
+            glyph.metrics = metrics;
             glyph.maxY = metrics
               ? box.top + metrics.fontAscent - metrics.inkAscent - clearance
               : null;
           }
           if (glyph.maxY !== null) {
             clearancePoints.push({ x, maxY: glyph.maxY });
+            if (bowlMode) {
+              const ink = glyph.metrics;
+              zones.push({
+                left:
+                  ink?.inkLeft === undefined
+                    ? box.left
+                    : box.left - ink.inkLeft,
+                right:
+                  ink?.inkRight === undefined
+                    ? box.right
+                    : box.left + ink.inkRight,
+                maxY: glyph.maxY
+              });
+            }
           }
         }
       }
-      arcs.push({
-        key: `${index}`,
-        index,
-        d: liaisonPath(
+      const arc: LiaisonArc = { key: `${index}`, index, d: "" };
+      if (bowlMode) {
+        const l = bowlAnchor(
+            left,
+            index === editingIndex || (link.bowl?.left_tip_pct ?? 0) < 0
+          ),
+          r = bowlAnchor(
+            right,
+            index === editingIndex || (link.bowl?.right_tip_pct ?? 0) < 0
+          );
+        const previousBottom = Math.max(
+          -Infinity,
+          ...(textGlyphs ?? [])
+            .filter(
+              (g) =>
+                g.box.top < left.lineTop - fontSize * SAME_LINE_TOLERANCE_EM &&
+                g.box.right > l.x &&
+                g.box.left < r.x
+            )
+            .map((g) => g.box.bottom)
+        );
+        const cap = Math.max(
+          0,
+          Math.min(
+            fontSize * 0.95,
+            Math.min(l.tipY, r.tipY) -
+              Math.max(stroke / 2, previousBottom + clearance),
+            availableRise(l.x, r.x, left.lineTop, l.tipY),
+            availableRise(l.x, r.x, right.lineTop, r.tipY)
+          )
+        );
+        const args = [l, r, fontSize, cap, zones, clearance, stroke] as const;
+        const pose = prepareBowl(...args);
+        if (link.bowl) {
+          const shaped = pose(link.bowl);
+          arc.d = shaped.d;
+          arc.tips = shaped.view;
+        }
+        if (index === editingIndex) {
+          arc.pose = pose;
+          arc.poseKey = JSON.stringify(args);
+          arc.tips ??= {
+            left: { x: left.x, y: left.tipY },
+            right: { x: right.x, y: right.tipY }
+          };
+        }
+      }
+      if (!link.bowl)
+        arc.d = liaisonPath(
           left,
           right,
           fontSize,
@@ -345,8 +473,8 @@ export function buildLiaisonArcs(
           ),
           clearancePoints,
           link
-        )
-      });
+        );
+      arcs.push(arc);
       return;
     }
     // 两段使用同一宽度；必要时一起收窄，笔画始终留在容器内。
@@ -366,8 +494,8 @@ export function buildLiaisonArcs(
         availableRise(right.x - halfSpan, right.x, right.lineTop, right.tipY)
       )
     );
-    arcs.push({ key: `${index}-head`, index, d: halves.head });
-    arcs.push({ key: `${index}-tail`, index, d: halves.tail });
+    arcs.push({ key: `${index}-head`, index, split: true, d: halves.head });
+    arcs.push({ key: `${index}-tail`, index, split: true, d: halves.tail });
   });
   return { arcs, strokeWidth: liaisonStrokeWidth(fontSize) };
 }
@@ -383,7 +511,10 @@ export function isSameLiaisonLayout(
   return left.arcs.every((arc, index) => {
     const other = right.arcs[index]!;
     return (
-      arc.key === other.key && arc.index === other.index && arc.d === other.d
+      arc.key === other.key &&
+      arc.index === other.index &&
+      arc.d === other.d &&
+      arc.poseKey === other.poseKey
     );
   });
 }

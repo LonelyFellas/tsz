@@ -24,7 +24,8 @@ import {
  */
 export function useLiaisonArcs(
   containerRef: RefObject<HTMLElement | null>,
-  collect: () => Array<LiaisonLinkElements | undefined>
+  collect: () => Array<LiaisonLinkElements | undefined>,
+  editingIndex?: number
 ): LiaisonLayout {
   const [layout, setLayout] = useState<LiaisonLayout>(EMPTY_LIAISON_LAYOUT);
   const collectRef = useRef(collect);
@@ -35,13 +36,14 @@ export function useLiaisonArcs(
     const next = buildLiaisonArcs(
       container,
       collectRef.current(),
-      createGlyphMeasurer(container)
+      createGlyphMeasurer(container),
+      editingIndex
     );
     // 量出来一样就沿用旧对象：零连读的句子每次击键不该多渲染一遍标注带。
     setLayout((previous) =>
       isSameLiaisonLayout(previous, next) ? previous : next
     );
-  }, [containerRef]);
+  }, [containerRef, editingIndex]);
 
   // collect 变了（文本、画笔、连读列表变化）就重量；先同步 ref 再量，量的是最新的。
   useLayoutEffect(() => {
