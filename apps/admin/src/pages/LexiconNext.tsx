@@ -1027,9 +1027,9 @@ function EntryEditor({
         }
         const problem = draftProblem(normalized, equivalentMetadataAvailable);
         if (problem) throw new Error(problem);
-        const changes = sentenceDraftsAvailable
+        const { changes, audioPending } = sentenceDraftsAvailable
           ? await sentenceWorkspace.prepare()
-          : [];
+          : { changes: [], audioPending: false };
         const result = await requests.save(saved.id, {
           expected_revision: saved.revision,
           ...(pairChanges.length ? { dialect_changes: pairChanges } : {}),
@@ -1056,7 +1056,8 @@ function EntryEditor({
         void queryClient.invalidateQueries({
           queryKey: ["admin-lexicon-next", "publication", saved.id]
         });
-        void message.success("草稿已保存");
+        if (audioPending) void message.warning("草稿已保存，例句配音待补。");
+        else void message.success("草稿已保存");
       },
       { preserveDraft: true }
     );

@@ -5312,6 +5312,55 @@ it("例句弹窗编辑和草稿预览零写入，统一保存提交英美两侧�
   ]);
   await waitForEntryReady();
 }, 15_000);
+it("例句配音不可用时仍保存词条、例句文字和译文", async () => {
+  const { env } = await import("@/lib/env");
+  const previous = env.VOICE_PREVIEW;
+  env.VOICE_PREVIEW = true;
+  onTestFinished(() => {
+    env.VOICE_PREVIEW = previous;
+  });
+  const { api } = unifiedSentenceRequests();
+  const profile = useAuthStore.getState().profile!;
+  act(() =>
+    useAuthStore.setState({
+      profile: {
+        ...profile,
+        permissions: [...profile.permissions, "speech.generate"]
+      }
+    })
+  );
+  const generate = vi
+    .spyOn(voiceEditorSource.adminVoicePreviewAdapter, "generateAudio")
+    .mockRejectedValue(new HttpError(503, "配音服务不可用"));
+  await waitForEntryReady();
+  fireEvent.click(stepButton(/^词义与例句/));
+  await editSentenceOriginal("英式英语", "The farmer led the horses.");
+  fireEvent.change(screen.getByLabelText("译文 1 简体中文正文"), {
+    target: { value: "农夫牵着马。" }
+  });
+  fireEvent.click(textAction("保存完整草稿"));
+  await waitFor(() => expect(generate).toHaveBeenCalled());
+  await waitFor(() => expect(api.save).toHaveBeenCalledOnce());
+  const input = api.save.mock.calls[0]![1];
+  expect(input.expected_revision).toBe(1);
+  expect(input.draft.senses[0].sentence_ids).toEqual(["shared"]);
+  expect(input.sentence_changes).toMatchObject([
+    {
+      expected_revision: 3,
+      variant: {
+        content: { text: "The farmer led the horses." },
+        translations: [{ content: { text: "农夫牵着马。" } }]
+      }
+    }
+  ]);
+  expect(
+    input.sentence_changes[0].variant.voice_profile?.voices.some(
+      (voice: { audio_asset_id?: string }) => voice.audio_asset_id
+    )
+  ).not.toBe(true);
+  expect(await screen.findByText("草稿已保存，例句配音待补。")).toBeVisible();
+});
+
 it("统一保存冲突保留本地例句，可比较服务器例句，明确确认后才重载", async () => {
   const { api, saved, source } = unifiedSentenceRequests();
   api.save.mockRejectedValueOnce(

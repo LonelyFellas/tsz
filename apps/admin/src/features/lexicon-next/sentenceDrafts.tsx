@@ -20,7 +20,11 @@ import {
   adminVoicePreviewAdapter,
   voicePreviewIsMock
 } from "@/features/dictionary/voice-editor/dataSource";
-import { toRichTextV2, withDefaultVoiceProfile } from "@tsz/voice-editor/core";
+import {
+  toRichTextV2,
+  voiceEffectKey,
+  withDefaultVoiceProfile
+} from "@tsz/voice-editor/core";
 import { env } from "@/lib/env";
 import { usePermission } from "@/lib/auth";
 
@@ -81,6 +85,28 @@ export function sentenceChanges(
           )
       )
         return [];
+      // 配音可能失败或尚未轮到；文字保存不能把旧正文、旧参数的合成音频当作新录音。
+      if (previous?.voice_profile && next.voice_profile) {
+        const textChanged =
+          JSON.stringify(previous.content) !== JSON.stringify(next.content);
+        const oldVoices = previous.voice_profile.voices;
+        next.voice_profile = {
+          ...next.voice_profile,
+          voices: next.voice_profile.voices.map((voice) => {
+            if (!voice.audio_asset_id) return voice;
+            const old = oldVoices.find(
+              (v) => v.audio_asset_id === voice.audio_asset_id
+            );
+            if (
+              !old ||
+              (!textChanged && voiceEffectKey(old) === voiceEffectKey(voice))
+            )
+              return voice;
+            const { audio_asset_id: _oldAudio, ...settings } = voice;
+            return settings;
+          })
+        };
+      }
       return [
         {
           id,
@@ -241,9 +267,9 @@ export function useSentenceDrafts(
           `${change.id}:${change.target_locale}`
         );
         if (task && !(await task()))
-          throw new Error("例句配音处理未完成，草稿已保留，请重试。 ");
+          return { changes: latest.current, audioPending: true };
       }
-      return latest.current;
+      return { changes: latest.current, audioPending: false };
     },
     prepareTasks
   };
