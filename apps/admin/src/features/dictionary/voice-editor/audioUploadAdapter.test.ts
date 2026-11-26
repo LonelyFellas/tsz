@@ -69,6 +69,21 @@ describe("admin audio upload adapter", () => {
     expect(dataSource.confirm).not.toHaveBeenCalled();
     expect(put).not.toHaveBeenCalled();
   });
+  it("keeps the batch mismatch hint when resolving saved audio", async () => {
+    const hint =
+      "音频不属于当前测试批次。请切换到匹配的批次，或退出测试模式后访问普通音频。";
+    const error = new HttpError(403, hint, [], "forbidden", [], {
+      code: "test_resource_scope_mismatch"
+    });
+    const dataSource = source({ url: vi.fn().mockRejectedValue(error) });
+    const adapter = createAdminAudioUploadAdapter(dataSource);
+
+    await expect(adapter.resolveUrl(ASSET.id)).rejects.toMatchObject({
+      message: hint,
+      retryable: false
+    });
+    expect(dataSource.url).toHaveBeenCalledTimes(1);
+  });
   it("runs the three steps: ticket → direct PUT with the signed headers → confirm, returning the wire asset as-is", async () => {
     const dataSource = source();
     const put = vi.fn<DirectUploader>(async ({ onProgress }) => {

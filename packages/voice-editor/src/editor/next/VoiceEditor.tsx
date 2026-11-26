@@ -1,4 +1,4 @@
-import { AudioUploadError } from "../../types";
+import { AudioUploadError, VoiceEditorDisplayError } from "../../types";
 import {
   localVoiceEditorErrorText,
   richTextIssueMessage,
@@ -399,7 +399,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   const [playingAssetId, setPlayingAssetId] = useState<string>();
   const [assetReview, setAssetReview] = useState<ReviewAudio>();
   /** 试听或下载失败的说明；只在音频面板里显示，不走阻断性错误那条红色通道。 */
-  const [playbackMessage, setPlaybackMessage] = useState<string>();
+  const [playbackMessage, setPlaybackMessage] = useVoiceEditorMessageState();
   const [genderUpdateAssetId, setGenderUpdateAssetId] = useState<string>();
   const [genderUpdateMessage, setGenderUpdateMessage] = useState<string>();
   const [downloadingAssetId, setDownloadingAssetId] = useState<string>();
@@ -2780,10 +2780,12 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         resolved = await audioUploadAdapter.resolveUrl(asset.id, {
           signal: request.signal
         });
-      } catch {
+      } catch (cause) {
         if (request.signal.aborted) return;
         stopAssetPlayback();
-        setPlaybackMessage(PLAYBACK_FAILED);
+        setPlaybackMessage(
+          cause instanceof VoiceEditorDisplayError ? cause : PLAYBACK_FAILED
+        );
         return;
       }
       // 等 URL 期间被停掉 / 换了一条 / 卸载了：这一路作废
