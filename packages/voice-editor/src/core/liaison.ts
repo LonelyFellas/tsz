@@ -34,33 +34,30 @@ export function liaisonAdjustment({
   };
 }
 
-/** 试听及正式配音只取连读锚点，缺省宽度与显式 1 等价。 */
+/** 试听/配音使用固定顺序的连读锚点，不受形状或 JSON 字段顺序影响。 */
 export function normalizeSpeechLiaisons(content: RichTextV2): RichTextV2 {
-  let changed = false;
-  const annotations = content.annotations.map((annotation) => {
-    if (
-      annotation.type !== "liaison" ||
-      (annotation.left_offset_pct === undefined &&
-        annotation.right_offset_pct === undefined &&
-        annotation.start_len !== 1 &&
-        annotation.end_len !== 1)
-    )
-      return annotation;
-    changed = true;
-    const {
-      left_offset_pct: _left,
-      right_offset_pct: _right,
-      start_len,
-      end_len,
-      ...anchors
-    } = annotation;
-    return {
-      ...anchors,
-      ...(start_len !== undefined && start_len !== 1 ? { start_len } : {}),
-      ...(end_len !== undefined && end_len !== 1 ? { end_len } : {})
-    };
-  });
-  return changed ? { ...content, annotations } : content;
+  const liaisons = content.annotations
+    .filter((annotation) => annotation.type === "liaison")
+    .map(({ start, end, start_len = 1, end_len = 1 }) => ({
+      type: "liaison" as const,
+      start,
+      end,
+      ...(start_len !== 1 ? { start_len } : {}),
+      ...(end_len !== 1 ? { end_len } : {})
+    }))
+    .sort(
+      (left, right) =>
+        left.start - right.start ||
+        left.end - right.end ||
+        (left.start_len ?? 1) - (right.start_len ?? 1) ||
+        (left.end_len ?? 1) - (right.end_len ?? 1)
+    );
+  if (liaisons.length === 0) return content;
+  let index = 0;
+  const annotations = content.annotations.map((annotation) =>
+    annotation.type === "liaison" ? liaisons[index++]! : annotation
+  );
+  return { ...content, annotations };
 }
 
 /**

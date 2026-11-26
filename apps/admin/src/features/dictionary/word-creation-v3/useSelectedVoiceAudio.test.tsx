@@ -569,11 +569,24 @@ it("英式正文变化只使英式继承资产失效，保留美式独立配置�
 
 it("只微调连读弧时保留现有音频，不重新生成", async () => {
   const generate = vi.fn().mockResolvedValue(asset("regenerated"));
-  const liaison = { type: "liaison", start: 0, end: 2 } as const;
+  const startWide = {
+    type: "liaison",
+    start: 0,
+    end: 4,
+    end_len: 1,
+    start_len: 3
+  } as const;
+  const endWide = {
+    type: "liaison",
+    start: 0,
+    end: 4,
+    end_len: 3,
+    start_len: 1
+  } as const;
   const view = setup(
     adapter(generate),
     { voices: [{ ...setting, audio_asset_id: "existing-audio" }] },
-    { ...content, annotations: [liaison] }
+    { ...content, annotations: [startWide, endWide] }
   );
 
   view.rerender({
@@ -581,8 +594,17 @@ it("只微调连读弧时保留现有音频，不重新生成", async () => {
       ...content,
       annotations: [
         {
-          ...liaison,
+          type: "liaison",
+          start: 0,
+          end: 4,
           start_len: 1,
+          end_len: 3
+        },
+        {
+          type: "liaison",
+          start: 0,
+          end: 4,
+          start_len: 3,
           end_len: 1,
           left_offset_pct: 15,
           right_offset_pct: -10

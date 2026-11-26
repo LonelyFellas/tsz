@@ -719,7 +719,7 @@ describe("PronunciationPreview", () => {
   it("只调整连读弧形状时保留可播放的试听结果", async () => {
     const dispose = vi.fn();
     preview.synthesize.mockResolvedValue(result({ dispose }));
-    const liaison = { type: "liaison", start: 2, end: 5 } as const;
+    const liaison = { end: 5, start: 2, type: "liaison" } as const;
     const content: RichTextV2 = {
       version: 2,
       text: "a record",
@@ -739,7 +739,14 @@ describe("PronunciationPreview", () => {
         content={{
           ...content,
           annotations: [
-            { ...liaison, start_len: 1, end_len: 1, left_offset_pct: 10 }
+            {
+              type: "liaison",
+              start: 2,
+              end: 5,
+              start_len: 1,
+              end_len: 1,
+              left_offset_pct: 10
+            }
           ]
         }}
         dialect="uk"
