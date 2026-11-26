@@ -5170,8 +5170,11 @@ function unifiedSentenceRequests() {
       sentence_resources: [current]
     };
   });
-  mount(api, `/lexicon-next/${id}?target_locale=en-GB&medium_locale=zh-Hans`);
-  return { api, source, saved };
+  const { unmount } = mount(
+    api,
+    `/lexicon-next/${id}?target_locale=en-GB&medium_locale=zh-Hans`
+  );
+  return { api, source, saved, unmount };
 }
 it("英文例句点击进入编辑器，未应用时锁住宿主操作，取消保留原文", async () => {
   const { api } = unifiedSentenceRequests();
@@ -5312,6 +5315,90 @@ it("例句弹窗编辑和草稿预览零写入，统一保存提交英美两侧�
   ]);
   await waitForEntryReady();
 }, 15_000);
+it("例句配音不可用时仍保存词条、例句文字和译文", async () => {
+  const { env } = await import("@/lib/env");
+  const previous = env.VOICE_PREVIEW;
+  env.VOICE_PREVIEW = true;
+  onTestFinished(() => {
+    env.VOICE_PREVIEW = previous;
+  });
+  const { api, unmount } = unifiedSentenceRequests();
+  const profile = useAuthStore.getState().profile!;
+  act(() =>
+    useAuthStore.setState({
+      profile: {
+        ...profile,
+        permissions: [...profile.permissions, "speech.generate"]
+      }
+    })
+  );
+  const generate = vi
+    .spyOn(voiceEditorSource.adminVoicePreviewAdapter, "generateAudio")
+    .mockRejectedValue(new HttpError(503, "配音服务不可用"));
+  await waitForEntryReady();
+  fireEvent.click(stepButton(/^词义与例句/));
+  await editSentenceOriginal("英式英语", "The farmer led the horses.");
+  fireEvent.change(screen.getByLabelText("译文 1 简体中文正文"), {
+    target: { value: "农夫牵着马。" }
+  });
+  fireEvent.click(textAction("保存完整草稿"));
+  await waitFor(() => expect(generate).toHaveBeenCalled());
+  await waitFor(() => expect(api.save).toHaveBeenCalledOnce());
+  const input = api.save.mock.calls[0]![1];
+  expect(input.expected_revision).toBe(1);
+  expect(input.draft.senses[0].sentence_ids).toEqual(["shared"]);
+  expect(input.sentence_changes).toMatchObject([
+    {
+      expected_revision: 3,
+      variant: {
+        content: { text: "The farmer led the horses." },
+        translations: [{ content: { text: "农夫牵着马。" } }]
+      }
+    }
+  ]);
+  expect(
+    input.sentence_changes[0].variant.voice_profile?.voices.some(
+      (voice: { audio_asset_id?: string }) => voice.audio_asset_id
+    )
+  ).not.toBe(true);
+  await screen.findByText("草稿已保存，例句配音待补。");
+  api.get.mockResolvedValue(await api.save.mock.results[0]!.value);
+  unmount();
+  mount(api);
+  const retry = await screen.findByRole("button", { name: "重试例句配音" });
+  expect(retry).toBeEnabled();
+  fireEvent.click(retry);
+  await waitFor(() => expect(generate).toHaveBeenCalledTimes(2));
+  await waitFor(() => expect(retry).toBeEnabled());
+  expect(api.save).toHaveBeenCalledOnce();
+  generate.mockResolvedValue({
+    id: "new-audio",
+    locale: "en-GB",
+    gender: "female",
+    content_type: "audio/mpeg",
+    original_name: "generated.mp3",
+    size_bytes: 128,
+    created_at: entry.updated_at
+  });
+  fireEvent.click(retry);
+  await waitFor(() => expect(api.save).toHaveBeenCalledTimes(2));
+  expect(api.save.mock.calls[1]![1]).toMatchObject({
+    expected_revision: 2,
+    sentence_changes: [
+      {
+        expected_revision: 4,
+        variant: {
+          content: { text: "The farmer led the horses." },
+          voice_profile: {
+            voices: [expect.objectContaining({ audio_asset_id: "new-audio" })]
+          }
+        }
+      }
+    ]
+  });
+  await waitFor(() => expect(retry).not.toBeInTheDocument());
+});
+
 it("统一保存冲突保留本地例句，可比较服务器例句，明确确认后才重载", async () => {
   const { api, saved, source } = unifiedSentenceRequests();
   api.save.mockRejectedValueOnce(
