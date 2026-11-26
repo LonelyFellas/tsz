@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/liaison-arc-adjustment/docs/openapi.json",
-  "_generatedAt": "2026-11-26T04:29:46.281Z",
+  "_generatedAt": "2026-11-26T04:50:23.928Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -10554,7 +10554,7 @@
             "left_offset_pct": {
               "type": "integer",
               "format": "int32",
-              "description": "弧顶左半弧在可调高度内的偏移百分比，正值向上。",
+              "description": "左半弧在可调高度内的偏移百分比，正值向上。",
               "default": 0,
               "maximum": 100,
               "minimum": -100
@@ -10692,7 +10692,7 @@
             "left_offset_pct": {
               "type": "integer",
               "format": "int32",
-              "description": "弧顶左半弧在可调高度内的偏移百分比，正值向上。",
+              "description": "左半弧在可调高度内的偏移百分比，正值向上。",
               "default": 0,
               "maximum": 100,
               "minimum": -100

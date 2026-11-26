@@ -111,6 +111,12 @@ function fromHttpError(
 ): AudioUploadError {
   const fail = (code: AudioUploadErrorCode, retryable: boolean) =>
     new AudioUploadError(code, MESSAGES[code], retryable);
+  if (
+    error.status === 403 &&
+    error.meta?.code === "test_resource_scope_mismatch"
+  ) {
+    return new AudioUploadError("unknown", error.message, false);
+  }
   if (error.status === 501 || error.code === "audio_storage_not_configured") {
     return fail("storage_unavailable", false);
   }
