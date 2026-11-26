@@ -1,13 +1,63 @@
-import type { RichTextAnnotation } from "@tsz/types";
+import type { RichTextAnnotation, RichTextV2 } from "@tsz/types";
 
 type LiaisonRange = Pick<
   Extract<RichTextAnnotation, { type: "liaison" }>,
   "start" | "end" | "start_len" | "end_len"
 >;
 
+export function liaisonAnchorKey(liaison: LiaisonRange): string {
+  return `${liaison.start}:${liaison.end}:${liaison.start_len ?? 1}:${liaison.end_len ?? 1}`;
+}
+
 export interface LiaisonAnchorSpans {
   start: { start: number; end: number };
   end: { start: number; end: number };
+}
+
+export type LiaisonAdjustment = Pick<
+  Extract<RichTextAnnotation, { type: "liaison" }>,
+  "left_offset_pct" | "right_offset_pct"
+>;
+
+export const LIAISON_ADJUSTMENT_LIMITS = {
+  left_offset_pct: 100,
+  right_offset_pct: 100
+} as const;
+
+export function liaisonAdjustment({
+  left_offset_pct,
+  right_offset_pct
+}: LiaisonAdjustment): LiaisonAdjustment {
+  return {
+    ...(left_offset_pct ? { left_offset_pct } : {}),
+    ...(right_offset_pct ? { right_offset_pct } : {})
+  };
+}
+
+/** 试听/配音使用固定顺序的连读锚点，不受形状或 JSON 字段顺序影响。 */
+export function normalizeSpeechLiaisons(content: RichTextV2): RichTextV2 {
+  const liaisons = content.annotations
+    .filter((annotation) => annotation.type === "liaison")
+    .map(({ start, end, start_len = 1, end_len = 1 }) => ({
+      type: "liaison" as const,
+      start,
+      end,
+      ...(start_len !== 1 ? { start_len } : {}),
+      ...(end_len !== 1 ? { end_len } : {})
+    }))
+    .sort(
+      (left, right) =>
+        left.start - right.start ||
+        left.end - right.end ||
+        (left.start_len ?? 1) - (right.start_len ?? 1) ||
+        (left.end_len ?? 1) - (right.end_len ?? 1)
+    );
+  if (liaisons.length === 0) return content;
+  let index = 0;
+  const annotations = content.annotations.map((annotation) =>
+    annotation.type === "liaison" ? liaisons[index++]! : annotation
+  );
+  return { ...content, annotations };
 }
 
 /**

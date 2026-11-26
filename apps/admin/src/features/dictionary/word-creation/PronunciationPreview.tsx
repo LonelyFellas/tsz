@@ -20,6 +20,7 @@ import type {
 } from "@tsz/types";
 import type { AdminDialectPreference } from "@tsz/shared";
 import {
+  normalizeSpeechLiaisons,
   retainResolvedAudio,
   voiceSettingAccent,
   voiceSettingFor,
@@ -380,6 +381,7 @@ function useResolvedPreviewProfile(
   profile = recommendationArea
     ? withDefaultVoiceProfile(profile, recommendationArea)
     : profile;
+  content = normalizeSpeechLiaisons(content);
   const locale = localeForDialect(dialect, context.dialectPreference);
   const key = JSON.stringify([
     profile,
@@ -987,7 +989,10 @@ export function PronunciationPreviewControls({
   >(undefined);
   const generateRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const previewContent = useMemo<RichTextV2>(
-    () => content ?? { version: 2, text: spelling ?? "", annotations: [] },
+    () =>
+      content
+        ? normalizeSpeechLiaisons(content)
+        : { version: 2, text: spelling ?? "", annotations: [] },
     [content, spelling]
   );
   const playbackProfile = useMemo(

@@ -20,7 +20,8 @@ import {
   newVoiceVersionId,
   retainResolvedAudio,
   voiceEffectKey,
-  voiceSettingKey
+  voiceSettingKey,
+  normalizeSpeechLiaisons
 } from "@tsz/voice-editor/core";
 import { VoiceAudioTasksContext, useVoiceAudioTasks } from "./voiceSaveContext";
 import { v3ContentFingerprint } from "./saveFlow";
@@ -110,8 +111,8 @@ function voiceEffects(profile: VoiceProfileV3 | null | undefined) {
 /** 折叠字段也生成正式资产；回写草稿，仍由宿主执行业务保存。 */
 export function useSelectedVoiceAudio({
   target,
-  content,
-  contentByAccent,
+  content: richContent,
+  contentByAccent: richContentByAccent,
   profile,
   adapter,
   locale,
@@ -135,6 +136,17 @@ export function useSelectedVoiceAudio({
   waitForSave?: boolean;
   onChange?: (profile: VoiceProfileV3) => void;
 }) {
+  const content = useMemo(
+    () => normalizeSpeechLiaisons(richContent),
+    [richContent]
+  );
+  const contentByAccent = useMemo(() => {
+    const { uk, us } = richContentByAccent ?? {};
+    return {
+      uk: uk && normalizeSpeechLiaisons(uk),
+      us: us && normalizeSpeechLiaisons(us)
+    };
+  }, [richContentByAccent]);
   const audioTasks = useVoiceAudioTasks();
   const inContentDialog = useContext(VoiceAudioTasksContext) !== null;
   const [busy, setBusy] = useState(false);

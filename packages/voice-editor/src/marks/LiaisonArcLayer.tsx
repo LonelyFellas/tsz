@@ -4,6 +4,7 @@ import type { LiaisonArc } from "./liaisonGeometry";
 export interface LiaisonArcLayerProps {
   arcs: LiaisonArc[];
   strokeWidth: number;
+  selectedIndex?: number;
   /** 给出后弧线可点：加粗的透明副本接点击，「点弧线删除」不必瞄准 1px 的线。 */
   onArcMouseDown?: (index: number, event: ReactMouseEvent) => void;
 }
@@ -12,6 +13,7 @@ export interface LiaisonArcLayerProps {
 export function LiaisonArcLayer({
   arcs,
   strokeWidth,
+  selectedIndex,
   onArcMouseDown
 }: LiaisonArcLayerProps) {
   return (
@@ -27,7 +29,11 @@ export function LiaisonArcLayer({
             />
           )}
           <path
-            className="tsz-ve-arc"
+            className={
+              arc.index === selectedIndex
+                ? "tsz-ve-arc is-selected"
+                : "tsz-ve-arc"
+            }
             data-arc-key={arc.key}
             d={arc.d}
             strokeWidth={strokeWidth}

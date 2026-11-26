@@ -36,6 +36,7 @@ export type Brush =
   | { kind: "none" }
   | { kind: "role"; level: string }
   | { kind: "liaison" }
+  | { kind: "liaison-adjust" }
   | { kind: "erase" }
   | { kind: "pause"; durationMs: number };
 
@@ -52,7 +53,7 @@ export const DEFAULT_BRUSH: Brush = { kind: "none" };
 export function brushTarget(
   brush: Brush
 ): "letter" | "gap" | "word" | "mark" | "none" {
-  if (brush.kind === "erase") return "mark";
+  if (brush.kind === "erase" || brush.kind === "liaison-adjust") return "mark";
   if (brush.kind === "association") return "word";
   if (brush.kind === "role") return "letter";
   if (brush.kind === "liaison") return "letter";

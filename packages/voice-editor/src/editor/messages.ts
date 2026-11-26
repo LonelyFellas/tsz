@@ -9,6 +9,11 @@ export const voiceEditorMessages = {
     "標註不得超過 {{annotations}} 個",
     "No more than {{annotations}} annotations are allowed"
   ],
+  local_invalid_liaison_adjustment: [
+    "连读形状偏移超出范围或不是整数",
+    "連讀形狀偏移超出範圍或不是整數",
+    "Liaison arc offsets must be integers within the allowed range"
+  ],
   local_invalid_range: [
     "标注区间必须是正文内非空的 [start, end)",
     "標註範圍必須是正文內非空的 [start, end)",
@@ -1081,6 +1086,13 @@ export const voiceEditorMessages = {
     "Grammar structure {{p0}}"
   ],
   liaison: ["连读", "連讀", "Liaison"],
+  adjust_liaison_arc: ["微调连读弧", "微調連讀弧", "Adjust liaison arc"],
+  select_liaison_arc: ["选择连读弧", "選擇連讀弧", "Select liaison arc"],
+  raise_liaison_left: ["左侧上调", "左側上調", "Raise left side"],
+  lower_liaison_left: ["左侧下调", "左側下調", "Lower left side"],
+  raise_liaison_right: ["右侧上调", "右側上調", "Raise right side"],
+  lower_liaison_right: ["右侧下调", "右側下調", "Lower right side"],
+  reset_liaison_arc: ["恢复自动", "恢復自動", "Restore automatic"],
   liaison_start: ["连读起点", "連讀起點", "Liaison start"],
   liaison_end: ["连读终点", "連讀終點", "Liaison end"],
   cancel_liaison: ["取消连读", "取消連讀", "Cancel liaison"],

@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/zentao-232-form-eligibility-api/tsz-rust/docs/openapi.json",
-  "_source_sha256": "2fcf7a2f98287e9bb93f2099c582bd7e48488aa71d7e84c29e76b23b65ea6a44",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/liaison-arc-adjustment/docs/openapi.json",
+  "_source_sha256": "cc814cd4387fa3df2c9b2eba62b4c7ccb51832d122f4d8100dbe207462556fd0",
   "roots": [
     "LexiconTaxonomy",
     "LexiconTaxonomyKind",
@@ -6045,6 +6045,16 @@
           "properties": {
             "end": { "type": "integer", "minimum": 0 },
             "end_len": { "type": "integer", "minimum": 1 },
+            "left_offset_pct": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": -100
+            },
+            "right_offset_pct": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": -100
+            },
             "start": { "type": "integer", "minimum": 0 },
             "start_len": { "type": "integer", "minimum": 1 },
             "type": { "type": "string", "enum": ["liaison"] }
@@ -6151,6 +6161,16 @@
           "properties": {
             "end": { "type": "integer", "minimum": 0 },
             "end_len": { "type": "integer", "minimum": 1 },
+            "left_offset_pct": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": -100
+            },
+            "right_offset_pct": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": -100
+            },
             "start": { "type": "integer", "minimum": 0 },
             "start_len": { "type": "integer", "minimum": 1 },
             "type": { "type": "string", "enum": ["liaison"] }

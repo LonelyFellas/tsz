@@ -1,3 +1,5 @@
+import type { LiaisonAdjustment } from "../core/liaison";
+
 /** 连读弧的一个端点：x 取选区中心，tipY 是字形顶端稍上的位置。 */
 export interface LiaisonAnchorGeometry {
   x: number;
@@ -17,31 +19,53 @@ export function liaisonRiseEm(spanEm: number): number {
   return Math.min(1, 0.484 + 0.16 * Math.sqrt(spanEm - 1.5));
 }
 
-/** 两个控制点各自从端点向上抬升；等高时对称，不等高时沿端点连线自然倾斜。 */
+/** 两端和弧顶固定，仅上下移动各半弧靠近端点的控制点。 */
 export function liaisonPath(
   left: LiaisonAnchorGeometry,
   right: LiaisonAnchorGeometry,
   fontSize: number,
   maxControlRise: number,
-  clearancePoints: { x: number; maxY: number }[]
+  clearancePoints: { x: number; maxY: number }[],
+  { left_offset_pct = 0, right_offset_pct = 0 }: LiaisonAdjustment = {}
 ): string {
   const span = right.x - left.x;
-  // 贝塞尔中点的抬升是控制点抬升的 3/4，保持原来的弧高规则。
-  let rise = (liaisonRiseEm(span / fontSize) * fontSize) / 0.75;
-  for (const { x, maxY } of clearancePoints) {
+  const baseline = (fraction: number) =>
+    left.tipY + fraction * (right.tipY - left.tipY);
+  const obstacles = clearancePoints.map(({ x, maxY }) => {
     const fraction = (x - left.x) / span;
-    // 两个控制点的 x 分别等于两端点，反解 x(t) = 3t² - 2t³，
-    // 才能按字形所在的横向位置计算抬升；偏侧字形不能用弧顶的高度判断。
+    // 反解 x(t) = 3t² - 2t³，按实际字形所在位置计算留白。
     const t = 0.5 - Math.sin(Math.asin(1 - 2 * fraction) / 3);
-    const baseY = left.tipY + fraction * (right.tipY - left.tipY);
-    rise = Math.max(rise, (baseY - maxY) / (3 * t * (1 - t)));
+    return { t, requiredRise: baseline(fraction) - maxY };
+  });
+  let rise = (liaisonRiseEm(span / fontSize) * fontSize) / 0.75;
+  for (const { t, requiredRise } of obstacles) {
+    rise = Math.max(rise, requiredRise / (3 * t * (1 - t)));
   }
-  // 仍遵守原有的 1em 弧高上限和上一行停顿的避让上限。
   rise = Math.min(rise, fontSize / 0.75, Math.max(0, maxControlRise));
-  return [
-    `M ${round(left.x)} ${round(left.tipY)}`,
-    `C ${round(left.x)} ${round(left.tipY - rise)}, ${round(right.x)} ${round(right.tipY - rise)}, ${round(right.x)} ${round(right.tipY)}`
-  ].join(" ");
+  const start = `M ${round(left.x)} ${round(left.tipY)}`;
+  const end = `${round(right.x)} ${round(right.tipY)}`;
+  if (!left_offset_pct && !right_offset_pct) {
+    return `${start} C ${round(left.x)} ${round(left.tipY - rise)}, ${round(right.x)} ${round(right.tipY - rise)}, ${end}`;
+  }
+
+  const controlRise = (offset: number, side: "left" | "right") => {
+    const automatic = rise / 2;
+    if (offset >= 0) return automatic + (rise / 4) * (offset / 100);
+    let lowerRoom = automatic;
+    for (const { t, requiredRise } of obstacles) {
+      // 两段各以端点为 0、弧顶为 1。只限制下调，不牵动另一半。
+      const u = 2 * (side === "left" ? t : 1 - t);
+      if (u <= 0 || u >= 1) continue;
+      const weight = 3 * u * (1 - u) ** 2;
+      const spare = 3 * t * (1 - t) * rise - requiredRise;
+      lowerRoom = Math.min(lowerRoom, Math.max(0, spare / weight));
+    }
+    return automatic + lowerRoom * (offset / 100);
+  };
+  const point = (x: number, height: number) =>
+    `${round(left.x + x * span)} ${round(baseline(x) - height)}`;
+  const apexRise = rise * 0.75;
+  return `${start} C ${point(0, controlRise(left_offset_pct, "left"))}, ${point(0.25, apexRise)}, ${point(0.5, apexRise)} C ${point(0.75, apexRise)}, ${point(1, controlRise(right_offset_pct, "right"))}, ${end}`;
 }
 
 /**

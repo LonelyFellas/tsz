@@ -1257,7 +1257,23 @@ it("旧纯文本词形与新 V2 拼写标注均能读取，严格拒绝 null/V1 
   };
   Object.assign(variant, { spelling_rich: rich });
   expect(decodeAdminWordV3Envelope({ word })).toEqual({ word });
+  const withOffsets = (
+    left_offset_pct: unknown,
+    right_offset_pct: unknown
+  ) => ({
+    ...rich,
+    annotations: [
+      rich.annotations[0],
+      { ...rich.annotations[1], left_offset_pct, right_offset_pct }
+    ]
+  });
+  Object.assign(variant, { spelling_rich: withOffsets(-100, 100) });
+  expect(decodeAdminWordV3Envelope({ word })).toEqual({ word });
   for (const invalid of [
+    withOffsets(101, 0),
+    withOffsets(0, -101),
+    withOffsets(null, 0),
+    withOffsets(0, 0.5),
     null,
     { version: 1, text: variant.spelling, spans: [], liaisons: [] },
     { ...rich, unexpected: true }

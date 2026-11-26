@@ -334,6 +334,10 @@ export type RichTextAnnotationV3 =
       start_len?: number;
       /** 终点锚点占几个码点（默认 1）。 */
       end_len?: number;
+      /** 左半弧在可调高度内的偏移百分比，正值向上。 */
+      left_offset_pct?: number;
+      /** 右半弧在可调高度内的偏移百分比，正值向上。 */
+      right_offset_pct?: number;
     }
   | {
       type: "highlight";

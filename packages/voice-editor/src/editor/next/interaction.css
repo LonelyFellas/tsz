@@ -251,6 +251,15 @@
   justify-content: flex-end;
   padding: 0 12px 10px;
 }
+.tsz-ve-arc.is-selected {
+  stroke: var(--ui-color-primary);
+}
+
+.tsz-ve-liaison-adjust-select {
+  min-width: 9em;
+  max-width: 16em;
+}
+
 .tsz-ve-selection-liaison {
   display: flex;
   align-items: center;

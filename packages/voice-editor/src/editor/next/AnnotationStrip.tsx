@@ -96,6 +96,7 @@ export interface AnnotationStripProps {
   onGapClick: (gapIndex: number) => void;
   onLetterClick: (anchor: LiaisonAnchor) => void;
   onLiaisonClick: (index: number) => void;
+  selectedLiaisonIndex?: number;
 }
 
 /**
@@ -141,7 +142,8 @@ export function AnnotationStrip({
   roleAnchorStart,
   onGapClick,
   onLetterClick,
-  onLiaisonClick
+  onLiaisonClick,
+  selectedLiaisonIndex
 }: AnnotationStripProps) {
   const { t } = useVoiceEditorTranslation();
   const tokens = tokenize(text);
@@ -194,7 +196,7 @@ export function AnnotationStrip({
     return marks.liaisons.map((link) => {
       const start = elementsOf(link.start);
       const end = elementsOf(link.end);
-      return start && end ? { start, end } : undefined;
+      return start && end ? { ...link, start, end } : undefined;
     });
   }, [
     marks.liaisons,
@@ -467,9 +469,14 @@ export function AnnotationStrip({
         <LiaisonArcLayer
           arcs={arcs}
           strokeWidth={strokeWidth}
+          selectedIndex={
+            brush.kind === "liaison-adjust" ? selectedLiaisonIndex : undefined
+          }
           onArcMouseDown={
             // 只在连读或清除模式开放删除，避免语法画笔误删端点附近的弧线。
-            brush.kind === "liaison" || brush.kind === "erase"
+            brush.kind === "liaison" ||
+            brush.kind === "erase" ||
+            brush.kind === "liaison-adjust"
               ? (index, event) => paint(() => onLiaisonClick(index))(event)
               : undefined
           }
