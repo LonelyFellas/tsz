@@ -1,13 +1,10 @@
 import { api } from "@/lib/auth";
-import {
-  speechAccentGroup,
-  spellingSpeechContent,
-  synthesisForLocale
-} from "@tsz/shared";
+import { speechAccentGroup, spellingSpeechContent } from "@tsz/shared";
 import { toRichTextV2 } from "@tsz/voice-editor/core";
 import type { GeneratedSpeechSource, VoiceProfileV3 } from "@tsz/types";
 import {
   variantForCopyReference,
+  voiceCopySynthesisForSide,
   type FormCopyPlan,
   type ResolvedFormCopyProfile
 } from "./formCopyModel";
@@ -28,26 +25,20 @@ export async function resolveFormCopyProfiles(
     const row = variant.pronunciations.find(
       (item) => item.id === match.source!.pronunciationId
     )!;
-    const selected =
-      row.synthesis &&
-      synthesisForLocale(
-        row.synthesis,
-        match.side === "uk" ? "en-GB" : "en-US",
-        match.source.region
-      );
-    if (selected?.source === "none" || selected?.source === "upload")
-      return false;
-    if (selected?.use_spelling) return variant.spelling_speech?.voice_profile;
-    return (
-      row.voice_profile ||
-      row.synthesis?.uk?.ipa_speech ||
-      row.synthesis?.uk?.ups_speech ||
-      row.synthesis?.us?.ipa_speech ||
-      row.synthesis?.us?.ups_speech
+    const selected = voiceCopySynthesisForSide(
+      row,
+      match.side,
+      match.source.region
     );
+    if (selected.source === "none" || selected.source === "upload")
+      return false;
+    if (selected.use_spelling) return variant.spelling_speech?.voice_profile;
+    return row.voice_profile || selected.ipa_speech || selected.ups_speech;
   });
   if (!hasProfiles) return [];
-  const catalogue = (await api.speech.voices(signal)).items;
+  const catalogue = new Map(
+    (await api.speech.voices(signal)).items.map((item) => [item.alias, item])
+  );
   signal.throwIfAborted();
   for (const match of plan.matches) {
     if (!match.source) continue;
@@ -60,11 +51,12 @@ export async function resolveFormCopyProfiles(
       (row) => row.id === reference.pronunciationId
     )!;
     const locale = match.side === "uk" ? "en-GB" : "en-US";
-    const synthesis = pronunciation.synthesis
-      ? synthesisForLocale(pronunciation.synthesis, locale, reference.region)
-      : undefined;
-    if (synthesis?.source === "none" || synthesis?.source === "upload")
-      continue;
+    const synthesis = voiceCopySynthesisForSide(
+      pronunciation,
+      match.side,
+      reference.region
+    );
+    if (synthesis.source === "none" || synthesis.source === "upload") continue;
     const add = (
       channel: ResolvedFormCopyProfile["channel"],
       profile: VoiceProfileV3 | undefined,
@@ -82,13 +74,11 @@ export async function resolveFormCopyProfiles(
             )
           : Promise.resolve({
               voices: profile.voices.filter((setting) => {
-                const voice = catalogue.find(
-                  (item) => item.alias === setting.voice_id
-                );
+                const voice = catalogue.get(setting.voice_id);
                 return (
                   speechAccentGroup(
                     voice?.locale ?? setting.locale,
-                    voice?.accent
+                    voice?.accent ?? setting.accent
                   ) === match.side
                 );
               })
@@ -100,12 +90,10 @@ export async function resolveFormCopyProfiles(
             voices.map((setting) => [voiceKey(setting), setting])
           );
           const stored = profile.voices.filter((setting) => {
-            const voice = catalogue.find(
-              (item) => item.alias === setting.voice_id
-            );
+            const voice = catalogue.get(setting.voice_id);
             const side = speechAccentGroup(
               voice?.locale ?? setting.locale,
-              voice?.accent
+              voice?.accent ?? setting.accent
             );
             return (
               resolved.has(voiceKey(setting)) ||
@@ -124,6 +112,7 @@ export async function resolveFormCopyProfiles(
             sourcePronunciationId: pronunciation.id,
             channel,
             sideScoped: true,
+            catalogue,
             profile: {
               ...profile,
               voices: [...merged, ...resolved.values()]
@@ -132,17 +121,17 @@ export async function resolveFormCopyProfiles(
         })
       );
     };
-    const spellingSpeech = synthesis?.use_spelling
+    const spellingSpeech = synthesis.use_spelling
       ? variant.spelling_speech
       : undefined;
     add(
       "fallback",
-      synthesis?.use_spelling
+      synthesis.use_spelling
         ? spellingSpeech?.voice_profile
         : pronunciation.voice_profile,
       {
         kind: "text",
-        content: synthesis?.use_spelling
+        content: synthesis.use_spelling
           ? (spellingSpeechContent(spellingSpeech, match.side) ?? {
               version: 2,
               text: variant.spelling,
@@ -157,17 +146,17 @@ export async function resolveFormCopyProfiles(
             )
       }
     );
-    if (synthesis?.use_spelling) continue;
+    if (synthesis.use_spelling) continue;
     for (const alphabet of ["ipa", "ups"] as const) {
-      const speech = synthesis?.[`${alphabet}_speech`];
+      const speech = synthesis[`${alphabet}_speech`];
       if (!speech) continue;
       add(alphabet, speech.voice_profile, {
         kind: "phoneme",
         phoneme_locale: locale,
         content: speech.content,
         alphabet,
-        phoneme: synthesis![alphabet],
-        ...(alphabet === "ups" ? { ups_words: synthesis!.ups_words ?? [] } : {})
+        phoneme: synthesis[alphabet],
+        ...(alphabet === "ups" ? { ups_words: synthesis.ups_words ?? [] } : {})
       });
     }
   }

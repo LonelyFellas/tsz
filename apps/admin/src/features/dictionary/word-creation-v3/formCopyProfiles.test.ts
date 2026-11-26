@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SharedFormsStepContentV3, VoiceProfileV3 } from "@tsz/types";
+import { pronunciationPlaybackSource } from "@tsz/shared";
 import {
   commonFormFixture,
   formsFixture,
@@ -86,6 +87,236 @@ beforeEach(() => {
   });
 });
 
+it.each(["ipa", "spelling", "default"] as const)(
+  "把来源当前使用的 UPS 配音复制到目标实际使用的 %s，并作为独立局部参数",
+  async (targetSource) => {
+    const sourceProfile: VoiceProfileV3 = {
+      voices: [
+        {
+          voice_id: "stored",
+          version_id: uuidFromInt(610),
+          version_name: "Sonia",
+          locale: "en-GB",
+          enabled: true,
+          rate_percent: 0,
+          volume_percent: 93,
+          audio_asset_id: uuidFromInt(611)
+        }
+      ],
+      dubbing: { area: "azure", uk: { mode: "local" }, us: { mode: "local" } }
+    };
+    resolve.mockImplementation(
+      async ({ profile }: { profile: VoiceProfileV3 }) => ({
+        voices: profile.voices
+      })
+    );
+    const forms = fixture(sourceProfile);
+    const from = forms.contents[0]!.regional_variants;
+    const to = forms.contents[1]!.regional_variants;
+    if (from.mode !== "common" || to.mode !== "common")
+      throw new Error("fixture");
+    const source = from.common.pronunciations[0]!;
+    const target = to.common.pronunciations[0]!;
+    const sourceCandidate = source.synthesis!.uk!;
+    delete source.voice_profile;
+    source.synthesis!.us = { source: "none", ipa: "", ups: "" };
+    sourceCandidate.source = "ups";
+    sourceCandidate.ups_speech = structuredClone(sourceCandidate.ipa_speech!);
+    sourceCandidate.ipa_speech!.voice_profile = {
+      ...sourceProfile,
+      voices: [
+        {
+          ...sourceProfile.voices[0]!,
+          version_id: uuidFromInt(614),
+          rate_percent: -20
+        }
+      ]
+    };
+
+    const previousProfile: VoiceProfileV3 = {
+      voices: [
+        {
+          ...sourceProfile.voices[0]!,
+          version_id: uuidFromInt(615),
+          rate_percent: -10
+        }
+      ],
+      dubbing: {
+        area: targetSource === "ipa" ? "azure" : "word",
+        uk: {
+          mode: "local",
+          recommendations: [
+            {
+              group_id: uuidFromInt(612),
+              recommendation_id: uuidFromInt(613),
+              voice_id: "stored",
+              contribution_id: uuidFromInt(615)
+            }
+          ]
+        },
+        us: { mode: "inherit" }
+      }
+    };
+    const targetSpeech = {
+      content: {
+        version: 2 as const,
+        text: to.common.spelling,
+        annotations:
+          targetSource === "default"
+            ? []
+            : [{ type: "pause" as const, at: 0, duration_ms: 100 }]
+      },
+      voice_profile: previousProfile
+    };
+    if (targetSource === "ipa") {
+      target.synthesis = {
+        alphabet: "ipa",
+        ipa: "",
+        ups: "",
+        uk: { source: "ipa", ipa: "s", ups: "", ipa_speech: targetSpeech }
+      };
+    } else {
+      delete target.synthesis;
+      if (targetSource === "spelling") to.common.spelling_speech = targetSpeech;
+    }
+
+    const plan = planFormCopy(
+      forms,
+      forms.pos[0]!.forms[0]!.id,
+      forms.pos[0]!.forms[1]!.id,
+      "voices"
+    );
+    const profiles = await resolveFormCopyProfiles(
+      plan,
+      new AbortController().signal
+    );
+    const next = applyFormCopy(forms, plan, profiles);
+    const copied = next.contents[1]!.regional_variants;
+    if (copied.mode !== "common") throw new Error("fixture");
+    const variant = copied.common;
+    const row = variant.pronunciations[0]!;
+    const active = pronunciationPlaybackSource(
+      variant.spelling,
+      row,
+      variant.spelling_speech,
+      "en-GB",
+      "common"
+    );
+    expect(active.profile?.voices).toEqual([
+      expect.objectContaining({
+        voice_id: "stored",
+        enabled: true,
+        rate_percent: 0,
+        volume_percent: 93
+      })
+    ]);
+    expect(active.profile?.voices[0]!.version_id).not.toBe(uuidFromInt(610));
+    expect(active.profile?.voices[0]!.version_id).not.toBe(uuidFromInt(615));
+    expect(active.profile?.voices[0]!.audio_asset_id).toBeUndefined();
+    expect(active.profile?.dubbing?.uk).toEqual({ mode: "local" });
+    expect(active.profile?.dubbing?.area).toBe(previousProfile.dubbing!.area);
+    const destination =
+      targetSource === "ipa"
+        ? row.synthesis?.uk?.ipa_speech
+        : variant.spelling_speech;
+    expect(destination?.content).toEqual(targetSpeech.content);
+    expect(row.synthesis?.uk?.source).toBe(
+      targetSource === "ipa" ? "ipa" : undefined
+    );
+    if (targetSource !== "ipa") {
+      expect(active.profile?.dubbing?.us).toEqual({ mode: "inherit" });
+    }
+    expect(next.contents[0]).toEqual(forms.contents[0]);
+  }
+);
+
+it.each(["default", "recommended", "duplicate", "reassigned"] as const)(
+  "单侧复制旧版参数时保留拼写目标的另一侧推荐，并拒绝冲突（%s）",
+  async (scenario) => {
+    const legacy: VoiceProfileV3 = {
+      voices: [{ voice_id: "stored", enabled: true, rate_percent: -20 }]
+    };
+    if (scenario === "reassigned") {
+      Object.assign(legacy.voices[0]!, {
+        version_id: uuidFromInt(620),
+        version_name: "Sonia",
+        locale: "en-US"
+      });
+      voices.mockResolvedValue({
+        items: [{ alias: "stored", locale: "en-US", accent: "gb" }]
+      });
+    }
+    if (scenario === "duplicate") {
+      legacy.voices.push({
+        voice_id: "resolved",
+        enabled: true,
+        rate_percent: 0
+      });
+      voices.mockResolvedValue({
+        items: legacy.voices.map(({ voice_id }) => ({
+          alias: voice_id,
+          locale: "en-GB",
+          accent: "gb",
+          capability_evidence: { provider_voice_id: "en-GB-SoniaNeural" }
+        }))
+      });
+    }
+    const forms = fixture(legacy);
+    const from = forms.contents[0]!.regional_variants;
+    const to = forms.contents[1]!.regional_variants;
+    if (from.mode !== "common" || to.mode !== "common")
+      throw new Error("fixture");
+    const source = from.common.pronunciations[0]!;
+    source.synthesis!.uk!.source = "ipa";
+    const target = to.common.pronunciations[0]!;
+    delete target.synthesis;
+    if (scenario === "recommended") {
+      to.common.spelling_speech = {
+        content: { text: to.common.spelling, version: 2, annotations: [] },
+        voice_profile: {
+          voices: [],
+          dubbing: {
+            area: "word",
+            uk: { mode: "inherit" },
+            us: { mode: "inherit" }
+          }
+        }
+      };
+    }
+    const [sourceForm, targetForm] = forms.pos[0]!.forms;
+    const plan = planFormCopy(forms, sourceForm!.id, targetForm!.id, "voices", {
+      us: { [target.id]: null }
+    });
+    const profiles = await resolveFormCopyProfiles(
+      plan,
+      new AbortController().signal
+    );
+    if (scenario === "duplicate") {
+      const before = structuredClone(forms);
+      expect(() => applyFormCopy(forms, plan, profiles)).toThrow(
+        "同一官方音色有多个旧版本"
+      );
+      expect(forms).toEqual(before);
+      return;
+    }
+    const copied = applyFormCopy(forms, plan, profiles).contents[1]!
+      .regional_variants;
+    if (copied.mode !== "common") throw new Error("fixture");
+    expect(copied.common.spelling_speech?.voice_profile).toEqual({
+      voices: [
+        {
+          ...legacy.voices[0],
+          version_id: expect.any(String),
+          version_name: expect.any(String),
+          locale: scenario === "reassigned" ? "en-US" : "en-GB",
+          ...(scenario === "reassigned" ? { accent: "gb" } : {})
+        }
+      ],
+      dubbing: { area: "word", uk: { mode: "local" }, us: { mode: "inherit" } }
+    });
+  }
+);
+
 describe("复制前解析完整音色配置", () => {
   it("独立拼写音色未配置时不请求解析残留读法配置", async () => {
     const forms = fixture(profile);
@@ -105,9 +336,9 @@ describe("复制前解析完整音色配置", () => {
     expect(resolve).not.toHaveBeenCalled();
   });
 
-  it.each([false, true])(
-    "按拼写正文解析独立音色并忽略旧读法配置（残留=%s）",
-    async (stale) => {
+  it.each(["explicit", "explicit-with-stale-row", "implicit"] as const)(
+    "按实际使用的拼写正文解析独立音色（%s）",
+    async (sourceKind) => {
       const forms = fixture({
         voices: [{ voice_id: "stale", enabled: true, rate_percent: 0 }],
         dubbing: {
@@ -123,6 +354,7 @@ describe("复制前解析完整音色配置", () => {
       const from = fromRegions.common;
       const to = toRegions.common;
       const row = from.pronunciations[0]!;
+      const stale = sourceKind === "explicit-with-stale-row";
       row.synthesis!.use_spelling = true;
       from.spelling_speech = {
         content: {
@@ -147,6 +379,7 @@ describe("复制前解析完整音色配置", () => {
         delete row.voice_profile;
         delete row.synthesis!.uk;
       }
+      if (sourceKind === "implicit") delete row.synthesis;
       to.pronunciations[0]!.synthesis = {
         alphabet: "ipa",
         ipa: "",
