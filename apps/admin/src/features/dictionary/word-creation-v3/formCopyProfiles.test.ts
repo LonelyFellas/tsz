@@ -87,6 +87,65 @@ beforeEach(() => {
   });
 });
 
+it("共用同一拼写的多条来源读法只解析一次，复制解析后的英式配音", async () => {
+  const forms = fixture(profile);
+  const source = forms.contents[0]!.regional_variants;
+  const target = forms.contents[1]!.regional_variants;
+  if (source.mode !== "common" || target.mode !== "common")
+    throw new Error("fixture");
+  source.common.spelling_speech = {
+    content: { version: 2, text: source.common.spelling, annotations: [] },
+    voice_profile: {
+      ...profile,
+      dubbing: { area: "word", uk: { mode: "inherit" }, us: { mode: "local" } }
+    }
+  };
+  source.common.pronunciations = ["citation", "normal"].map((style, index) => ({
+    ...pronunciationFixture({
+      id: uuidFromInt(620 + index),
+      style: style === "citation" ? "citation" : "normal"
+    }),
+    synthesis: {
+      alphabet: "ipa",
+      ipa: "",
+      ups: "",
+      use_spelling: true,
+      us: { source: "none", ipa: "", ups: "" }
+    }
+  }));
+  target.common.pronunciations.push(
+    pronunciationFixture({ id: uuidFromInt(624), style: "citation" }),
+    pronunciationFixture({ id: uuidFromInt(625), style: "citation" })
+  );
+  const plan = planFormCopy(
+    forms,
+    forms.pos[0]!.forms[0]!.id,
+    forms.pos[0]!.forms[1]!.id,
+    "voices"
+  );
+  const resolved = await resolveFormCopyProfiles(
+    plan,
+    new AbortController().signal
+  );
+  const result = applyFormCopy(forms, plan, resolved).contents[1]!
+    .regional_variants;
+
+  expect(resolve).toHaveBeenCalledTimes(1);
+  expect(result).toMatchObject({
+    common: {
+      spelling_speech: {
+        voice_profile: {
+          dubbing: { uk: { mode: "local" }, us: { mode: "inherit" } },
+          voices: [
+            expect.objectContaining({ voice_id: "stored", enabled: false }),
+            expect.objectContaining({ voice_id: "resolved", rate_percent: 20 })
+          ]
+        }
+      }
+    }
+  });
+});
+
 it.each(["ipa", "spelling", "default"] as const)(
   "把来源当前使用的 UPS 配音复制到目标实际使用的 %s，并作为独立局部参数",
   async (targetSource) => {

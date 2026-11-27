@@ -417,6 +417,70 @@ describe("词形复制交互", () => {
     expect(current().pos).toEqual(initial.pos);
   });
 
+  it("共用目标标签的拼写配音无需映射读法，确认后写入草稿", async () => {
+    const initial = fixture(2);
+    const source = initial.contents[0]!.regional_variants;
+    const target = initial.contents[1]!.regional_variants;
+    if (source.mode !== "common" || target.mode !== "common")
+      throw new Error("fixture");
+    target.common.pronunciations[1]!.style = "citation";
+    source.common.spelling_speech = {
+      content: { version: 2, text: source.common.spelling, annotations: [] },
+      voice_profile: {
+        voices: [
+          {
+            voice_id: "source-voice",
+            locale: "en-GB",
+            rate_percent: 20,
+            enabled: true
+          }
+        ]
+      }
+    };
+    initial.pos[0]!.forms.push({
+      ...structuredClone(initial.pos[0]!.forms[1]!),
+      id: uuidFromInt(950),
+      form_type: "past"
+    });
+    render(<Harness initial={initial} />);
+    const sourceButton = within(screen.getByTestId("form-0")).getByRole(
+      "button",
+      { name: "复制英美音色参数" }
+    );
+    const chooseTarget = () => {
+      fireEvent.click(sourceButton);
+      fireEvent.click(screen.getByTestId("voices-1"));
+      return screen.findByRole("dialog");
+    };
+    const firstDialog = await chooseTarget();
+    expect(within(firstDialog).queryByRole("combobox")).toBeNull();
+    fireEvent.click(
+      within(firstDialog).getByRole("button", { name: /^取\s*消$/ })
+    );
+    expect(current()).toEqual(initial);
+
+    const dialog = await chooseTarget();
+    fireEvent.click(within(dialog).getByRole("button", { name: "复制到草稿" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(current().contents[1]!.regional_variants).toMatchObject({
+      common: {
+        spelling: target.common.spelling,
+        pronunciations: target.common.pronunciations,
+        spelling_speech: {
+          voice_profile: {
+            voices: [
+              expect.objectContaining({
+                voice_id: "source-voice",
+                rate_percent: 20
+              })
+            ]
+          }
+        }
+      }
+    });
+    expect(current().pos).toEqual(initial.pos);
+  });
+
   it("同名目标用序号区分并完成复制", async () => {
     const initial = fixture();
     initial.pos[0]!.forms[1]!.form_type = "base";

@@ -16,7 +16,19 @@ export async function resolveFormCopyProfiles(
 ): Promise<ResolvedFormCopyProfile[]> {
   if (plan.kind !== "voices") return [];
   const profiles = new Map<string, Promise<ResolvedFormCopyProfile>>();
-  const hasProfiles = plan.matches.some((match) => {
+  const copies = [
+    ...plan.matches.map(({ side, source }) => ({
+      side,
+      source,
+      activeOnly: false
+    })),
+    ...plan.sharedSpellings.flatMap(({ sides }) =>
+      sides.flatMap(({ side, sources }) =>
+        sources.map((source) => ({ side, source, activeOnly: true }))
+      )
+    )
+  ];
+  const hasProfiles = copies.some((match) => {
     if (!match.source) return false;
     const variant = variantForCopyReference(
       plan.source.contentSnapshot,
@@ -33,14 +45,18 @@ export async function resolveFormCopyProfiles(
     if (selected.source === "none" || selected.source === "upload")
       return false;
     if (selected.use_spelling) return variant.spelling_speech?.voice_profile;
-    return row.voice_profile || selected.ipa_speech || selected.ups_speech;
+    return (
+      row.voice_profile ||
+      selected[`${selected.alphabet}_speech`] ||
+      (!match.activeOnly && (selected.ipa_speech || selected.ups_speech))
+    );
   });
   if (!hasProfiles) return [];
   const catalogue = new Map(
     (await api.speech.voices(signal)).items.map((item) => [item.alias, item])
   );
   signal.throwIfAborted();
-  for (const match of plan.matches) {
+  for (const match of copies) {
     if (!match.source) continue;
     const reference = match.source;
     const variant = variantForCopyReference(
@@ -148,6 +164,7 @@ export async function resolveFormCopyProfiles(
     );
     if (synthesis.use_spelling) continue;
     for (const alphabet of ["ipa", "ups"] as const) {
+      if (match.activeOnly && alphabet !== synthesis.alphabet) continue;
       const speech = synthesis[`${alphabet}_speech`];
       if (!speech) continue;
       add(alphabet, speech.voice_profile, {

@@ -2055,6 +2055,16 @@ export const lexiconEditorPanelMessages = {
     "同一詞形的拼寫音色由多個讀法共用，所選對映或跳過項無法同時保留，請統一選擇後再複製",
     "Multiple readings share the same spelling voice. Selected mappings or skipped items cannot all be retained. Align the selections before copying."
   ],
+  copy_shared_spelling_voice_conflict_uk: [
+    "来源有多套英式配音参数，目标共用一套拼写配音。请单独编辑目标的英式拼写配音。",
+    "來源有多套英式配音參數，目標共用一套拼寫配音。請單獨編輯目標的英式拼寫配音。",
+    "The source has multiple British voice configurations and the target shares one spelling voice configuration. Edit the target's British spelling voices separately."
+  ],
+  copy_shared_spelling_voice_conflict_us: [
+    "来源有多套美式配音参数，目标共用一套拼写配音。请单独编辑目标的美式拼写配音。",
+    "來源有多套美式配音參數，目標共用一套拼寫配音。請單獨編輯目標的美式拼寫配音。",
+    "The source has multiple American voice configurations and the target shares one spelling voice configuration. Edit the target's American spelling voices separately."
+  ],
   copy_recordings_retained: [
     "目标真人录音将保留；复制音标后请重新审听，确认录音与新音标一致。",
     "目標真人錄音將保留；複製音標後請重新試聽，確認錄音與新音標一致。",
