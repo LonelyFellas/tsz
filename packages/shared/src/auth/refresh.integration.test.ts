@@ -403,6 +403,273 @@ describe.each(["web", "admin"] as const)("%s HTTP + auth runtime", (realm) => {
   });
 });
 
+describe.each(["web", "admin"] as const)(
+  "%s 明确拒绝续期后的会话恢复",
+  (realm) => {
+    const user = {
+      id: "learner",
+      roles: ["student"],
+      active_role: "student"
+    };
+    const profile = {
+      id: "admin",
+      role: "admin",
+      permission_version: 1,
+      catalog_version: "v1",
+      permissions: []
+    };
+    const session = realm === "web" ? { user, onboarded: true } : profile;
+    const authenticated = realm === "web" ? { user } : { profile };
+    const baseUrl = realm === "web" ? "/api/v1" : "/api/v1/admin";
+    const capability = () =>
+      new Response(null, {
+        status: 204,
+        headers: {
+          "x-refresh-recovery": "v1",
+          "x-refresh-current-only": "v1"
+        }
+      });
+    const rotated = () =>
+      new Response(
+        JSON.stringify({ access_token: "new-access", expires_in: 900 }),
+        { headers: { "x-refresh-recovery": "v1" } }
+      );
+
+    function createStorage() {
+      const values = new Map<string, string>();
+      return {
+        getItem: (key: string) => values.get(key) ?? null,
+        setItem: (key: string, value: string) => values.set(key, value),
+        removeItem: (key: string) => values.delete(key)
+      };
+    }
+
+    function setup(pathname: string) {
+      vi.useFakeTimers();
+      const tabStorage = createStorage();
+      vi.stubGlobal("sessionStorage", tabStorage);
+      vi.stubGlobal("localStorage", createStorage());
+      const navigate = vi.fn();
+      const location = {
+        pathname,
+        set href(path: string) {
+          navigate(path);
+        }
+      };
+      const navigation = { type: "navigate" };
+      const win = Object.assign(new EventTarget(), {
+        location,
+        performance: { getEntriesByType: () => [navigation] }
+      });
+      vi.stubGlobal("window", win);
+      vi.stubGlobal("document", new EventTarget());
+      const fetch = vi
+        .spyOn(globalThis, "fetch")
+        .mockImplementation(async () =>
+          response(401, { code: "invalid_refresh_token" })
+        );
+      const createRuntime = () =>
+        realm === "web"
+          ? createAuthRuntime({ baseUrl })
+          : createAdminAuthRuntime({ baseUrl });
+      const anonymous = realm === "web" ? { user: null } : { profile: null };
+      return {
+        createRuntime,
+        location,
+        navigation,
+        navigate,
+        fetch,
+        anonymous,
+        tabStorage
+      };
+    }
+
+    it("登录页收到 refresh 401 后，重复恢复和重载都不再发送请求", async () => {
+      const { createRuntime, navigate, fetch, anonymous } = setup("/login");
+      const loginPage = createRuntime();
+      await loginPage.restoreSession();
+      expect(loginPage.store.getState()).toMatchObject({
+        ...anonymous,
+        hydrated: true,
+        connectionError: false
+      });
+
+      await expect(loginPage.tokens.refreshTokens()).rejects.toMatchObject({
+        status: 401
+      });
+      await loginPage.restoreSession();
+      await createRuntime().restoreSession();
+      expect(navigate).not.toHaveBeenCalled();
+      expect(fetch.mock.calls.map(([, init]) => init?.method)).toEqual([
+        "POST"
+      ]);
+    });
+
+    it("已登录页面后台刷新收到 401 后，只跳转一次且登录页不再探测", async () => {
+      const { createRuntime, location, navigate, fetch, anonymous } =
+        setup("/protected");
+      const protectedPage = createRuntime();
+      protectedPage.persistSession({ access_token: "access", expires_in: 60 });
+      fetch.mockResolvedValueOnce(response(200, session));
+      await protectedPage.restoreSession();
+      expect(protectedPage.store.getState()).toMatchObject(authenticated);
+      fetch.mockClear();
+
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(protectedPage.tokens.getToken()).toBeUndefined();
+      expect(navigate.mock.calls).toEqual([["/login"]]);
+      window.dispatchEvent(new Event("online"));
+      await vi.advanceTimersByTimeAsync(120_000);
+
+      location.pathname = "/login";
+      const loginPage = createRuntime();
+      await loginPage.restoreSession();
+      expect(loginPage.store.getState()).toMatchObject({
+        ...anonymous,
+        hydrated: true,
+        connectionError: false
+      });
+      expect(navigate.mock.calls).toEqual([["/login"]]);
+      expect(fetch.mock.calls.map(([, init]) => init?.method)).toEqual([
+        "POST"
+      ]);
+    });
+
+    it("本标签页被拒绝后，其他标签页仍可恢复，显式登录可开启新会话", async () => {
+      const { createRuntime, fetch, navigate, tabStorage } = setup("/login");
+      await createRuntime().restoreSession();
+      fetch.mockImplementation(async (url) =>
+        String(url).endsWith("/auth/refresh")
+          ? response(200, { access_token: "rotated", expires_in: 900 })
+          : response(200, session)
+      );
+      vi.stubGlobal("sessionStorage", createStorage());
+      const otherTab = createRuntime();
+      await otherTab.restoreSession();
+      expect(otherTab.store.getState()).toMatchObject(authenticated);
+
+      vi.stubGlobal("sessionStorage", tabStorage);
+      const loginPage = createRuntime();
+      loginPage.persistSession({
+        access_token: "explicit-login",
+        expires_in: 900
+      });
+      await loginPage.restoreSession();
+      expect(loginPage.store.getState()).toMatchObject(authenticated);
+      await expect(loginPage.tokens.refreshTokens()).resolves.toBe("rotated");
+      expect(navigate).not.toHaveBeenCalled();
+    });
+
+    it.each([200, 401])(
+      "其他标签页轮换后，旧标签页安全恢复并处理返回 %s",
+      async (status) => {
+        const { createRuntime, fetch, navigate, tabStorage, anonymous } =
+          setup("/login");
+        tabStorage.setItem(`tsz:refresh-unconfirmed:${baseUrl}`, "1");
+        fetch.mockResolvedValueOnce(capability());
+
+        await createRuntime().restoreSession();
+        await createRuntime().restoreSession();
+        expect(fetch.mock.calls.map(([, init]) => init?.method)).toEqual([
+          "HEAD",
+          "POST"
+        ]);
+
+        // 模拟另一标签页成功取得轮换响应，并让浏览器接收新的共享 Cookie。
+        vi.stubGlobal("sessionStorage", createStorage());
+        fetch
+          .mockResolvedValueOnce(rotated())
+          .mockResolvedValueOnce(response(200, session));
+        const otherTab = createRuntime();
+        await otherTab.restoreSession();
+        expect(otherTab.store.getState()).toMatchObject(authenticated);
+
+        vi.stubGlobal("sessionStorage", tabStorage);
+        fetch.mockClear();
+        fetch
+          .mockResolvedValueOnce(capability())
+          .mockResolvedValueOnce(
+            status === 200
+              ? rotated()
+              : response(401, { code: "invalid_refresh_token" })
+          );
+        if (status === 200) fetch.mockResolvedValueOnce(response(200, session));
+        const oldTab = createRuntime();
+        await oldTab.restoreSession();
+        expect(oldTab.store.getState()).toMatchObject(
+          status === 200 ? authenticated : anonymous
+        );
+        expect(
+          new Headers(fetch.mock.calls[1]?.[1]?.headers).get(
+            "x-refresh-current-only"
+          )
+        ).toBe("v1");
+        if (status === 401) {
+          await createRuntime().restoreSession();
+          expect(fetch.mock.calls.map(([, init]) => init?.method)).toEqual([
+            "HEAD",
+            "POST"
+          ]);
+        }
+        expect(navigate).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each([200, 401])(
+      "其他标签页未发布轮换版本时，显式重载可安全探测一次（%s）",
+      async (status) => {
+        const { createRuntime, fetch, navigation, tabStorage, anonymous } =
+          setup("/login");
+        tabStorage.setItem(`tsz:refresh-unconfirmed:${baseUrl}`, "1");
+        fetch.mockResolvedValueOnce(capability());
+        await createRuntime().restoreSession();
+        await createRuntime().restoreSession();
+        expect(fetch).toHaveBeenCalledTimes(2);
+
+        // 旧版本标签页可更新共享 Cookie，却不会写入轮换通知。
+        navigation.type = "reload";
+        fetch.mockClear();
+        fetch
+          .mockResolvedValueOnce(capability())
+          .mockResolvedValueOnce(
+            status === 200
+              ? rotated()
+              : response(401, { code: "invalid_refresh_token" })
+          );
+        if (status === 200) fetch.mockResolvedValueOnce(response(200, session));
+        const reloaded = createRuntime();
+        await reloaded.restoreSession();
+        expect(reloaded.store.getState()).toMatchObject(
+          status === 200 ? authenticated : anonymous
+        );
+        expect(
+          new Headers(fetch.mock.calls[1]?.[1]?.headers).get(
+            "x-refresh-current-only"
+          )
+        ).toBe("v1");
+        if (status === 401) {
+          await reloaded.restoreSession();
+          navigation.type = "navigate";
+          await createRuntime().restoreSession();
+          expect(fetch.mock.calls.map(([, init]) => init?.method)).toEqual([
+            "HEAD",
+            "POST"
+          ]);
+
+          navigation.type = "reload";
+          fetch
+            .mockResolvedValueOnce(capability())
+            .mockResolvedValueOnce(rotated())
+            .mockResolvedValueOnce(response(200, session));
+          const laterReload = createRuntime();
+          await laterReload.restoreSession();
+          expect(laterReload.store.getState()).toMatchObject(authenticated);
+        }
+      }
+    );
+  }
+);
+
 describe("web 账号安全真实请求层", () => {
   const operations = [
     [

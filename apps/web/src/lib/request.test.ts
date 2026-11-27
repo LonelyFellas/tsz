@@ -155,13 +155,12 @@ describe("refreshTokens — 竞态保护", () => {
     expect(result).toBe("at2");
   });
 
-  it("刷新失败时 Promise reject，refreshingPromise 清空供下次重试", async () => {
+  it("刷新临时限流后，下一次调用仍可重新发请求", async () => {
     setAccessToken("tok");
-    refreshFail();
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 429 }));
 
-    await expect(refreshTokens()).rejects.toThrow("会话刷新失败，请重试");
+    await expect(refreshTokens()).rejects.toMatchObject({ status: 429 });
 
-    // 下次可以重新发请求
     refreshOk("at-retry");
     const result = await refreshTokens();
     expect(result).toBe("at-retry");

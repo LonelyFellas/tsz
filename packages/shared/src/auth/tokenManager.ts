@@ -16,6 +16,8 @@ export class SessionChangedError extends Error {
 export class SessionRefreshError extends Error {}
 export class SessionRefreshHttpError extends HttpError {}
 
+const refreshFailureMessage = "会话刷新失败，请重试";
+
 export interface TokenManager {
   getToken: () => string | undefined;
   getTokenForRequest: () => string | undefined | Promise<string>;
@@ -73,6 +75,10 @@ export function createTokenManager({
   const unconfirmedKey = `tsz:refresh-unconfirmed:${baseUrl}`;
   let unconfirmed: RefreshUnconfirmedError | null = null;
   let legacyUnconfirmed = false;
+  const rejectedKey = `tsz:refresh-rejected:${baseUrl}`;
+  const rotationKey = `tsz:refresh-rotation:${baseUrl}`;
+  let rejectedRotation: string | null = null;
+  let canProbeAfterReload = false;
   const logoutKey = `tsz.auth.logged-out:${baseUrl}`;
   const sessionKey = `tsz:auth-session:${baseUrl}`;
   const tabSessionKey = `tsz:auth-tab:${baseUrl}`;
@@ -99,13 +105,20 @@ export function createTokenManager({
     /* 存储不可用时仍保留内存状态与刷新主体检查。 */
   }
   try {
-    const marker =
-      typeof sessionStorage !== "undefined"
-        ? sessionStorage.getItem(unconfirmedKey)
-        : null;
+    const storage =
+      typeof sessionStorage !== "undefined" ? sessionStorage : undefined;
+    const marker = storage?.getItem(unconfirmedKey);
     if (marker === "1" || marker === "cancelled") {
       unconfirmed = new RefreshUnconfirmedError();
       legacyUnconfirmed = marker === "1";
+    }
+    rejectedRotation = storage?.getItem(rejectedKey) ?? null;
+    if (rejectedRotation !== null && typeof window !== "undefined") {
+      // 旧前端不会通知 Cookie 轮换。重载的新文档可安全探测一次。
+      const navigation = window.performance?.getEntriesByType?.(
+        "navigation"
+      )[0] as PerformanceNavigationTiming | undefined;
+      canProbeAfterReload = navigation?.type === "reload";
     }
   } catch {
     /* In-memory protection still applies when storage is unavailable. */
@@ -120,6 +133,44 @@ export function createTokenManager({
     } catch {
       /* No credentials are stored; storage failure must not replay a Cookie. */
     }
+  }
+
+  function rememberRefreshRejection(rotation: string | null) {
+    rejectedRotation = rotation;
+    canProbeAfterReload = false;
+    try {
+      if (typeof sessionStorage === "undefined") return;
+      if (rotation !== null) sessionStorage.setItem(rejectedKey, rotation);
+      else sessionStorage.removeItem(rejectedKey);
+    } catch {
+      /* 存储不可用时仍可阻止当前文档重复刷新。 */
+    }
+  }
+
+  function readRotationStamp(): string | null {
+    try {
+      if (typeof localStorage !== "undefined")
+        return localStorage.getItem(rotationKey);
+    } catch {
+      /* 无法确认其他标签页轮换时，继续尊重当前拒绝。 */
+    }
+    return null;
+  }
+
+  function publishRotation() {
+    // 仅作为共享 Cookie 已轮换的通知，不记录访问凭证或刷新请求键。
+    try {
+      if (typeof localStorage !== "undefined")
+        localStorage.setItem(rotationKey, `${Date.now()}:${Math.random()}`);
+    } catch {
+      /* 跨标签页通知失败不影响本次刷新。 */
+    }
+  }
+
+  function isRefreshRejected() {
+    if (rejectedRotation === null || canProbeAfterReload) return false;
+    const rotation = readRotationStamp();
+    return rotation === null || rotation === rejectedRotation;
   }
 
   function requestStorage() {
@@ -225,6 +276,7 @@ export function createTokenManager({
     }
     // Local logout cannot prove that the rotating Cookie was revoked.
     if (token !== null) {
+      rememberRefreshRejection(null);
       unconfirmed = null;
       legacyUnconfirmed = false;
       rememberUnconfirmed(false);
@@ -267,6 +319,10 @@ export function createTokenManager({
     } catch (error) {
       return Promise.reject(error);
     }
+    if (isRefreshRejected())
+      return Promise.reject(
+        new SessionRefreshHttpError(401, refreshFailureMessage)
+      );
     if (unconfirmed && !legacyUnconfirmed) {
       onRefreshError?.(unconfirmed);
       return Promise.reject(unconfirmed);
@@ -279,6 +335,8 @@ export function createTokenManager({
       return Promise.reject(error);
     }
     const generation = sessionGeneration;
+    const currentOnly = legacyUnconfirmed || rejectedRotation !== null;
+    let attemptedRotation: string | null = null;
     const assertCurrent = () => {
       checkSharedSession();
       if (generation !== sessionGeneration) throw new SessionChangedError();
@@ -303,7 +361,7 @@ export function createTokenManager({
       }
       const recovering = Boolean(stored || requestId);
       requestId = stored || requestId || crypto.randomUUID();
-      if (recovering || legacyUnconfirmed) {
+      if (recovering || currentOnly) {
         const capability = await fetch(`${baseUrl}/auth/refresh`, {
           method: "HEAD",
           headers: localizationHeaders,
@@ -319,7 +377,7 @@ export function createTokenManager({
           capability.headers.get("x-refresh-recovery") === "v1";
         if (
           !recoverySupported ||
-          (legacyUnconfirmed &&
+          (currentOnly &&
             capability.headers.get("x-refresh-current-only") !== "v1")
         )
           throw new RefreshUnconfirmedError();
@@ -332,20 +390,22 @@ export function createTokenManager({
         // 请求键无法持久化时，页面重载后不能安全猜测上次的轮换结果。
         rememberUnconfirmed(true);
       }
+      // 只记本次请求发出时的轮换状态，保留请求在途期间其他标签页的更新。
+      attemptedRotation = readRotationStamp();
       return fetch(`${baseUrl}/auth/refresh`, {
         method: "POST",
         credentials: "include",
         headers: {
           ...localizationHeaders,
           "X-Refresh-Request-Id": requestId,
-          ...(legacyUnconfirmed ? { "X-Refresh-Current-Only": "v1" } : {})
+          ...(currentOnly ? { "X-Refresh-Current-Only": "v1" } : {})
         },
         signal: deadline.signal
       }).then(async (res) => {
         assertCurrent();
         deadline.signal.throwIfAborted();
         if (!res.ok)
-          throw new SessionRefreshHttpError(res.status, "会话刷新失败，请重试");
+          throw new SessionRefreshHttpError(res.status, refreshFailureMessage);
         recoverySupported = res.headers?.get("x-refresh-recovery") === "v1";
         const data = (await res.json()) as {
           access_token: string;
@@ -374,6 +434,8 @@ export function createTokenManager({
         unconfirmed = null;
         legacyUnconfirmed = false;
         refreshNeeded = false;
+        if (recoverySupported) publishRotation();
+        if (rejectedRotation !== null) rememberRefreshRejection(null);
         clearRequest();
         rememberUnconfirmed(false);
         retryAttempt = 0;
@@ -411,17 +473,16 @@ export function createTokenManager({
           throw unconfirmed;
         }
         if (error instanceof HttpError && error.status < 500) clearRequest();
-        if (
-          error instanceof HttpError &&
-          error.status === 401 &&
-          legacyUnconfirmed
-        ) {
+        if (error instanceof SessionRefreshHttpError && error.status === 401) {
+          rememberRefreshRejection(attemptedRotation ?? "");
           unconfirmed = null;
           legacyUnconfirmed = false;
+          refreshNeeded = false;
           rememberUnconfirmed(false);
+          if (refreshTimer) clearTimeout(refreshTimer);
+          refreshTimer = null;
           onRefreshError?.(null);
-        }
-        if (!(error instanceof HttpError && error.status === 401)) {
+        } else {
           refreshNeeded = true;
           onRefreshError?.(error);
           if (
@@ -501,7 +562,7 @@ export function createTokenManager({
     clearSession,
     canRestoreSession: () => {
       checkSharedSession();
-      return !locallyLoggedOut;
+      return !locallyLoggedOut && !isRefreshRejected();
     },
     scheduleRefresh,
     refreshTokens,
