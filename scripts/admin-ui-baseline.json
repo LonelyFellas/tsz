@@ -121,7 +121,7 @@
   "apps/admin/src/features/dictionary/word-creation-v3/components/V3SynthesisInputs.css": {
     "raw-radius": 1,
     "raw-font-size": 2,
-    "raw-font-weight": 6,
+    "raw-font-weight": 4,
     "raw-color": 4
   },
   "apps/admin/src/features/dictionary/word-creation-v3/components/V3TargetCascader.tsx": {

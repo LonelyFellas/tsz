@@ -19,7 +19,7 @@ import type { SpellingSettingsOpener } from "./V3VoiceTextField";
 import { Alert, Button, Flex, Space, Typography } from "@tsz/ui/admin/display";
 import { Input, Radio } from "@tsz/ui/admin/forms";
 import { Modal } from "@tsz/ui/admin/overlays";
-import { useEffect, useId, useRef, useState } from "react";
+import { Fragment, useEffect, useId, useRef, useState } from "react";
 import type {
   AudioAssetV3,
   Dialect,
@@ -45,7 +45,10 @@ import {
   speechAccentGroup,
   spellingSpeechContent
 } from "@tsz/shared";
-import { PronunciationPreviewControls } from "../../word-creation/PronunciationPreview";
+import {
+  PronunciationPreviewControls,
+  PronunciationPreviewVoiceList
+} from "../../word-creation/PronunciationPreview";
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import { v3IssueMessage } from "../presentationErrors";
 import "./V3SynthesisInputs.css";
@@ -607,6 +610,11 @@ export function V3SynthesisInputs({
                           {sideLabel}
                         </Typography.Text>
                       )}
+                      {currentSource === "none" && (
+                        <Typography.Text type="secondary">
+                          {t("creation_no_pronunciation_audio")}
+                        </Typography.Text>
+                      )}
                       <Radio.Group
                         name={`synthesis-source-${pronunciation.id}-${side}`}
                         data-v3-node-id={pronunciation.id}
@@ -638,31 +646,19 @@ export function V3SynthesisInputs({
                           [
                             {
                               value: "spelling",
-                              name: t("spelling"),
-                              text: spelling,
-                              fontClass: "tsz-words"
+                              name: t("spelling")
                             },
                             {
                               value: "ipa",
-                              name: "Azure IPA",
-                              text: candidate.ipa.trim()
-                                ? `/ ${candidate.ipa.trim()} /`
-                                : "",
-                              fontClass: "tsz-phonetics"
+                              name: "Azure IPA"
                             },
                             {
                               value: "ups",
-                              name: "Azure UPS",
-                              text: candidate.ups.trim(),
-                              fontClass: "tsz-phonetics"
+                              name: "Azure UPS"
                             },
                             {
                               value: "upload",
                               name: t("creation_upload_audio"),
-                              text:
-                                (recording ?? recordings[0])?.original_name ??
-                                "",
-                              fontClass: "",
                               disabled: recordings.length === 0
                             }
                           ] as const
@@ -693,6 +689,32 @@ export function V3SynthesisInputs({
                             option.value === "spelling"
                               ? spellingSpeech?.voice_profile
                               : phonemeSpeech?.voice_profile;
+                          const voiceProfile =
+                            savedProfile ??
+                            (isPhoneme
+                              ? pronunciation.voice_profile
+                              : undefined);
+                          const savedAssetId = savedVoiceAudioAsset(
+                            savedProfile,
+                            sideLocale
+                          );
+                          const savedVoice = savedAssetId
+                            ? savedProfile?.voices.find(
+                                (voice) =>
+                                  voice.enabled &&
+                                  voice.audio_asset_id === savedAssetId
+                              )
+                            : undefined;
+                          const active = currentSource === option.value;
+                          const sourceRecording =
+                            option.value === "upload"
+                              ? (recording ?? recordings[0])
+                              : option.value === "spelling"
+                                ? spellingRecording
+                                : undefined;
+                          const recommendationArea =
+                            option.value === "spelling" ? "word" : "azure";
+                          const hidden = option.value === "ups" && !upsExpanded;
                           const previewContent =
                             option.value === "spelling"
                               ? (spellingSpeechContent(spellingSpeech, side) ??
@@ -729,134 +751,158 @@ export function V3SynthesisInputs({
                                         "creation_phoneme_word_boundaries_are_missing_or_do_not_match_the_text_check_ipa_or_convert_ups_agai"
                                       )
                                     : undefined));
-                          return (
-                            <div
-                              key={option.value}
-                              className="word-synthesis-source-option"
-                              hidden={option.value === "ups" && !upsExpanded}
-                              aria-hidden={
-                                option.value === "ups" && !upsExpanded
-                              }
-                              inert={option.value === "ups" && !upsExpanded}
-                            >
-                              <Radio
-                                id={`${inputPrefix}-${side}-source-${option.value}`}
-                                value={option.value}
-                                aria-label={
-                                  dialect === "common"
-                                    ? `${sideLabel} ${option.name}`
-                                    : option.name
-                                }
-                                disabled={
-                                  "disabled" in option && option.disabled
-                                }
-                                className="word-synthesis-choice"
-                              />
-                              <PronunciationPreviewControls
-                                recommendationArea={
-                                  option.value === "spelling" ? "word" : "azure"
-                                }
-                                playbackOnly
-                                assetOnly={option.value === "upload"}
-                                audioAssetId={
-                                  (option.value === "upload"
-                                    ? (recording ?? recordings[0])?.id
-                                    : option.value === "spelling"
-                                      ? spellingRecording?.id
-                                      : undefined) ??
-                                  savedVoiceAudioAsset(savedProfile, sideLocale)
-                                }
-                                pronunciationId={pronunciation.id}
+                          const voiceSummary = active &&
+                            option.value !== "upload" &&
+                            !sourceRecording &&
+                            (!previewDisabled || voiceProfile) && (
+                              <PronunciationPreviewVoiceList
                                 dialect={side}
-                                ariaLabelPrefix={t(
-                                  "creation_final_reading_label",
-                                  {
-                                    label,
-                                    side: sideLabel,
-                                    name: option.name
-                                  }
-                                )}
-                                disabled={previewDisabled}
-                                disabledReason={previewDisabledReason}
+                                source={option.value}
                                 content={previewContent}
                                 voiceProfile={
-                                  savedProfile ??
-                                  (isPhoneme
-                                    ? pronunciation.voice_profile
-                                    : undefined)
+                                  savedVoice
+                                    ? { voices: [savedVoice] }
+                                    : voiceProfile
                                 }
+                                recommendationArea={
+                                  savedVoice ? undefined : recommendationArea
+                                }
+                                requestSharedResolution={false}
                               />
-                              {option.value === "spelling" &&
-                                onSpellingSettings && (
-                                  <Button
-                                    className="word-synthesis-source-settings"
-                                    type="text"
-                                    size="small"
-                                    disabled={!canEdit}
-                                    icon={<SettingsIcon />}
-                                    aria-label={t("spelling_speech_settings", {
-                                      side: sideLabel
-                                    })}
-                                    onClick={(event) => {
-                                      event.preventDefault();
-                                      event.stopPropagation();
-                                      onSpellingSettings({
-                                        dialect: side
-                                      });
-                                    }}
-                                  />
-                                )}
-                              {(option.value === "ipa" ||
-                                option.value === "ups") && (
-                                <V3PhonemeSpeechSettings
-                                  active={currentSource === option.value}
-                                  spelling={spelling}
-                                  nodeId={pronunciation.id}
-                                  field={`synthesis.${side}.${option.value}_speech`}
-                                  candidate={candidate}
-                                  alphabet={option.value}
-                                  locale={side === "uk" ? "en-GB" : "en-US"}
-                                  label={`${label} ${sideLabel} ${option.name}`}
-                                  fallbackVoiceProfile={
-                                    pronunciation.voice_profile
+                            );
+                          return (
+                            <Fragment key={option.value}>
+                              <div
+                                className="word-synthesis-source-option"
+                                hidden={hidden}
+                                aria-hidden={hidden}
+                                inert={hidden}
+                              >
+                                <Radio
+                                  id={`${inputPrefix}-${side}-source-${option.value}`}
+                                  value={option.value}
+                                  aria-label={
+                                    dialect === "common"
+                                      ? `${sideLabel} ${option.name}`
+                                      : option.name
                                   }
-                                  audioAssets={pronunciation.audio_assets}
-                                  onChange={(next, audioAssets) =>
-                                    writeCandidate(side, next, audioAssets)
+                                  disabled={
+                                    "disabled" in option && option.disabled
                                   }
+                                  className="word-synthesis-choice"
                                 />
-                              )}
-                              {option.value === "upload" && (
-                                <V3PronunciationAudioUpload
-                                  nodeId={pronunciation.id}
-                                  locale={side === "uk" ? "en-GB" : "en-US"}
-                                  label={t(
-                                    "creation_upload_pronunciation_audio",
+                                <PronunciationPreviewControls
+                                  recommendationArea={recommendationArea}
+                                  playbackOnly
+                                  assetOnly={option.value === "upload"}
+                                  audioAssetId={
+                                    sourceRecording?.id ?? savedAssetId
+                                  }
+                                  pronunciationId={pronunciation.id}
+                                  dialect={side}
+                                  ariaLabelPrefix={t(
+                                    "creation_final_reading_label",
                                     {
-                                      label: `${label} ${sideLabel}`
+                                      label,
+                                      side: sideLabel,
+                                      name: option.name
                                     }
                                   )}
-                                  assets={pronunciation.audio_assets ?? []}
-                                  onChange={(audio_assets) =>
-                                    writeAudioAssets(side, audio_assets)
-                                  }
+                                  disabled={previewDisabled}
+                                  disabledReason={previewDisabledReason}
+                                  content={previewContent}
+                                  voiceProfile={voiceProfile}
                                 />
+                                {option.value === "spelling" &&
+                                  onSpellingSettings && (
+                                    <Button
+                                      className="word-synthesis-source-settings"
+                                      type="text"
+                                      size="small"
+                                      disabled={!canEdit}
+                                      icon={<SettingsIcon />}
+                                      aria-label={t(
+                                        "spelling_speech_settings",
+                                        {
+                                          side: sideLabel
+                                        }
+                                      )}
+                                      onClick={(event) => {
+                                        event.preventDefault();
+                                        event.stopPropagation();
+                                        onSpellingSettings({
+                                          dialect: side
+                                        });
+                                      }}
+                                    />
+                                  )}
+                                {(option.value === "ipa" ||
+                                  option.value === "ups") && (
+                                  <V3PhonemeSpeechSettings
+                                    active={currentSource === option.value}
+                                    spelling={spelling}
+                                    nodeId={pronunciation.id}
+                                    field={`synthesis.${side}.${option.value}_speech`}
+                                    candidate={candidate}
+                                    alphabet={option.value}
+                                    locale={side === "uk" ? "en-GB" : "en-US"}
+                                    label={`${label} ${sideLabel} ${option.name}`}
+                                    fallbackVoiceProfile={
+                                      pronunciation.voice_profile
+                                    }
+                                    audioAssets={pronunciation.audio_assets}
+                                    onChange={(next, audioAssets) =>
+                                      writeCandidate(side, next, audioAssets)
+                                    }
+                                  />
+                                )}
+                                {option.value === "upload" && (
+                                  <V3PronunciationAudioUpload
+                                    nodeId={pronunciation.id}
+                                    locale={side === "uk" ? "en-GB" : "en-US"}
+                                    label={t(
+                                      "creation_upload_pronunciation_audio",
+                                      {
+                                        label: `${label} ${sideLabel}`
+                                      }
+                                    )}
+                                    assets={pronunciation.audio_assets ?? []}
+                                    onChange={(audio_assets) =>
+                                      writeAudioAssets(side, audio_assets)
+                                    }
+                                  />
+                                )}
+                                <div className="word-synthesis-choice-details">
+                                  <label
+                                    htmlFor={`${inputPrefix}-${side}-source-${option.value}`}
+                                    className="word-synthesis-choice-content"
+                                  >
+                                    <span className="word-synthesis-choice-tag">
+                                      {option.name}
+                                    </span>
+                                    {active && sourceRecording && (
+                                      <span
+                                        className="word-synthesis-choice-recording"
+                                        title={sourceRecording.original_name}
+                                      >
+                                        {sourceRecording.original_name}
+                                      </span>
+                                    )}
+                                  </label>
+                                  {!hidden && voiceSummary}
+                                </div>
+                              </div>
+                              {hidden && active && (
+                                <div className="word-synthesis-choice-details word-synthesis-collapsed-source">
+                                  <Typography.Text type="secondary">
+                                    {t("creation_current_source", {
+                                      source: option.name
+                                    })}
+                                  </Typography.Text>
+                                  {voiceSummary}
+                                </div>
                               )}
-                              <label
-                                htmlFor={`${inputPrefix}-${side}-source-${option.value}`}
-                                className="word-synthesis-choice-content"
-                              >
-                                <span className="word-synthesis-choice-tag">
-                                  {option.name}
-                                </span>
-                                <span
-                                  className={`word-synthesis-choice-preview ${option.fontClass}`}
-                                  title={option.text}
-                                >
-                                  {option.text}
-                                </span>
-                              </label>
-                            </div>
+                            </Fragment>
                           );
                         })}
                       </Radio.Group>
