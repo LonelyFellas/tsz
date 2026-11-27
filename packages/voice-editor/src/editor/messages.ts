@@ -324,11 +324,6 @@ export const voiceEditorMessages = {
   local_recommendation: ["局部推荐", "局部推薦", "Local recommendation"],
   recommended_voices: ["推荐配音", "推薦配音", "Recommended voices"],
   recommendation: ["推荐项", "推薦項", "Recommendation"],
-  do_not_use_recommended_voices: [
-    "不使用推荐配音",
-    "不使用推薦配音",
-    "Do not use recommended voices"
-  ],
   source_group: ["来源分组", "來源分組", "Source group"],
   none_selected_in_group: [
     "（组内未选）",

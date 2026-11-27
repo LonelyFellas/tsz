@@ -363,22 +363,39 @@ describe("新版局部主页和唯一声音草稿", () => {
     });
   });
 
-  it("已获取的配音可以逐条移除并保留其他音色的参数与音频", async () => {
+  it("逐条移除时取消关联的推荐勾选，重新勾选复用原版本和音频", async () => {
     const onProfile = vi.fn();
+    const alpha = {
+      ...version("a", -27),
+      volume_percent: 64,
+      audio_asset_id: "alpha-audio"
+    };
+    const recommendations = [
+      recommendation("a", "第一套"),
+      recommendation("a", "第二套"),
+      recommendation("b", "第三套"),
+      recommendation("us", "美式推荐")
+    ];
     render(
       <Harness
         initial={pool([
-          {
-            ...version("a", -27),
-            volume_percent: 64,
-            audio_asset_id: "alpha-audio"
-          },
+          { ...alpha, enabled: false },
           version("b"),
           version("us")
         ])}
+        recommendations={recommendations}
         onProfile={onProfile}
       />
     );
+    const first = await screen.findByRole("checkbox", { name: "第一套" });
+    const second = screen.getByRole("checkbox", { name: "第二套" });
+    const third = screen.getByRole("checkbox", { name: "第三套" });
+    const american = screen.getByRole("checkbox", { name: "美式推荐" });
+    for (const checkbox of [first, second, third, american]) {
+      fireEvent.click(checkbox);
+      expect(checkbox).toBeChecked();
+    }
+    const beforeRemoval = onProfile.mock.calls.at(-1)![0] as VoiceProfile;
 
     const removeAlpha = await screen.findByRole("button", {
       name: "移除 a"
@@ -390,16 +407,87 @@ describe("新版局部主页和唯一声音草稿", () => {
       expect(screen.getByLabelText("英式池 b")).toBeVisible();
       expect(screen.getByLabelText("美式池 us")).toBeVisible();
     });
+    expect(first).not.toBeChecked();
+    expect(second).not.toBeChecked();
+    expect(third).toBeChecked();
+    expect(american).toBeChecked();
     const saved = onProfile.mock.calls.at(-1)![0] as VoiceProfile;
-    expect(saved.voices.find((item) => item.voice_id === "a")).toMatchObject({
-      enabled: false,
-      rate_percent: -27,
-      volume_percent: 64,
-      audio_asset_id: "alpha-audio"
+    expect(saved.voices.find((item) => item.voice_id === "a")).toEqual({
+      ...alpha,
+      enabled: false
     });
     expect(
       saved.voices.filter((item) => item.enabled).map((item) => item.voice_id)
     ).toEqual(["b", "us"]);
+    expect(
+      saved.dubbing!.uk.recommendations?.map((item) => item.recommendation_id)
+    ).toEqual([recommendations[2]!.id]);
+    expect(saved.dubbing!.us).toEqual(beforeRemoval.dubbing!.us);
+
+    fireEvent.click(first);
+    expect(first).toBeChecked();
+    expect(second).not.toBeChecked();
+    const restored = onProfile.mock.calls.at(-1)![0] as VoiceProfile;
+    expect(restored.voices.filter((item) => item.voice_id === "a")).toEqual([
+      alpha
+    ]);
+  });
+
+  it("旧草稿的停用音色不显示为已选，修改本侧时清除残留推荐", async () => {
+    const stale = recommendation("a", "旧推荐");
+    const onProfile = vi.fn();
+    const initial = pool([{ ...version("a"), enabled: false }, version("b")]);
+    initial.dubbing!.uk.recommendations = [
+      {
+        group_id: stale.groupId!,
+        recommendation_id: stale.id,
+        voice_id: "a",
+        contribution_id: "a-version"
+      }
+    ];
+    render(
+      <Harness
+        initial={initial}
+        recommendations={[stale]}
+        onProfile={onProfile}
+      />
+    );
+    expect(
+      await screen.findByRole("checkbox", { name: "旧推荐" })
+    ).not.toBeChecked();
+    expect(onProfile).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText("完整音色目录"));
+    fireEvent.click(screen.getByRole("checkbox", { name: "选用 Beta" }));
+    const saved = onProfile.mock.calls.at(-1)![0] as VoiceProfile;
+    expect(saved.dubbing!.uk).toEqual({ mode: "local" });
+    expect(saved.voices.find((item) => item.voice_id === "a")?.enabled).toBe(
+      false
+    );
+  });
+
+  it("旧草稿的音色还没有版本号时也能从本侧音色池移除", async () => {
+    const onProfile = vi.fn();
+    render(
+      <Harness
+        initial={{
+          voices: [{ voice_id: "a", enabled: true, rate_percent: -27 }]
+        }}
+        onProfile={onProfile}
+      />
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "移除 a" }));
+    expect(screen.queryByLabelText("英式池 a")).not.toBeInTheDocument();
+    expect(onProfile).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        voices: [
+          expect.objectContaining({
+            voice_id: "a",
+            enabled: false,
+            rate_percent: -27
+          })
+        ]
+      })
+    );
   });
 
   it("目录音色被同声推荐采用后，取消推荐保留原目录参数且另一侧选择不受影响", async () => {
@@ -1277,9 +1365,11 @@ describe("新版局部主页和唯一声音草稿", () => {
     ).toBe(-27);
     expect(within(ukGroup.parentElement!).getByText("来源分组")).toBeVisible();
     expect(screen.getAllByText("释义组")[0]).toBeVisible();
-    fireEvent.click(
-      within(ukGroup).getByRole("checkbox", { name: "不使用推荐配音" })
-    );
+    fireEvent.click(first);
+    fireEvent.click(within(ukGroup).getByRole("checkbox", { name: /第二套/ }));
+    expect(
+      within(ukGroup).queryByRole("checkbox", { name: "不使用推荐配音" })
+    ).toBeNull();
     expect(
       onProfile.mock.calls
         .at(-1)![0]
@@ -1363,11 +1453,13 @@ describe("新版局部主页和唯一声音草稿", () => {
     expect(next.dubbing!.us).toEqual({ mode: "inherit" });
     expect(next.voices.map((item) => item.voice_id)).toEqual(["a", "b"]);
     const uk = within(screen.getByRole("group", { name: "英式 局部推荐" }));
-    fireEvent.click(uk.getByRole("checkbox", { name: "不使用推荐配音" }));
+    fireEvent.click(uk.getByRole("checkbox", { name: "首推" }));
+    expect(uk.getByRole("checkbox", { name: "首推" })).not.toBeChecked();
     next = onProfile.mock.calls.at(-1)![0] as VoiceProfile;
     expect(
       next.voices.filter((item) => item.enabled).map((item) => item.voice_id)
     ).toEqual(["b"]);
+    expect(next.dubbing!.uk).toEqual({ mode: "local" });
     expect(next.dubbing!.us).toEqual({ mode: "inherit" });
     await waitFor(() => expect(screen.getByText("保存整段")).toBeEnabled());
     fireEvent.click(screen.getByText("保存整段"));
