@@ -640,7 +640,7 @@ export interface UploadPanelProps {
   /** 还在路上或失败待重试的上传。 */
   pending: PendingUpload[];
   limit: number;
-  onAddFiles: (files: FileList) => void;
+  onAddFiles: (files: FileList, gender: AudioAssetGender) => void;
   onRetryUpload: (id: string) => void;
   onDismissUpload: (id: string) => void;
   onRemoveAsset: (asset: AudioAsset) => void;
@@ -651,7 +651,7 @@ export interface UploadPanelProps {
   downloadingAssetId?: string;
   /** 试听失败的说明；只在这块面板里显示。 */
   playbackMessage?: string;
-  genderUpdatePending?: boolean;
+  genderUpdateAssetId?: string;
   genderUpdateMessage?: string;
 }
 
@@ -685,7 +685,7 @@ export function UploadPanel({
   onPlayAsset,
   playingAssetId,
   playbackMessage,
-  genderUpdatePending,
+  genderUpdateAssetId,
   downloadingAssetId,
   genderUpdateMessage
 }: UploadPanelProps) {
@@ -693,19 +693,19 @@ export function UploadPanel({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inFlight = pending.filter((item) => !item.error).length;
   const used = assets.length + inFlight;
-  const replacingAccent = assets.some(
+  const currentAsset = assets.find(
     (asset) =>
       speechAccentGroup(asset.locale) === speechAccentGroup(upload.locale)
   );
-  const selectedAssetGender = assets.find(
-    (asset) =>
-      speechAccentGroup(asset.locale) === speechAccentGroup(upload.locale)
-  )?.gender;
+  const uploadGender =
+    currentAsset && currentAsset.id !== genderUpdateAssetId
+      ? currentAsset.gender
+      : upload.gender;
   const canAdd =
     available &&
     uploadAllowed &&
     !readOnly &&
-    (used < limit || replacingAccent);
+    (used < limit || Boolean(currentAsset));
   return (
     <div className="tsz-ve-pop tsz-ve-pop-upload" aria-label={t("audio")}>
       <div className="tsz-ve-upload-header">
@@ -731,7 +731,8 @@ export function UploadPanel({
         style={{ display: "none" }}
         disabled={!canAdd}
         onChange={(event) => {
-          if (event.target.files?.length) onAddFiles(event.target.files);
+          if (event.target.files?.length)
+            onAddFiles(event.target.files, uploadGender);
           event.target.value = "";
         }}
       />
@@ -767,9 +768,12 @@ export function UploadPanel({
           size="middle"
           optionType="button"
           aria-label={t("upload_audio_gender")}
-          value={selectedAssetGender ?? upload.gender}
+          value={uploadGender}
           disabled={
-            readOnly || !available || !uploadAllowed || genderUpdatePending
+            readOnly ||
+            !available ||
+            !uploadAllowed ||
+            genderUpdateAssetId !== undefined
           }
           onChange={(event) => {
             const gender = event.target.value as AudioAssetGender;

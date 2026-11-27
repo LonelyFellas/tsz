@@ -159,6 +159,7 @@ function Harness({
   generatedLocale,
   spellingSpeech,
   recording = false,
+  recordingLocale = "en-GB",
   extraRecording = false,
   issues = [],
   audioTasks = null,
@@ -175,6 +176,7 @@ function Harness({
   generatedLocale?: "en-GB";
   spellingSpeech?: SpellingSpeechV3;
   recording?: boolean;
+  recordingLocale?: "en-GB" | "en-US";
   extraRecording?: boolean;
   issues?: readonly V3DraftValidationIssue[];
   audioTasks?: Map<string, () => Promise<boolean>> | null;
@@ -209,7 +211,7 @@ function Harness({
           audio_assets: [
             {
               id: "old-recording",
-              locale: "en-GB" as const,
+              locale: recordingLocale,
               gender: "female" as const,
               content_type: "audio/mpeg",
               size_bytes: 1024,
@@ -1963,11 +1965,12 @@ it("外层人工上传按口音保存并选源，上传未完成时阻止保存�
   const fileInput = await screen.findByLabelText("上传音频", {
     selector: "input"
   });
+  expect(screen.getByRole("radio", { name: "男声" })).toBeChecked();
   const file = new File(["fixture"], "american.mp3", { type: "audio/mpeg" });
   fireEvent.change(fileInput, { target: { files: [file] } });
   await waitFor(() =>
     expect(speech.upload).toHaveBeenCalledWith(
-      expect.objectContaining({ file, locale: "en-US" })
+      expect.objectContaining({ file, locale: "en-US", gender: "male" })
     )
   );
   expect(await tasks.get("p:en-US:upload")!()).toBe(false);
@@ -1977,7 +1980,7 @@ it("外层人工上传按口音保存并选源，上传未完成时阻止保存�
   finish({
     id: "uploaded-us",
     locale: "en-US",
-    gender: "female",
+    gender: "male",
     content_type: "audio/mpeg",
     size_bytes: 7,
     original_name: "american.mp3",
@@ -1994,7 +1997,11 @@ it("外层人工上传按口音保存并选源，上传未完成时阻止保存�
       .audio_assets
   ).toEqual(
     expect.arrayContaining([
-      expect.objectContaining({ id: "uploaded-us", is_default: false })
+      expect.objectContaining({
+        id: "uploaded-us",
+        gender: "male",
+        is_default: false
+      })
     ])
   );
   const complete = within(settings).getByLabelText(`完成${settingsLabel}设置`);
@@ -2018,6 +2025,68 @@ it("外层人工上传按口音保存并选源，上传未完成时阻止保存�
     ])
   );
 });
+
+it.each([
+  {
+    scenario: "英式首次上传",
+    locale: "en-GB",
+    recording: false,
+    chooseFemale: false
+  },
+  {
+    scenario: "美式手动选女声",
+    locale: "en-US",
+    recording: false,
+    chooseFemale: true
+  },
+  {
+    scenario: "替换美式女声录音",
+    locale: "en-US",
+    recording: true,
+    chooseFemale: false
+  }
+] as const)(
+  "$scenario 按面板选中的女声上传",
+  async ({ locale, recording, chooseFemale }) => {
+    speech.upload.mockResolvedValue({
+      id: "uploaded-female",
+      locale,
+      gender: "female",
+      content_type: "audio/mpeg",
+      size_bytes: 7,
+      original_name: "female.mp3",
+      created_at: "2026-11-12T00:00:00Z"
+    });
+    const british = locale === "en-GB";
+    render(
+      <Harness
+        dialect={british ? "uk" : "us"}
+        recording={recording}
+        recordingLocale={locale}
+      />
+    );
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: `第 1 条发音 ${british ? "英式" : "美式"}上传音频`
+      })
+    );
+    const female = await screen.findByRole("radio", { name: "女声" });
+    if (chooseFemale) fireEvent.click(female);
+    expect(female).toBeChecked();
+    const file = new File(["fixture"], "female.mp3", { type: "audio/mpeg" });
+    fireEvent.change(screen.getByLabelText("上传音频", { selector: "input" }), {
+      target: { files: [file] }
+    });
+    await waitFor(() =>
+      expect(speech.upload).toHaveBeenCalledWith(
+        expect.objectContaining({ file, locale, gender: "female" })
+      )
+    );
+    expect(
+      await screen.findByRole("list", { name: "已上传音频" })
+    ).toHaveTextContent("female.mp3");
+  }
+);
 
 it("外层上传权限不足时保留已有录音，文件校验和失败重试仍使用原上传流程", async () => {
   speech.canUpload = false;
