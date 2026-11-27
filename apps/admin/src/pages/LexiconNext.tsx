@@ -709,7 +709,6 @@ function EntryEditor({
   const canCreate = usePermission("words.create");
   const canCreateSentence = usePermission("sentences.create");
   const canAccessSentence = usePermission("sentences.access");
-  const canGenerateAudio = usePermission("speech.generate");
   // Translate only local or singly referenced sentences this editor can modify.
   const referencedSentenceIds = new Set(
     draft.senses.flatMap((s) => s.sentence_ids ?? [])
@@ -1036,10 +1035,10 @@ function EntryEditor({
           ? await sentenceWorkspace.prepare(
               !dirty && sentenceWorkspace.hasPendingAudio
             )
-          : { changes: [], pendingAudio: [] };
+          : { changes: [], pendingAudio: undefined };
         if (sentenceWorkspace.hasPendingAudio && !dirty && !changes.length) {
           sentenceWorkspace.reset(pendingAudio);
-          if (pendingAudio.length)
+          if (pendingAudio?.length)
             void message.warning("例句配音仍未完成，请稍后重试。");
           return;
         }
@@ -1069,7 +1068,7 @@ function EntryEditor({
         void queryClient.invalidateQueries({
           queryKey: ["admin-lexicon-next", "publication", saved.id]
         });
-        if (pendingAudio.length)
+        if (pendingAudio?.length)
           void message.warning("草稿已保存，例句配音待补。");
         else void message.success("草稿已保存");
       },
@@ -1299,7 +1298,8 @@ function EntryEditor({
         {writable &&
           !viewingSnapshot &&
           canAccessSentence &&
-          canGenerateAudio &&
+          sentenceDraftsAvailable &&
+          sentenceWorkspace.audioAvailable &&
           sentenceWorkspace.hasPendingAudio && (
             <Alert
               type="warning"
