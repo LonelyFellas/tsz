@@ -12,6 +12,7 @@ type ReferenceEntry = {
   forms?: ReferenceForm[];
   formsByPos?: { pos: string; forms: ReferenceForm[] }[];
   definitions?: string[];
+  examples?: string[];
   grammarPatterns?: string[];
   grammarExamples?: string[];
   summary?: string;
@@ -205,7 +206,10 @@ function readStructured(
       entry.reading = field.slice("读音标记 ".length);
     } else if (field.startsWith("释义 ")) {
       hasFacts = true;
-      entry.definitions = [field.slice("释义 ".length)];
+      (entry.definitions ??= []).push(field.slice("释义 ".length));
+    } else if (field.startsWith("例句 ")) {
+      hasFacts = true;
+      (entry.examples ??= []).push(field.slice("例句 ".length));
     } else if (
       field.startsWith("句型 ") &&
       field.slice("句型 ".length).trim()
