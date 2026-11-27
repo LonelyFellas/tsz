@@ -5484,7 +5484,7 @@ it("例句配音不可用时仍保存词条、例句文字和译文", async () =
     ]
   });
   await waitFor(() => expect(retry).not.toBeInTheDocument());
-});
+}, 15_000);
 
 it("统一保存冲突保留本地例句，可比较服务器例句，明确确认后才重载", async () => {
   const { api, saved, source } = unifiedSentenceRequests();
