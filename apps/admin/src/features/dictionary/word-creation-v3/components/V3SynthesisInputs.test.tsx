@@ -11,7 +11,7 @@ import {
   within
 } from "@testing-library/react";
 import { useState } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import type {
   Dialect,
   SpellingSpeechV3,
@@ -19,6 +19,7 @@ import type {
   WordPronunciationV3
 } from "@tsz/types";
 import { PronunciationPreviewProvider } from "../../word-creation/PronunciationPreview";
+import { adminVoicePreviewAdapter } from "../../voice-editor/dataSource";
 import { V3PhonemeSpeechSettings } from "./V3PhonemeSpeechSettings";
 import { V3SynthesisInputs } from "./V3SynthesisInputs";
 import { V3PronunciationConvertAll } from "./V3PronunciationConvertAll";
@@ -149,6 +150,7 @@ beforeEach(() => {
 
 function Harness({
   dialect,
+  index = 0,
   legacy = false,
   empty = false,
   profiled = false,
@@ -167,6 +169,7 @@ function Harness({
   onLatestChange
 }: {
   dialect: Dialect;
+  index?: number;
   legacy?: boolean;
   empty?: boolean;
   profiled?: boolean;
@@ -333,7 +336,7 @@ function Harness({
             spelling={legacyPhrase || settingsPhrase ? "far away" : "far"}
             spellingSpeech={spellingSpeech}
             dialect={dialect}
-            index={0}
+            index={index}
             issues={issues}
             onSpellingSettings={() => {}}
             onChange={(patch) =>
@@ -1758,6 +1761,90 @@ it("UPS 音素间空格不能被保存为英文词间停顿", async () => {
   fireEvent.mouseDown(screen.getByRole("dialog").querySelector(".tsz-ve-gap")!);
   expect(screen.getByText(/停顿须在词间/)).toBeInTheDocument();
   expect(screen.getByLabelText(`完成${label}设置`)).toBeDisabled();
+});
+
+it("第 2 条美式 IPA 移除推荐后，取消不落草稿，完成重开保留目录音色", async () => {
+  const catalogue = await adminVoicePreviewAdapter.listVoices({
+    language: "en"
+  });
+  const andrew = {
+    ...catalogue.find((voice) => voice.id === "en-us-aria")!,
+    id: "en-us-andrew",
+    label: "Andrew"
+  };
+  const listVoices = vi
+    .spyOn(adminVoicePreviewAdapter, "listVoices")
+    .mockResolvedValue([...catalogue, andrew]);
+  onTestFinished(() => {
+    listVoices.mockRestore();
+  });
+  speech.recommendations.mockResolvedValue([
+    {
+      id: "11111111-1111-4111-8111-111111111112",
+      groupId: "11111111-1111-4111-8111-111111111113",
+      name: "自然发音",
+      groupName: "词形拼写和音标",
+      locale: "en-US",
+      setting: { voice_id: andrew.id, enabled: true, rate_percent: -35 }
+    }
+  ]);
+  render(<Harness dialect="common" index={1} />);
+  fireEvent.click(sourceRadio("Azure IPA"));
+  const label = "第 2 条发音 美式 Azure IPA";
+  const wire = () =>
+    JSON.parse(screen.getByTestId("pronunciation-wire").textContent!);
+  const initial = wire();
+  async function open() {
+    fireEvent.click(screen.getByLabelText(`打开${label} TTS 设置器`));
+    return within(await phonemeDialog(label));
+  }
+  async function removeRecommendation(dialog: ReturnType<typeof within>) {
+    const aria = await dialog.findByRole("checkbox", { name: "选用 Aria" });
+    await waitFor(() => expect(aria).toBeEnabled());
+    if (aria.getAttribute("aria-checked") !== "true") fireEvent.click(aria);
+    const natural = await dialog.findByRole("checkbox", { name: "自然发音" });
+    await waitFor(() => expect(natural).toBeEnabled());
+    if (natural.getAttribute("aria-checked") !== "true")
+      fireEvent.click(natural);
+    await waitFor(() => expect(natural).toBeChecked());
+    fireEvent.click(
+      await dialog.findByRole("button", { name: "移除 自然发音" })
+    );
+    expect(natural).not.toBeChecked();
+    expect(dialog.getByRole("checkbox", { name: "选用 Aria" })).toBeChecked();
+  }
+
+  let dialog = await open();
+  await removeRecommendation(dialog);
+  fireEvent.click(dialog.getByLabelText(`取消${label}设置`));
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+  );
+  expect(wire()).toEqual(initial);
+
+  dialog = await open();
+  await removeRecommendation(dialog);
+  const complete = dialog.getByLabelText(`完成${label}设置`);
+  await waitFor(() => expect(complete).toBeEnabled());
+  fireEvent.click(complete);
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+  );
+  const saved = wire().synthesis.us.ipa_speech.voice_profile;
+  expect(saved.dubbing.us).toEqual({ mode: "local" });
+  expect(saved.voices).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ voice_id: andrew.id, enabled: false }),
+      expect.objectContaining({ voice_id: "en-us-aria", enabled: true })
+    ])
+  );
+
+  dialog = await open();
+  expect(
+    await dialog.findByRole("checkbox", { name: "自然发音" })
+  ).not.toBeChecked();
+  expect(dialog.queryByRole("checkbox", { name: "不使用推荐配音" })).toBeNull();
+  expect(dialog.getByRole("checkbox", { name: "选用 Aria" })).toBeChecked();
 });
 
 it("未配置的音素设置器采用首位推荐，完成时保存参数", async () => {

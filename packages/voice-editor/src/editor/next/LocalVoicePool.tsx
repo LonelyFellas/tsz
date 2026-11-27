@@ -70,6 +70,47 @@ function voiceSides(t: VoiceEditorTranslation = defaultVoiceEditorTranslation) {
   ] as const;
 }
 
+function activeRecommendationSources(
+  profile: VoiceProfile | null | undefined,
+  side: "uk" | "us",
+  voices: VoiceOption[]
+) {
+  const sources = profile?.dubbing?.[side].recommendations;
+  if (!profile || !sources?.length) return [];
+  const enabled = profile.voices.filter(
+    (setting) => setting.enabled && voiceSettingAccent(setting, voices) === side
+  );
+  const voiceIds = new Set(enabled.map((setting) => setting.voice_id));
+  const versions = new Map(
+    enabled.map((setting) => [voiceSettingKey(setting), setting.voice_id])
+  );
+  return sources.filter(({ contribution_id, voice_id }) =>
+    contribution_id
+      ? versions.get(contribution_id) === voice_id
+      : voiceIds.has(voice_id)
+  );
+}
+
+function pruneRecommendationSources(
+  profile: VoiceProfile,
+  side: "uk" | "us",
+  voices: VoiceOption[]
+): VoiceProfile {
+  const dubbing = profile.dubbing;
+  if (!dubbing?.[side].recommendations) return profile;
+  const recommendations = activeRecommendationSources(profile, side, voices);
+  return {
+    ...profile,
+    dubbing: {
+      ...dubbing,
+      [side]: {
+        mode: dubbing[side].mode,
+        ...(recommendations.length ? { recommendations } : {})
+      }
+    }
+  };
+}
+
 export function LocalVoicePool({
   profile,
   settings,
@@ -236,6 +277,10 @@ export function LocalVoicePool({
   const conflicts = voicePoolConflicts(current, voices);
   const inheritedFor = (side: "uk" | "us") =>
     profile?.dubbing?.[side].mode === "inherit";
+  const localSources = {
+    uk: activeRecommendationSources(profile, "uk", voices),
+    us: activeRecommendationSources(profile, "us", voices)
+  };
   const selectedRecommendations = (side: "uk" | "us") =>
     inheritedFor(side)
       ? recommendations.filter(
@@ -246,7 +291,7 @@ export function LocalVoicePool({
             )
         )
       : recommendations.filter((item) =>
-          profile?.dubbing?.[side].recommendations?.some(
+          localSources[side].some(
             (source) => source.recommendation_id === item.id
           )
         );
@@ -254,9 +299,7 @@ export function LocalVoicePool({
     sides.flatMap(({ key }) => {
       const ids = inheritedFor(key)
         ? selectedRecommendations(key).map((item) => item.setting.voice_id)
-        : (profile?.dubbing?.[key].recommendations?.map(
-            (item) => item.voice_id
-          ) ?? []);
+        : localSources[key].map((item) => item.voice_id);
       return ids.map((id) => providerVoiceKey(id, voices));
     })
   );
@@ -313,7 +356,7 @@ export function LocalVoicePool({
           contribution_id: voiceSettingKey(selected)
         }
       ];
-    return local;
+    return pruneRecommendationSources(local, side, voices);
   }
   function selectRecommendation(
     items: VoiceRecommendation[],
@@ -415,13 +458,16 @@ export function LocalVoicePool({
     if (readOnly) return;
     const local = materialize(side);
     if (!local) return;
-    const key = voiceSettingKey(setting);
-    onChange({
+    const next = {
       ...local,
-      voices: local.voices.map((item) =>
-        voiceSettingKey(item) === key ? { ...item, enabled: false } : item
-      )
-    });
+      voices: local.voices.map((item) => {
+        const matches = setting.version_id
+          ? item.version_id === setting.version_id
+          : item.voice_id === setting.voice_id && sideOf(item) === side;
+        return matches ? { ...item, enabled: false } : item;
+      })
+    };
+    onChange(pruneRecommendationSources(next, side, voices));
   }
   function preview(
     item: VoiceSetting,
@@ -801,18 +847,9 @@ export function LocalVoicePool({
                             size="small"
                             type="link"
                             disabled={readOnly}
-                            onClick={() => {
-                              const local = materialize(side.key);
-                              if (local)
-                                onChange({
-                                  ...local,
-                                  voices: local.voices.map((item) =>
-                                    voiceSettingKey(item) === key
-                                      ? { ...item, enabled: false }
-                                      : item
-                                  )
-                                });
-                            }}
+                            onClick={() =>
+                              removeSelectedVoice(setting, side.key)
+                            }
                           >
                             {t("deselect")}{" "}
                             {setting.version_name ?? setting.voice_id}
@@ -920,16 +957,6 @@ export function LocalVoicePool({
                   role="group"
                   aria-label={`${side.label} ${t("local_recommendation")}`}
                 >
-                  <Checkbox
-                    checked={
-                      !selected.length &&
-                      profile?.dubbing?.[side.key].mode === "local"
-                    }
-                    disabled={readOnly}
-                    onChange={() => selectRecommendation([], side.key)}
-                  >
-                    {t("do_not_use_recommended_voices")}
-                  </Checkbox>
                   {items.map((item) => (
                     <div
                       key={item.id}
