@@ -293,6 +293,13 @@
   font-size: var(--ui-font-size-sm);
   color: var(--ui-color-text-secondary);
 }
+.tsz-ve-bowl-value {
+  align-items: center;
+}
+.tsz-ve-bowl-percent.ui-input-affix-wrapper {
+  width: 6em;
+  font-variant-numeric: tabular-nums;
+}
 .tsz-ve-bowl-note {
   flex-basis: 100%;
   font-size: var(--ui-font-size-sm);

@@ -1089,6 +1089,16 @@ export const voiceEditorMessages = {
   adjust_liaison_arc: ["微调连读弧", "微調連讀弧", "Adjust liaison arc"],
   select_liaison_arc: ["选择连读弧", "選擇連讀弧", "Select liaison arc"],
   bowl_curve: ["整弧", "整弧", "Whole arc"],
+  bowl_curve_percent: [
+    "整弧调整百分比",
+    "整弧調整百分比",
+    "Whole arc adjustment percentage"
+  ],
+  bowl_curve_range: [
+    "请输入 -100 到 100 的整数。",
+    "請輸入 -100 到 100 的整數。",
+    "Enter a whole number from -100 to 100."
+  ],
   bowl_left: ["左端点", "左端點", "Left tip"],
   bowl_right: ["右端点", "右端點", "Right tip"],
   bowl_flatter: ["更平", "更平", "Flatter"],

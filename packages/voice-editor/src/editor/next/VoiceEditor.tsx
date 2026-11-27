@@ -28,7 +28,14 @@ import {
 import { Alert, Button, Space, Tag, Typography } from "@tsz/ui/admin/display";
 import { Input, Select } from "@tsz/ui/admin/forms";
 import { Modal, Tooltip } from "@tsz/ui/admin/overlays";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentRef
+} from "react";
 import {
   liaisonAdjustment,
   normalizeSpeechLiaisons,
@@ -343,6 +350,8 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   const [liaisonEnd, setLiaisonEnd] = useState<LiaisonEnd>("start");
   const [selectedLiaisonIndex, setSelectedLiaisonIndex] = useState<number>();
   const [bowlTarget, setBowlTarget] = useState<BowlTarget>("curve_pct");
+  // 切换动作可能拦截 mousedown 的默认焦点转移，卸载前主动让输入失焦。
+  const liaisonCurveInputRef = useRef<ComponentRef<typeof Input>>(null);
   const [bowlPreview, setBowlPreview] = useState<{
     link: LiaisonLink;
     bowl: LiaisonBowl;
@@ -1450,6 +1459,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   ]);
 
   const changeBrush = (next: Brush) => {
+    liaisonCurveInputRef.current?.blur();
     if (next.kind === "role") lastRoleRef.current = next.level;
     if (next.kind === "pause") lastPauseRef.current = next.durationMs;
     setBrush(next);
@@ -2466,6 +2476,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   ) => {
     if (readOnly) return;
     if (brush.kind === "liaison-adjust") {
+      liaisonCurveInputRef.current?.blur();
       setSelectedLiaisonIndex(index);
       setBowlTarget(target);
       setBowlPreview(undefined);
@@ -3493,7 +3504,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                 }
                 target={bowlTarget}
                 disabled={readOnly}
+                curveInputRef={liaisonCurveInputRef}
                 onTarget={(v) => {
+                  liaisonCurveInputRef.current?.blur();
                   setBowlPreview(undefined);
                   setBowlTarget(v);
                 }}

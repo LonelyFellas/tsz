@@ -14,6 +14,8 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RichTextV2 } from "@tsz/types";
+import { prepareBowl } from "../../marks/liaisonBowl";
+import * as liaisonArcMeasurement from "../../marks/useLiaisonArcs";
 import {
   AudioUploadError,
   type AudioAsset,
@@ -1488,6 +1490,84 @@ describe("VoiceEditor 文本与落盘", () => {
         start_len: 1,
         end_len: 1
       }
+    ]);
+  });
+
+  it("画布切换连读弧或端点前提交聚焦的整弧输入", () => {
+    const pose = prepareBowl(
+      { x: 5, tipY: 16 },
+      { x: 60, tipY: 16 },
+      18,
+      15,
+      [],
+      3,
+      1
+    );
+    const tips = pose({}).view;
+    vi.spyOn(liaisonArcMeasurement, "useLiaisonArcs").mockReturnValue({
+      arcs: [0, 1].map((index) => ({
+        index,
+        key: String(index),
+        d: "M0 0 Q20 20 40 0",
+        pose,
+        tips
+      })),
+      strokeWidth: 1
+    });
+    const first = { type: "liaison", start: 3, end: 6, bowl: {} };
+    const second = {
+      type: "liaison",
+      start: 6,
+      end: 9,
+      bowl: { curve_pct: 16 }
+    };
+    const view = props({
+      mode: "actual-pron",
+      value: { version: 2, text: "pick it up", annotations: [first, second] }
+    });
+    const { container } = render(<VoiceEditor {...view} />);
+    const input = () => screen.getByRole("textbox", { name: "整弧调整百分比" });
+
+    fireEvent.click(button("微调连读弧"));
+    act(() => input().focus());
+    fireEvent.change(input(), { target: { value: "-68" } });
+    const secondArc = container.querySelectorAll(".tsz-ve-arc-hit")[1]!;
+    expect(fireEvent.mouseDown(secondArc)).toBe(false);
+    expect(input()).toHaveValue("16");
+    expect(view.onChange).toHaveBeenCalledOnce();
+    expect(applied(view).annotations).toMatchObject([
+      { ...first, bowl: { curve_pct: -68 } },
+      second
+    ]);
+
+    act(() => input().focus());
+    fireEvent.change(input(), { target: { value: "24" } });
+    fireEvent.mouseDown(container.querySelector('[data-arc-end="left"]')!);
+    expect(screen.getByRole("slider", { name: "左端点" })).toBeInTheDocument();
+    expect(view.onChange).toHaveBeenCalledTimes(2);
+    expect(applied(view).annotations).toMatchObject([
+      { ...first, bowl: { curve_pct: -68 } },
+      { ...second, bowl: { curve_pct: 24 } }
+    ]);
+
+    fireEvent.click(button("上一步"));
+    expect(applied(view).annotations).toMatchObject([
+      { ...first, bowl: { curve_pct: -68 } },
+      second
+    ]);
+
+    fireEvent.click(screen.getByRole("radio", { name: "整弧" }));
+    act(() => input().focus());
+    fireEvent.change(input(), { target: { value: "35" } });
+    expect(input()).toHaveFocus();
+    fireEvent.click(button("编辑文本"));
+    expect(
+      screen.queryByRole("textbox", { name: "整弧调整百分比" })
+    ).not.toBeInTheDocument();
+    expect(view.onChange).toHaveBeenCalledTimes(4);
+    expect(applied(view).annotations).toMatchObject([
+      { ...first, bowl: { curve_pct: -68 } },
+      { ...second, bowl: { curve_pct: 35 } }
     ]);
   });
 
