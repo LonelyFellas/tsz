@@ -294,6 +294,7 @@ const fixedVoiceMessages = {
   british: ["英式", "英式", "British"],
   american: ["美式", "美式", "American"],
   save_to_this_group: ["保存到本组", "儲存至此組", "Save to this group"],
+  add_to_this_group: ["加入本组", "加入此組", "Add to this group"],
   dubbing_settings: ["配音设置", "配音設定", "Dubbing settings"],
   preview_and_review: ["试听与审听", "試聽與審聽", "Preview and review"],
   preview_content: ["试听内容", "試聽內容", "Preview content"],

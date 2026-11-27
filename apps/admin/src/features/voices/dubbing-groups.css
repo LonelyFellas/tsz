@@ -339,6 +339,21 @@
   overflow: auto;
   scrollbar-gutter: stable;
 }
+.dubbing-recommendation-picker,
+.dubbing-recommendation-picker .dubbing-recommendation-catalog {
+  height: 100%;
+}
+.dubbing-recommendation-picker .dubbing-recommendation-catalog {
+  grid-template-rows: minmax(0, 1fr);
+  margin-block: 0;
+}
+.dubbing-recommendation-picker .dubbing-recommendation-catalog > section {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+.dubbing-recommendation-picker .dubbing-picker-list {
+  height: auto;
+}
 .dubbing-picker-radios.ui-radio-group {
   display: flex;
   flex-direction: column;

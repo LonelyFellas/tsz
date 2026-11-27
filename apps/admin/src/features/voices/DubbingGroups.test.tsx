@@ -449,11 +449,11 @@ describe("按口音独立推荐与逐组草稿", () => {
     expect(within(panel).queryByRole("button", { name: "完成" })).toBeNull();
     expect(api.speech.saveIndependentGroup).not.toHaveBeenCalled();
   });
-  it("一侧为空时可新增当前侧，取消抽屉不制造草稿，完成不补齐另一侧", async () => {
+  it("单选以音色默认值加入当前侧，取消不产生草稿，完成后可回读", async () => {
     const initial = data();
     initial.groups[0]!.uk = [];
     initial.groups[0]!.us = [];
-    mount(initial);
+    const { client } = mount(initial, [uk, us, ukMale]);
     const panel = groupPanel("A");
     const british = within(panel).getByLabelText("A 英式");
     fireEvent.click(button("新增推荐", british));
@@ -462,33 +462,31 @@ describe("按口音独立推荐与逐组草稿", () => {
     closeDialog();
     expect(within(panel).queryByRole("button", { name: "完成" })).toBeNull();
     fireEvent.click(button("新增推荐", british));
-    const sonia = screen.getByRole("checkbox", { name: "女声 Sonia" });
-    expect(sonia).not.toBeChecked();
-    fireEvent.click(sonia);
-    fireEvent.change(screen.getByLabelText("推荐名称"), {
-      target: { value: "英式慢速" }
-    });
-    fireEvent.change(screen.getByLabelText("合成语速"), {
-      target: { value: "0.73" }
-    });
-    fireEvent.click(button("保存到本组", screen.getByRole("dialog")));
+    const dialog = within(screen.getByRole("dialog"));
+    expect(
+      dialog.getByRole("checkbox", { name: "女声 Sonia" })
+    ).not.toBeChecked();
+    fireEvent.click(dialog.getByRole("checkbox", { name: "男声 Ryan" }));
+    expect(dialog.queryByLabelText("推荐名称")).toBeNull();
+    expect(dialog.queryByLabelText("合成语速")).toBeNull();
+    fireEvent.click(dialog.getByRole("button", { name: "加入本组" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(api.speech.saveIndependentGroup).not.toHaveBeenCalled();
     await complete(panel);
-    expect(api.speech.saveIndependentGroup).toHaveBeenCalledWith(
+    expect(api.speech.saveIndependentGroup).toHaveBeenCalledTimes(1);
+    await act(async () => client.refetchQueries({ queryKey }));
+    const saved =
+      client.getQueryData<AdminDubbingGroupsV3Response>(queryKey)!.groups[0]!;
+    expect(saved.uk).toEqual([
       {
-        group: expect.objectContaining({
-          uk: [
-            expect.objectContaining({
-              name: "英式慢速",
-              parameters: expect.objectContaining({ rate_percent: -27 })
-            })
-          ],
-          us: []
-        }),
-        base_revision: 1
-      },
-      false
-    );
+        id: expect.any(String),
+        name: ukMale.display_name,
+        voice_alias: ukMale.alias,
+        selected: true,
+        parameters: { rate_percent: 10, pitch_semitones: 0, style: null }
+      }
+    ]);
+    expect(saved.us).toEqual([]);
   });
   it("跨搜索结果批量加入当前侧，每条使用自己的默认参数并可独立编辑、保存和回读", async () => {
     const initial = data();
@@ -497,20 +495,18 @@ describe("按口音独立推荐与逐组草稿", () => {
     fireEvent.click(button("新增推荐", within(panel).getByLabelText("A 英式")));
     const editor = within(screen.getByRole("dialog"));
     fireEvent.click(editor.getByRole("checkbox", { name: "女声 Sonia" }));
-    fireEvent.change(editor.getByLabelText("合成语速"), {
-      target: { value: "0.73" }
-    });
+    expect(editor.queryByLabelText("合成语速")).toBeNull();
     const ryan = editor.getByRole("checkbox", { name: "男声 Ryan" });
     fireEvent.click(ryan);
     expect(editor.queryByLabelText("合成语速")).toBeNull();
     fireEvent.click(ryan);
-    expect(editor.getByLabelText("合成语速")).toHaveValue("0.73");
+    expect(editor.queryByLabelText("合成语速")).toBeNull();
     fireEvent.change(editor.getByLabelText("搜索英式女声"), {
       target: { value: "无匹配" }
     });
     expect(editor.queryByRole("checkbox", { name: "女声 Sonia" })).toBeNull();
     fireEvent.click(ryan);
-    fireEvent.click(editor.getByRole("button", { name: "保存到本组" }));
+    fireEvent.click(editor.getByRole("button", { name: "加入本组" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(api.speech.saveIndependentGroup).not.toHaveBeenCalled();
 
@@ -567,7 +563,7 @@ describe("按口音独立推荐与逐组草稿", () => {
     const updated = structuredClone(initial);
     updated.groups[0]!.uk.push({ ...seed, id: "another-recommendation" });
     await act(async () => client.setQueryData(queryKey, updated));
-    const add = editor.getByRole("button", { name: "保存到本组" });
+    const add = editor.getByRole("button", { name: "加入本组" });
     await waitFor(() => expect(add).toBeDisabled());
     expect(sonia).toBeChecked();
     expect(ryan).toBeChecked();
