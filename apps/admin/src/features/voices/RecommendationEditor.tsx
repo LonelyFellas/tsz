@@ -5,11 +5,7 @@ import {
 } from "./i18n";
 import { useLayoutEffect, useRef, useState } from "react";
 import { speechAccentGroup } from "@tsz/shared";
-import type {
-  AdminSpeechVoice,
-  AdminDubbingRecommendation,
-  AdminVoiceParameters
-} from "@tsz/types";
+import type { AdminSpeechVoice, AdminDubbingRecommendation } from "@tsz/types";
 import { EmptyState, Button, Space, Typography } from "@tsz/ui/admin/display";
 import { Checkbox, Form, Input, Radio } from "@tsz/ui/admin/forms";
 import { Drawer } from "@tsz/ui/admin/overlays";
@@ -34,12 +30,25 @@ export type RecommendationSeed = Partial<AdminDubbingRecommendation>;
 type ParameterFormValues = {
   [Key in keyof VoiceParameterValues]: VoiceParameterValues[Key] | null;
 };
+type RecommendationSubmission =
+  | {
+      bulkAdd?: undefined;
+      onSave: (item: AdminDubbingRecommendation) => void;
+    }
+  | {
+      bulkAdd: {
+        remainingSlots: number;
+        onSave: (items: AdminDubbingRecommendation[]) => void;
+      };
+      onSave?: never;
+    };
 
 export function RecommendationEditor({
   voices,
   initial,
   side,
   disabled,
+  bulkAdd,
   onBeforeAudition,
   onSave,
   onCancel
@@ -49,9 +58,8 @@ export function RecommendationEditor({
   side: DubbingSide;
   disabled: boolean;
   onBeforeAudition?: () => void;
-  onSave: (item: AdminDubbingRecommendation) => void;
   onCancel: () => void;
-}) {
+} & RecommendationSubmission) {
   const { t } = useVoiceTranslation();
   const [parameterForm] = Form.useForm<ParameterFormValues>();
   const [value, setValue] = useState<RecommendationSeed>(() =>
@@ -61,7 +69,13 @@ export function RecommendationEditor({
     Record<string, VoiceTrialSource>
   >({});
   const [ssmlDrafts, setSsmlDrafts] = useState<Record<string, SsmlDraft>>({});
-  const voiceDrafts = useRef(new Map<string, AdminVoiceParameters>());
+  const voiceDrafts = useRef(new Map<string, RecommendationSeed>());
+  const [selectedAliases, setSelectedAliases] = useState<string[]>([]);
+  const showSingleFields = !bulkAdd || selectedAliases.length === 1;
+  const atCapacity =
+    !!bulkAdd && selectedAliases.length >= bulkAdd.remainingSlots;
+  const selectionExceedsCapacity =
+    !!bulkAdd && selectedAliases.length > bulkAdd.remainingSlots;
   const [searches, setSearches] = useState({ female: "", male: "" });
   const lists = useRef(new Map<string, HTMLDivElement>());
   const positions = useRef(new Map<string, number>());
@@ -79,32 +93,105 @@ export function RecommendationEditor({
     if (current?.voice_alias === chosen.alias) return;
     // 在本次抽屉内暂存每个候选声音，切回时恢复参数。
     if (current.voice_alias && current.parameters)
-      voiceDrafts.current.set(
-        current.voice_alias,
-        structuredClone(current.parameters)
-      );
+      voiceDrafts.current.set(current.voice_alias, current);
     const next = newRecommendationVoice(chosen);
     const saved = voiceDrafts.current.get(chosen.alias);
-    if (saved) next.parameters = structuredClone(saved);
-    if (current.id) next.id = current.id;
-    setValue((previous) => ({ ...previous, ...next }));
+    if (bulkAdd) {
+      setValue(saved ?? next);
+    } else {
+      if (saved?.parameters) next.parameters = saved.parameters;
+      if (current.id) next.id = current.id;
+      setValue((previous) => ({ ...previous, ...next }));
+    }
     setError(undefined);
   }
+  function toggleVoice(alias: string) {
+    const checked = selectedAliases.includes(alias);
+    if (disabled || (!checked && atCapacity)) return;
+    const next = checked
+      ? selectedAliases.filter((selected) => selected !== alias)
+      : [...selectedAliases, alias];
+    setSelectedAliases(next);
+    setError(undefined);
+    if (next.length === 1) {
+      const chosen = voices.find((candidate) => candidate.alias === next[0]);
+      if (chosen) chooseVoice(chosen);
+    }
+  }
   const item =
-    value.voice_alias && value.parameters
+    showSingleFields &&
+    value.voice_alias &&
+    value.parameters &&
+    (!bulkAdd || value.voice_alias === selectedAliases[0])
       ? (value as AdminDubbingRecommendation)
       : undefined;
   const voice = voices.find((v) => v.alias === item?.voice_alias);
   function parameters(update: Partial<NonNullable<typeof item>["parameters"]>) {
+    if (!item) return;
     setError(undefined);
     setValue((current) => ({
       ...current,
-      parameters: { ...item!.parameters, ...update }
+      parameters: { ...item.parameters, ...update }
     }));
   }
 
+  function validate(
+    recommendation: AdminDubbingRecommendation,
+    candidate: AdminSpeechVoice | undefined
+  ) {
+    if (
+      !recommendationError(
+        t("recommendation"),
+        side,
+        recommendation,
+        candidate,
+        t
+      )
+    )
+      return true;
+    setError({
+      format: (t) =>
+        recommendationError(
+          t("recommendation"),
+          side,
+          recommendation,
+          candidate,
+          t
+        ) ?? ""
+    });
+    return false;
+  }
+
+  const saveDisabled =
+    disabled ||
+    (!!bulkAdd && (!selectedAliases.length || selectionExceedsCapacity));
   function save() {
-    if (disabled) return;
+    if (saveDisabled) return;
+    if (bulkAdd && selectedAliases.length > 1) {
+      const recommendations: AdminDubbingRecommendation[] = [];
+      for (const alias of selectedAliases) {
+        const candidate = voices.find((voice) => voice.alias === alias);
+        if (!candidate) {
+          setError(voiceMessage("recommendation_catalog_changed"));
+          return;
+        }
+        const recommendation = {
+          ...newRecommendationVoice(candidate),
+          name:
+            Array.from(candidate.display_name.trim()).slice(0, 40).join("") ||
+            t("unnamed_recommendation"),
+          selected: true
+        };
+        if (!validate(recommendation, candidate)) return;
+        recommendations.push(recommendation);
+      }
+      bulkAdd.onSave(recommendations);
+      return;
+    }
+    if (bulkAdd && (!item || !voice)) {
+      setError(voiceMessage("recommendation_catalog_changed"));
+      return;
+    }
     const name = value.name?.trim() || t("unnamed_recommendation");
     if (Array.from(name).length > 40) {
       setError(
@@ -118,27 +205,11 @@ export function RecommendationEditor({
       });
       return;
     }
-    const issue = recommendationError(
-      t("recommendation"),
-      side,
-      { ...item, name },
-      voice,
-      t
-    );
-    if (issue) {
-      setError({
-        format: (t) =>
-          recommendationError(
-            t("recommendation"),
-            side,
-            { ...item, name },
-            voice,
-            t
-          ) ?? ""
-      });
-      return;
+    const recommendation = { ...item, name, selected: value.selected ?? true };
+    if (validate(recommendation, voice)) {
+      if (bulkAdd) bulkAdd.onSave([recommendation]);
+      else onSave(recommendation);
     }
-    onSave({ ...item, name, selected: value.selected ?? true });
   }
 
   // 只在切换声音或口音时回填，避免逐字输入时重设表单打断编辑。
@@ -244,25 +315,8 @@ export function RecommendationEditor({
         </Typography.Paragraph>
       </div>
     );
-  const content = (
-    <Form
-      component="div"
-      form={parameterForm}
-      onValuesChange={(_, fields: ParameterFormValues) =>
-        parameters({
-          rate_percent: fields.rate_percent ?? Number.NaN,
-          pitch_semitones: fields.pitch_semitones ?? Number.NaN,
-          volume_percent: fields.volume_percent ?? Number.NaN,
-          style: fields.style || null,
-          style_degree:
-            fields.style_degree === null ? Number.NaN : fields.style_degree,
-          role: fields.role || undefined
-        })
-      }
-      layout="vertical"
-      requiredMark={false}
-      disabled={disabled}
-    >
+  const singleFields = (
+    <>
       <Form.Item label={t("recommendation_name")}>
         <Input
           aria-label={t("recommendation_name")}
@@ -284,6 +338,28 @@ export function RecommendationEditor({
       >
         {t("use_recommendation")}
       </Checkbox>
+    </>
+  );
+  const content = (
+    <Form
+      component="div"
+      form={parameterForm}
+      onValuesChange={(_, fields: ParameterFormValues) =>
+        parameters({
+          rate_percent: fields.rate_percent ?? Number.NaN,
+          pitch_semitones: fields.pitch_semitones ?? Number.NaN,
+          volume_percent: fields.volume_percent ?? Number.NaN,
+          style: fields.style || null,
+          style_degree:
+            fields.style_degree === null ? Number.NaN : fields.style_degree,
+          role: fields.role || undefined
+        })
+      }
+      layout="vertical"
+      requiredMark={false}
+      disabled={disabled}
+    >
+      {!bulkAdd && singleFields}
       <div
         className="dubbing-recommendation-catalog"
         role="group"
@@ -301,6 +377,37 @@ export function RecommendationEditor({
                 .toLowerCase()
                 .includes(searches[gender].trim().toLowerCase())
           );
+          const choiceLabel = t("side_gender_voice", {
+            side: sideName(side, t),
+            gender: label
+          });
+          const options = candidates.map((candidate) => {
+            const checked = selectedAliases.includes(candidate.alias);
+            const unavailable = candidate.synthesis_available === false;
+            const name = <VoiceName voice={candidate} />;
+            return (
+              <div key={candidate.alias} className="dubbing-picker-option">
+                {bulkAdd ? (
+                  <Checkbox
+                    checked={checked}
+                    disabled={
+                      disabled || (!checked && (atCapacity || unavailable))
+                    }
+                    onChange={() => toggleVoice(candidate.alias)}
+                  >
+                    {name}
+                  </Checkbox>
+                ) : (
+                  <Radio value={candidate.alias} disabled={unavailable}>
+                    {name}
+                  </Radio>
+                )}
+                <Typography.Text className="dubbing-picker-id">
+                  {candidate.metadata?.provider_voice_id ?? candidate.alias}
+                </Typography.Text>
+              </div>
+            );
+          });
           return (
             <section key={gender}>
               <Typography.Text>{label}</Typography.Text>
@@ -337,39 +444,26 @@ export function RecommendationEditor({
                   gender: label
                 })}
               >
-                <Radio.Group
-                  aria-label={t("side_gender_voice", {
-                    side: sideName(side, t),
-                    gender: label
-                  })}
-                  value={item?.voice_alias}
-                  disabled={disabled}
-                  className="dubbing-picker-radios"
-                  onChange={(event) => {
-                    const chosen = voices.find(
-                      (voice) => voice.alias === event.target.value
-                    );
-                    if (chosen) chooseVoice(chosen);
-                  }}
-                >
-                  {candidates.map((candidate) => (
-                    <div
-                      key={candidate.alias}
-                      className="dubbing-picker-option"
-                    >
-                      <Radio
-                        value={candidate.alias}
-                        disabled={candidate.synthesis_available === false}
-                      >
-                        <VoiceName voice={candidate} />
-                      </Radio>
-                      <Typography.Text className="dubbing-picker-id">
-                        {candidate.metadata?.provider_voice_id ??
-                          candidate.alias}
-                      </Typography.Text>
-                    </div>
-                  ))}
-                </Radio.Group>
+                {bulkAdd ? (
+                  <div role="group" aria-label={choiceLabel}>
+                    {options}
+                  </div>
+                ) : (
+                  <Radio.Group
+                    aria-label={choiceLabel}
+                    value={item?.voice_alias}
+                    disabled={disabled}
+                    className="dubbing-picker-radios"
+                    onChange={(event) => {
+                      const chosen = voices.find(
+                        (voice) => voice.alias === event.target.value
+                      );
+                      if (chosen) chooseVoice(chosen);
+                    }}
+                  >
+                    {options}
+                  </Radio.Group>
+                )}
                 {!candidates.length && (
                   <EmptyState
                     description={t(
@@ -382,19 +476,30 @@ export function RecommendationEditor({
           );
         })}
       </div>
-      {controls}
+      {bulkAdd && showSingleFields && singleFields}
+      {showSingleFields && controls}
     </Form>
   );
 
   const footer = (
     <div className="dubbing-editor-footer">
       <div className="dubbing-editor-footer-status">
+        {bulkAdd && (
+          <Typography.Text type="secondary" aria-live="polite">
+            {t("recommendation_selection_count", {
+              selected: selectedAliases.length,
+              limit: bulkAdd.remainingSlots
+            })}
+          </Typography.Text>
+        )}
         <Typography.Text type="secondary">
           {t("editor_status_side")}
         </Typography.Text>
-        {error && (
+        {(selectionExceedsCapacity || error) && (
           <Typography.Text type="danger" role="alert">
-            {error}
+            {selectionExceedsCapacity
+              ? t("recommendation_selection_exceeds_capacity")
+              : error}
           </Typography.Text>
         )}
       </div>
@@ -404,7 +509,7 @@ export function RecommendationEditor({
           type="primary"
           className="dubbing-accent-action"
           data-side={side}
-          disabled={disabled}
+          disabled={saveDisabled}
           onClick={save}
         >
           {t("save_to_this_group")}

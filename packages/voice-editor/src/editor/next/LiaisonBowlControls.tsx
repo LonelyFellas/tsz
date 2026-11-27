@@ -1,10 +1,66 @@
-import { useRef } from "react";
+import { useRef, useState, type ComponentRef, type Ref } from "react";
 import type { LiaisonBowl } from "@tsz/types";
 import { Button } from "@tsz/ui/admin/display";
-import { Segmented, Slider } from "@tsz/ui/admin/forms";
+import { Input, Segmented, Slider } from "@tsz/ui/admin/forms";
 import { useVoiceEditorTranslation } from "../i18n";
 import type { LiaisonArc } from "../../marks/liaisonGeometry";
 import type { BowlTarget } from "../../marks/liaisonBowl";
+
+const ADJUSTMENT_LIMIT = 100;
+
+function LiaisonCurveInput({
+  value,
+  disabled,
+  inputRef,
+  onCommit
+}: {
+  value: number;
+  disabled: boolean;
+  inputRef?: Ref<ComponentRef<typeof Input>>;
+  onCommit: (value: number) => void;
+}) {
+  const { t } = useVoiceEditorTranslation();
+  const [draft, setDraft] = useState<string>();
+  const text = draft?.trim() ?? "";
+  const next = /^[+-]?\d+$/u.test(text) ? Number(text) : NaN;
+  const valid = next >= -ADJUSTMENT_LIMIT && next <= ADJUSTMENT_LIMIT;
+  const invalid = !/^[+-]?$/u.test(text) && !valid;
+  const range = t("bowl_curve_range");
+
+  function commit() {
+    setDraft(undefined);
+    if (!disabled && valid && next !== value) onCommit(next);
+  }
+
+  return (
+    <Input
+      ref={inputRef}
+      className="tsz-ve-bowl-percent"
+      size="small"
+      aria-label={t("bowl_curve_percent")}
+      aria-description={range}
+      aria-invalid={invalid || undefined}
+      title={range}
+      status={invalid ? "error" : undefined}
+      disabled={disabled}
+      value={draft ?? String(value)}
+      suffix={<span aria-hidden="true">%</span>}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          event.stopPropagation();
+          if (event.nativeEvent.isComposing) return;
+          event.preventDefault();
+          if (!invalid) commit();
+        } else if (event.key === "Escape" && draft !== undefined) {
+          event.stopPropagation();
+          setDraft(undefined);
+        }
+      }}
+    />
+  );
+}
 
 interface Props {
   bowl?: LiaisonBowl;
@@ -12,6 +68,7 @@ interface Props {
   arc?: LiaisonArc;
   target: BowlTarget;
   disabled: boolean;
+  curveInputRef?: Ref<ComponentRef<typeof Input>>;
   onTarget: (target: BowlTarget) => void;
   onPreview: (bowl: LiaisonBowl | undefined) => void;
   onCommit: (bowl: LiaisonBowl) => void;
@@ -22,6 +79,7 @@ export function LiaisonBowlControls({
   arc,
   target,
   disabled,
+  curveInputRef,
   onTarget,
   onPreview,
   onCommit
@@ -32,8 +90,8 @@ export function LiaisonBowlControls({
   const curve = target === "curve_pct";
   const view = arc?.pose?.(value).view;
   const tip = view?.[target === "left_tip_pct" ? "left" : "right"];
-  const min = !curve && tip && tip.down < 0.02 ? 0 : -100;
-  const max = !curve && tip && tip.up < 0.02 ? 0 : 100;
+  const min = !curve && tip && tip.down < 0.02 ? 0 : -ADJUSTMENT_LIMIT;
+  const max = !curve && tip && tip.up < 0.02 ? 0 : ADJUSTMENT_LIMIT;
   const blocked = disabled || !view || (curve ? view.blocked : min === max);
   const targets = [
     { value: "curve_pct", label: t("bowl_curve") },
@@ -102,9 +160,20 @@ export function LiaisonBowlControls({
       >
         <div className="tsz-ve-bowl-value">
           <span>{label}</span>
-          <output>
-            {arc?.split ? t("bowl_retained", { value: number }) : number}
-          </output>
+          {curve && !arc?.split ? (
+            <LiaisonCurveInput
+              value={n}
+              disabled={blocked}
+              inputRef={curveInputRef}
+              onCommit={(next) => {
+                if (!slide.current) onCommit({ ...bowl, curve_pct: next });
+              }}
+            />
+          ) : (
+            <output>
+              {arc?.split ? t("bowl_retained", { value: number }) : number}
+            </output>
+          )}
         </div>
         <Slider
           ariaLabelForHandle={label}

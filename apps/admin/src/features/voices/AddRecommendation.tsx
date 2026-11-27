@@ -13,6 +13,7 @@ import { api, useAuthStore, usePermission } from "@/lib/auth";
 import { useDubbingDrafts } from "./DubbingDrafts";
 import {
   dubbingGroupsKey,
+  MAX_RECOMMENDATIONS_PER_SIDE,
   newRecommendationVoice,
   type DubbingDraft
 } from "./dubbing-model";
@@ -73,7 +74,7 @@ export function AddRecommendation({
       setError(voiceMessage("select_a_recommendation_group"));
       return;
     }
-    if (group[locale].length >= 20) {
+    if (group[locale].length >= MAX_RECOMMENDATIONS_PER_SIDE) {
       setError(
         voiceMessage(
           "this_group_already_has_20_recommendations_organise_them_in_group_"

@@ -10,6 +10,7 @@ import { newWordNodeId } from "@/features/dictionary/word-model/primitives";
 export const dubbingGroupsKey = (accountId: string | undefined) =>
   ["admin-dubbing-groups-v3", accountId] as const;
 export type DubbingDraft = AdminDubbingGroupV3;
+export const MAX_RECOMMENDATIONS_PER_SIDE = 20;
 export const sides = ["uk", "us"] as const;
 export type DubbingSide = (typeof sides)[number];
 export const sideName = (

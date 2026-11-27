@@ -348,11 +348,12 @@
   padding: var(--ui-space-2) var(--ui-space-1);
   border-bottom: 1px solid var(--ui-color-border-secondary);
 }
-.dubbing-picker-option .ui-radio-wrapper {
+.dubbing-picker-option :is(.ui-radio-wrapper, .ui-checkbox-wrapper) {
   display: flex;
   min-width: 0;
 }
-.dubbing-picker-option .ui-radio-wrapper > span:last-child {
+.dubbing-picker-option
+  :is(.ui-radio-wrapper > span:last-child, .ui-checkbox-label) {
   min-width: 0;
 }
 .dubbing-picker-id {
