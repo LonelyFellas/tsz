@@ -23,6 +23,7 @@ import { HttpError } from "@tsz/api-client";
 import { api, useAuthStore } from "@/lib/auth";
 import { DubbingGroups } from "./DubbingGroups";
 import { DubbingDrafts } from "./DubbingDrafts";
+import { dubbingGroupsKey } from "./dubbing-model";
 
 // 草稿用例保留真实配置表单；完整试听和媒体生命周期由对应试听、音色库用例验证。
 vi.mock("./DubbingAudition", async (importOriginal) => {
@@ -131,6 +132,19 @@ function deferred<T>() {
     }),
     resolve: (value: T) => resolve(value)
   };
+}
+function mockMissingGroupRead(id: string) {
+  const response = deferred<void>();
+  const read = vi
+    .mocked(api.speech.audioUpdates)
+    .mockImplementation((groupId) =>
+      groupId === id
+        ? response.promise.then(() => {
+            throw new HttpError(404, "Group not found", [], "not_found");
+          })
+        : Promise.resolve({ updates: [] })
+    );
+  return { response, read };
 }
 function mount(initial = data(), voices = [uk, us]) {
   stored = structuredClone(initial);
@@ -301,6 +315,152 @@ async function remove(name: string, table: HTMLElement) {
 }
 
 describe("按口音独立推荐与逐组草稿", () => {
+  it("分组状态返回 404 后仅刷新当前账号的列表一次，保留已移除分组的本地草稿", async () => {
+    const { response, read } = mockMissingGroupRead("a");
+    const { client, onDirtyChange } = mount();
+    const otherList = dubbingGroupsKey("other-admin");
+    client.setQueryData(otherList, data());
+    await rename("A", "A 本地草稿");
+    expect(groupPanel("B")).toBeInTheDocument();
+
+    stored = {
+      ...stored,
+      groups: stored.groups.filter(({ id }) => id === "global")
+    };
+    await act(async () => response.resolve());
+    await waitFor(() =>
+      expect(screen.queryByLabelText("B 分组配置")).not.toBeInTheDocument()
+    );
+
+    expect(api.speech.groupsV3).toHaveBeenCalledTimes(1);
+    expect(read.mock.calls.filter(([id]) => id === "a")).toHaveLength(1);
+    expect(client.getQueryData(queryKey)).toEqual(stored);
+    expect(client.getQueryState(otherList)?.isInvalidated).toBe(false);
+    expect(groupPanel("A 本地草稿")).toBeInTheDocument();
+    expect(onDirtyChange).toHaveBeenLastCalledWith(true);
+  });
+
+  it.each([
+    {
+      action: "编辑分组",
+      field: "分组名称",
+      apply: "应用到本组",
+      groupName: "还在编辑",
+      refreshFails: false
+    },
+    {
+      action: "修改英式 A推荐",
+      field: "推荐名称",
+      apply: "保存到本组",
+      groupName: "A",
+      refreshFails: false
+    },
+    {
+      action: "修改英式 A推荐",
+      field: "推荐名称",
+      apply: "保存到本组",
+      groupName: "A",
+      refreshFails: true
+    }
+  ])(
+    "$action 的输入在 404 触发列表更新后仍能应用到本地草稿（刷新失败：$refreshFails）",
+    async ({ action, field, apply, groupName, refreshFails }) => {
+      const { response } = mockMissingGroupRead("a");
+      const { client } = mount();
+      fireEvent.click(button(action, groupPanel("A")));
+      fireEvent.change(screen.getByLabelText(field), {
+        target: { value: "还在编辑" }
+      });
+      if (refreshFails)
+        vi.mocked(api.speech.groupsV3).mockRejectedValueOnce(
+          new HttpError(503, "Unavailable")
+        );
+      stored = {
+        ...stored,
+        groups: stored.groups.filter(({ id }) => id !== "a")
+      };
+      await act(async () => response.resolve());
+      await waitFor(() =>
+        refreshFails
+          ? expect(client.getQueryState(queryKey)?.status).toBe("error")
+          : expect(client.getQueryData(queryKey)).toEqual(stored)
+      );
+
+      expect(screen.getByLabelText(field)).toHaveValue("还在编辑");
+      fireEvent.click(button(apply, screen.getByRole("dialog")));
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      const panel = groupPanel(groupName);
+      expect(within(panel).getByText("未保存")).toBeVisible();
+      if (field === "推荐名称")
+        expect(within(panel).getByLabelText("英式 1 推荐名称")).toHaveValue(
+          "还在编辑"
+        );
+      expect(api.speech.saveIndependentGroup).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    { refreshedFirst: true, latestFromSave: false },
+    { refreshedFirst: false, latestFromSave: false },
+    { refreshedFirst: false, latestFromSave: true }
+  ])(
+    "404 刷新与保存并发时保留最新列表（列表先返回：$refreshedFirst，保存版本更新：$latestFromSave）",
+    async ({ refreshedFirst, latestFromSave }) => {
+      const { response } = mockMissingGroupRead("a");
+      const saved = deferred<AdminDubbingGroupsV3Response>();
+      const refreshed = deferred<AdminDubbingGroupsV3Response>();
+      vi.mocked(api.speech.saveIndependentGroup).mockReturnValue(saved.promise);
+      const list = vi
+        .mocked(api.speech.groupsV3)
+        .mockReturnValueOnce(refreshed.promise);
+      const { client } = mount();
+      await rename("B", "B 已保存");
+      fireEvent.click(button("完成", groupPanel("B 已保存")));
+
+      const original = data();
+      const renamed = {
+        ...original.groups[1]!,
+        revision: 2,
+        name: "B 已保存"
+      };
+      stored = {
+        ...original,
+        revision: original.revision + 2,
+        groups: [renamed, original.groups[2]!]
+      };
+      const olderList = {
+        ...stored,
+        revision: original.revision + 1,
+        groups: original.groups.filter(({ id }) => id !== "a")
+      };
+      const olderSave = {
+        ...stored,
+        revision: original.revision + 1,
+        groups: [original.groups[0]!, ...stored.groups]
+      };
+      await act(async () => response.resolve());
+      await waitFor(() => expect(list).toHaveBeenCalledTimes(1));
+      if (refreshedFirst) {
+        await act(async () => refreshed.resolve(stored));
+        await waitFor(() =>
+          expect(client.getQueryData(queryKey)).toEqual(stored)
+        );
+      }
+      await act(async () => saved.resolve(latestFromSave ? stored : olderSave));
+      await screen.findByText(/配音已保存。/);
+      if (!refreshedFirst)
+        await act(async () =>
+          refreshed.resolve(latestFromSave ? olderList : stored)
+        );
+
+      await waitFor(() =>
+        expect(client.getQueryData(queryKey)).toEqual(stored)
+      );
+      expect(screen.queryByLabelText("A 分组配置")).toBeNull();
+      expect(list).toHaveBeenCalledTimes(1);
+    }
+  );
+
   it("英式和美式音色均按性别标志、英文名、中文名展示", () => {
     mount(data(), [
       { ...uk, display_name: "Sonia（索尼娅）" },

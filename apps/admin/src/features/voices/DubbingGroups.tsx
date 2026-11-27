@@ -18,7 +18,11 @@ import {
   Volume2Icon,
   PlusIcon
 } from "lucide-react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  replaceEqualDeep,
+  useQuery,
+  useQueryClient
+} from "@tanstack/react-query";
 import { HttpError } from "@tsz/api-client";
 import type {
   AdminDubbingGroupsV3Response,
@@ -68,7 +72,7 @@ const areas = [
   { value: "example", label: "多维例句" }
 ];
 type Editing = {
-  groupId: string;
+  group: DubbingDraft;
   initial?: RecommendationSeed;
   side: DubbingSide;
 };
@@ -100,10 +104,18 @@ export function DubbingGroups({
   const canEdit = usePermission("speech.global_dubbing");
   const client = useQueryClient();
   const { modal } = App.useApp();
+  const groupsKey = dubbingGroupsKey(accountId);
   const groups = useQuery({
-    queryKey: dubbingGroupsKey(accountId),
+    queryKey: groupsKey,
     queryFn: ({ signal }) => api.speech.groupsV3(signal),
-    retry: false
+    retry: false,
+    structuralSharing: (previous, incoming) => {
+      const cached = previous as AdminDubbingGroupsV3Response | undefined;
+      const result = incoming as AdminDubbingGroupsV3Response;
+      return cached && cached.revision > result.revision
+        ? cached
+        : replaceEqualDeep(cached, result);
+    }
   });
   const [drafts, setDrafts] = useDubbingDrafts();
   const [savingId, setSavingId] = useState<string>();
@@ -122,7 +134,7 @@ export function DubbingGroups({
     id: string;
     after: boolean;
   }>();
-  const [settingsId, setSettingsId] = useState<string>();
+  const [settingsGroup, setSettingsGroup] = useState<DubbingDraft>();
   const [settingsCreating, setSettingsCreating] = useState(false);
   const [settingsDirty, setSettingsDirty] = useState(false);
   const [previewArea, setPreviewArea] = useState<string>();
@@ -141,22 +153,23 @@ export function DubbingGroups({
       (draft) => !groups.data?.groups.some((group) => group.id === draft.id)
     )
   ].sort((a, b) => Number(a.is_global) - Number(b.is_global));
-  function change(id: string, update: (group: DubbingDraft) => DubbingDraft) {
+  function change(
+    id: string,
+    update: (group: DubbingDraft) => DubbingDraft,
+    fallback?: DubbingDraft
+  ) {
     if (!canEdit || savingId === id) return;
     onInvalidatePreview();
-    setDrafts((value) =>
-      value[id] || groups.data?.groups.some((group) => group.id === id)
-        ? {
-            ...value,
-            [id]: update(
-              value[id] ??
-                structuredClone(
-                  groups.data!.groups.find((group) => group.id === id)!
-                )
-            )
-          }
-        : value
-    );
+    setDrafts((value) => {
+      const draft = value[id];
+      const base =
+        draft ??
+        groups.data?.groups.find((group) => group.id === id) ??
+        fallback;
+      return base
+        ? { ...value, [id]: update(draft ?? structuredClone(base)) }
+        : value;
+    });
     setSaved(undefined);
   }
   function setGroupSaveError(id: string, message?: VoiceMessageValue) {
@@ -178,18 +191,19 @@ export function DubbingGroups({
     });
   }
   async function accept(result: AdminDubbingGroupsV3Response) {
+    // 分组缺失触发的刷新继续读取，和保存响应按列表版本取舍。
+    const refreshing = client.getQueryState(groupsKey)?.isInvalidated;
     await Promise.all([
-      client.cancelQueries({
-        queryKey: dubbingGroupsKey(accountId),
-        exact: true
-      }),
+      refreshing
+        ? undefined
+        : client.cancelQueries({ queryKey: groupsKey, exact: true }),
       client.cancelQueries({
         queryKey: ["admin-dubbing-groups", accountId],
         exact: true
       })
     ]);
     if (useAuthStore.getState().profile?.id !== accountId) return false;
-    client.setQueryData(dubbingGroupsKey(accountId), result);
+    client.setQueryData(groupsKey, result);
     // 文本入口使用独立查询缓存，保存后重新读取推荐。
     void client.invalidateQueries({
       queryKey: ["admin-dubbing-groups", accountId],
@@ -331,10 +345,7 @@ export function DubbingGroups({
       is_global: false
     };
     setDrafts((v) => ({ ...v, [group.id]: group }));
-    settingsForm.setFieldsValue({ name: group.name, areas: group.areas });
-    setSettingsDirty(false);
-    setSettingsCreating(true);
-    setSettingsId(group.id);
+    openSettings(group, true);
   }
   function removeGroup(group: DubbingDraft) {
     modal.confirm({
@@ -412,21 +423,25 @@ export function DubbingGroups({
     setDropTarget(undefined);
   }
   const editingGroup =
-    editing && current.find((group) => group.id === editing.groupId);
+    editing &&
+    (current.find((group) => group.id === editing.group.id) ?? editing.group);
   function saveRecommendations(recommendations: AdminDubbingRecommendation[]) {
-    if (!editing || !editingGroup || !canEdit || saving) return;
-    const { groupId, side, initial } = editing;
-    if (initial) {
-      const [item] = recommendations;
-      if (!item) return;
-      updateSide(groupId, side, (items) =>
-        items.some((value) => value.id === item.id)
-          ? items.map((value) => (value.id === item.id ? item : value))
-          : [...items, item]
-      );
-    } else {
-      updateSide(groupId, side, (items) => [...items, ...recommendations]);
-    }
+    if (!editing || !canEdit || saving) return;
+    const { group, side, initial } = editing;
+    const item = initial ? recommendations[0] : undefined;
+    if (initial && !item) return;
+    change(
+      group.id,
+      (base) => {
+        const items = base[side];
+        const next =
+          item && items.some((value) => value.id === item.id)
+            ? items.map((value) => (value.id === item.id ? item : value))
+            : [...items, ...recommendations];
+        return { ...base, [side]: next };
+      },
+      group
+    );
     setEditing(undefined);
   }
   const matching =
@@ -436,17 +451,17 @@ export function DubbingGroups({
   const previewGroups = matching.length
     ? matching
     : (groups.data?.groups.filter((group) => group.is_global) ?? []);
-  function openSettings(group: DubbingDraft) {
+  function openSettings(group: DubbingDraft, creating = false) {
     settingsForm.setFieldsValue({ name: group.name, areas: group.areas });
     setSettingsDirty(false);
-    setSettingsCreating(false);
-    setSettingsId(group.id);
+    setSettingsCreating(creating);
+    setSettingsGroup(group);
   }
   function cancelSettings() {
-    if (settingsId && settingsCreating) discard(settingsId);
+    if (settingsGroup && settingsCreating) discard(settingsGroup.id);
     setSettingsDirty(false);
     setSettingsCreating(false);
-    setSettingsId(undefined);
+    setSettingsGroup(undefined);
   }
   function recommendations(
     group: DubbingDraft,
@@ -476,7 +491,7 @@ export function DubbingGroups({
                       disabled={
                         group[side].length >= MAX_RECOMMENDATIONS_PER_SIDE
                       }
-                      onClick={() => setEditing({ groupId: group.id, side })}
+                      onClick={() => setEditing({ group, side })}
                     >
                       {t("add_recommendation")}
                     </Button>
@@ -722,7 +737,7 @@ export function DubbingGroups({
                                   onClick={() => {
                                     onInvalidatePreview();
                                     setEditing({
-                                      groupId: group.id,
+                                      group,
                                       side,
                                       initial: item
                                     });
@@ -762,7 +777,7 @@ export function DubbingGroups({
                                   }
                                   onClick={() =>
                                     setEditing({
-                                      groupId: group.id,
+                                      group,
                                       side,
                                       initial: {
                                         ...structuredClone(item),
@@ -868,20 +883,19 @@ export function DubbingGroups({
     );
   }
 
-  if (groups.isError && !dirty)
-    return renderPage(
-      <Alert
-        type="error"
-        showIcon
-        title={t("could_not_load_groups_try_again")}
-        action={
-          <Button onClick={() => void groups.refetch()}>
-            {t("try_again")}
-          </Button>
-        }
-      />
-    );
-  if (!groups.data) return renderPage(<Card loading />);
+  const listError = groups.isError && (
+    <Alert
+      type="error"
+      showIcon
+      title={t("could_not_load_groups_try_again")}
+      action={
+        <Button onClick={() => void groups.refetch()}>{t("try_again")}</Button>
+      }
+    />
+  );
+  if (!groups.data) return renderPage(listError || <Card loading />);
+  if (listError && !dirty && !editing && !settingsGroup)
+    return renderPage(listError);
   return renderPage(
     <>
       {blocker.state === "blocked" && (
@@ -909,6 +923,7 @@ export function DubbingGroups({
           {t("leaving_discards_the_current_group_drafts")}
         </Modal>
       )}
+      {listError}
       {error && (
         <Alert
           type="error"
@@ -1067,7 +1082,7 @@ export function DubbingGroups({
         })}
       </div>
       <Modal
-        open={!!settingsId}
+        open={!!settingsGroup}
         title={settingsCreating ? t("create_group") : t("edit_group")}
         onCancel={cancelSettings}
         footer={null}
@@ -1079,15 +1094,19 @@ export function DubbingGroups({
           disabled={!canEdit || saving}
           onValuesChange={() => setSettingsDirty(true)}
           onFinish={(value) => {
-            if (!settingsId) return;
-            change(settingsId, (group) => ({
-              ...group,
-              name: value.name.trim(),
-              areas: value.areas
-            }));
+            if (!settingsGroup) return;
+            change(
+              settingsGroup.id,
+              (group) => ({
+                ...group,
+                name: value.name.trim(),
+                areas: value.areas
+              }),
+              settingsGroup
+            );
             setSettingsDirty(false);
             setSettingsCreating(false);
-            setSettingsId(undefined);
+            setSettingsGroup(undefined);
           }}
         >
           <Form.Item
@@ -1112,14 +1131,16 @@ export function DubbingGroups({
           </Form.Item>
           <div className="dubbing-settings-footer">
             <div>
-              {settingsId &&
-                groups.data.groups.some((g) => g.id === settingsId) && (
+              {settingsGroup &&
+                groups.data.groups.some((g) => g.id === settingsGroup.id) && (
                   <Button
                     danger
                     type="text"
                     icon={<Trash2Icon aria-hidden />}
                     onClick={() => {
-                      const group = current.find((g) => g.id === settingsId);
+                      const group = current.find(
+                        (g) => g.id === settingsGroup.id
+                      );
                       if (group) removeGroup(group);
                     }}
                   >
@@ -1144,7 +1165,7 @@ export function DubbingGroups({
       </Modal>
       {editing && editingGroup && (
         <RecommendationEditor
-          key={`${editing.groupId}-${editing.initial?.id ?? "new"}-${editing.side}`}
+          key={`${editing.group.id}-${editing.initial?.id ?? "new"}-${editing.side}`}
           voices={voices}
           initial={editing.initial ?? {}}
           side={editing.side}
