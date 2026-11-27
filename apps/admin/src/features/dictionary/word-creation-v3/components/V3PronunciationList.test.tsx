@@ -32,6 +32,7 @@ vi.mock("@/features/dictionary/voice-editor/dataSource", () => ({
   voicePreviewIsMock: false
 }));
 vi.mock("../../word-creation/PronunciationPreview", () => ({
+  PronunciationPreviewVoiceList: () => null,
   PronunciationPreviewControls: ({
     content,
     ariaLabelPrefix,

@@ -688,6 +688,7 @@ export function PronunciationPreviewVoiceList({
   audioAssetId,
   column = "voice",
   layout = "table",
+  requestSharedResolution = true,
   playback
 }: {
   dialect: Dialect;
@@ -699,6 +700,7 @@ export function PronunciationPreviewVoiceList({
   audioAssetId?: string;
   column?: "voice" | "rate" | "volume";
   layout?: "table" | "media";
+  requestSharedResolution?: boolean;
   playback?: { pronunciationId: string; label: string };
 }) {
   const { t } = useLexiconEditorTranslation();
@@ -716,13 +718,18 @@ export function PronunciationPreviewVoiceList({
   const needsCatalog =
     shouldLoadSettings && !voicesRequested && !context.voicesError;
   useEffect(() => {
-    if (shouldLoadSettings && !voiceResolutionRequested) {
+    if (
+      shouldLoadSettings &&
+      requestSharedResolution &&
+      !voiceResolutionRequested
+    ) {
       requestVoiceResolution();
     }
     if (needsCatalog) void loadVoices().catch(() => undefined);
   }, [
     loadVoices,
     needsCatalog,
+    requestSharedResolution,
     requestVoiceResolution,
     shouldLoadSettings,
     voiceResolutionRequested
@@ -734,7 +741,7 @@ export function PronunciationPreviewVoiceList({
     dialect,
     context.adapter,
     recommendationArea,
-    shouldLoadSettings && voiceResolutionRequested
+    shouldLoadSettings && (!requestSharedResolution || voiceResolutionRequested)
   );
   // 空文本无法解析试听音色，但本侧独立配置的参数已经可以展示。
   const storedProfile =
