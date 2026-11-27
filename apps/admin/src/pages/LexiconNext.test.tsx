@@ -5214,8 +5214,9 @@ function unifiedSentenceRequests() {
     }
   };
   api.get.mockResolvedValue(saved);
+  let storedSentence = source;
   api.save.mockImplementation(async (_id, input) => {
-    const current = structuredClone(source);
+    const current = structuredClone(storedSentence);
     for (const change of input.sentence_changes ?? []) {
       const previous = current.draft.variants.find(
         (v) => v.locale === change.target_locale
@@ -5235,10 +5236,11 @@ function unifiedSentenceRequests() {
         }
       ];
     }
-    current.revision++;
+    if (input.sentence_changes?.length) current.revision++;
+    storedSentence = current;
     return {
       ...saved,
-      revision: 2,
+      revision: input.expected_revision + 1,
       draft: input.draft,
       sentence_resources: [current]
     };
@@ -5437,13 +5439,25 @@ it("例句配音不可用时仍保存词条、例句文字和译文", async () =
   await screen.findByText("草稿已保存，例句配音待补。");
   api.get.mockResolvedValue(await api.save.mock.results[0]!.value);
   unmount();
+  env.VOICE_PREVIEW = false;
+  const offline = mount(api);
+  await waitForEntryReady();
+  expect(screen.queryByRole("button", { name: "重试例句配音" })).toBeNull();
+  fireEvent.click(stepButton(/^词义与例句/));
+  await editSentenceOriginal("英式英语", "The farmer led two horses.");
+  fireEvent.click(textAction("保存完整草稿"));
+  await waitFor(() => expect(api.save).toHaveBeenCalledTimes(2));
+  expect(generate).toHaveBeenCalledTimes(1);
+  api.get.mockResolvedValue(await api.save.mock.results[1]!.value);
+  offline.unmount();
+  env.VOICE_PREVIEW = true;
   mount(api);
   const retry = await screen.findByRole("button", { name: "重试例句配音" });
   expect(retry).toBeEnabled();
   fireEvent.click(retry);
   await waitFor(() => expect(generate).toHaveBeenCalledTimes(2));
   await waitFor(() => expect(retry).toBeEnabled());
-  expect(api.save).toHaveBeenCalledOnce();
+  expect(api.save).toHaveBeenCalledTimes(2);
   generate.mockResolvedValue({
     id: "new-audio",
     locale: "en-GB",
@@ -5454,14 +5468,14 @@ it("例句配音不可用时仍保存词条、例句文字和译文", async () =
     created_at: entry.updated_at
   });
   fireEvent.click(retry);
-  await waitFor(() => expect(api.save).toHaveBeenCalledTimes(2));
-  expect(api.save.mock.calls[1]![1]).toMatchObject({
-    expected_revision: 2,
+  await waitFor(() => expect(api.save).toHaveBeenCalledTimes(3));
+  expect(api.save.mock.calls[2]![1]).toMatchObject({
+    expected_revision: 3,
     sentence_changes: [
       {
-        expected_revision: 4,
+        expected_revision: 5,
         variant: {
-          content: { text: "The farmer led the horses." },
+          content: { text: "The farmer led two horses." },
           voice_profile: {
             voices: [expect.objectContaining({ audio_asset_id: "new-audio" })]
           }

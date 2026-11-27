@@ -143,6 +143,9 @@ export function useSentenceDrafts(
   medium: string,
   pendingStorageKey?: string
 ) {
+  const canGenerate = usePermission("speech.generate");
+  const audioAvailable =
+    canGenerate && env.VOICE_PREVIEW && !voicePreviewIsMock;
   const [attempted, setAttempted] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, NextSentence>>({});
   const [imported, setImported] = useState<Record<string, NextSentence>>({});
@@ -294,6 +297,7 @@ export function useSentenceDrafts(
     importResource(source: NextSentence) {
       setImported((current) => ({ ...current, [source.id]: source }));
     },
+    audioAvailable,
     audioQueue,
     hasPendingAudio: audioQueue.some((c) => pendingKeys.has(audioKey(c))),
     reset(remaining?: string[]) {
@@ -319,10 +323,11 @@ export function useSentenceDrafts(
     async prepare(retryPending: boolean) {
       const error = draftSentenceError(latest.current);
       if (error) throw new Error(error);
+      if (!audioAvailable) return { changes: latest.current, pendingAudio };
       const queue = retryPending ? audioQueue : changes;
       for (const [index, change] of queue.entries()) {
         const task = prepareTasks.current.get(audioKey(change));
-        if (task && !(await task()))
+        if (!task || !(await task()))
           return {
             changes: latest.current,
             pendingAudio: audioQueue.slice(index).map(audioKey)
@@ -348,7 +353,6 @@ function SentenceAudioTask({
   change: NextSentenceDraftChange;
   workspace: SentenceDraftWorkspace;
 }) {
-  const canGenerate = usePermission("speech.generate");
   const content = useMemo(
     () => toRichTextV2(change.variant.content),
     [change.variant.content]
@@ -363,7 +367,7 @@ function SentenceAudioTask({
     profile,
     adapter: adminVoicePreviewAdapter,
     locale: change.target_locale as "en-GB" | "en-US",
-    enabled: canGenerate && env.VOICE_PREVIEW && !voicePreviewIsMock,
+    enabled: workspace.audioAvailable,
     defer: true,
     onChange: (voice_profile) =>
       flushSync(() =>
