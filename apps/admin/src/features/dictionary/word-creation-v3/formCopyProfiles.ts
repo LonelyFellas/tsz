@@ -16,16 +16,16 @@ export async function resolveFormCopyProfiles(
 ): Promise<ResolvedFormCopyProfile[]> {
   if (plan.kind !== "voices") return [];
   const profiles = new Map<string, Promise<ResolvedFormCopyProfile>>();
+  const rowCopies = plan.matches.map(({ side, source }) => ({
+    side,
+    source,
+    activeOnly: false
+  }));
+  const sharedSides = plan.sharedSpellings.flatMap(({ sides }) => sides);
   const copies = [
-    ...plan.matches.map(({ side, source }) => ({
-      side,
-      source,
-      activeOnly: false
-    })),
-    ...plan.sharedSpellings.flatMap(({ sides }) =>
-      sides.flatMap(({ side, sources }) =>
-        sources.map((source) => ({ side, source, activeOnly: true }))
-      )
+    ...rowCopies,
+    ...sharedSides.flatMap(({ side, sources }) =>
+      sources.map((source) => ({ side, source, activeOnly: true }))
     )
   ];
   const hasProfiles = copies.some((match) => {
@@ -56,8 +56,8 @@ export async function resolveFormCopyProfiles(
     (await api.speech.voices(signal)).items.map((item) => [item.alias, item])
   );
   signal.throwIfAborted();
-  for (const match of copies) {
-    if (!match.source) continue;
+  const resolveCopy = async (match: (typeof copies)[number]) => {
+    if (!match.source) return [];
     const reference = match.source;
     const variant = variantForCopyReference(
       plan.source.contentSnapshot,
@@ -72,7 +72,8 @@ export async function resolveFormCopyProfiles(
       match.side,
       reference.region
     );
-    if (synthesis.source === "none" || synthesis.source === "upload") continue;
+    if (synthesis.source === "none" || synthesis.source === "upload") return [];
+    const pending: Promise<ResolvedFormCopyProfile>[] = [];
     const add = (
       channel: ResolvedFormCopyProfile["channel"],
       profile: VoiceProfileV3 | undefined,
@@ -80,10 +81,13 @@ export async function resolveFormCopyProfiles(
     ) => {
       if (!profile) return;
       const key = `${match.side}:${pronunciation.id}:${channel}`;
-      if (profiles.has(key)) return;
-      profiles.set(
-        key,
-        (profile.dubbing
+      const cached = profiles.get(key);
+      if (cached) {
+        pending.push(cached);
+        return;
+      }
+      const request = (
+        profile.dubbing
           ? api.speech.resolve(
               { profile, source, accent: match.side === "uk" ? "gb" : "us" },
               signal
@@ -99,43 +103,44 @@ export async function resolveFormCopyProfiles(
                 );
               })
             })
-        ).then(({ voices }) => {
-          const voiceKey = (setting: (typeof voices)[number]) =>
-            setting.version_id ?? setting.voice_id;
-          const resolved = new Map(
-            voices.map((setting) => [voiceKey(setting), setting])
+      ).then(({ voices }) => {
+        const voiceKey = (setting: (typeof voices)[number]) =>
+          setting.version_id ?? setting.voice_id;
+        const resolved = new Map(
+          voices.map((setting) => [voiceKey(setting), setting])
+        );
+        const stored = profile.voices.filter((setting) => {
+          const voice = catalogue.get(setting.voice_id);
+          const side = speechAccentGroup(
+            voice?.locale ?? setting.locale,
+            voice?.accent ?? setting.accent
           );
-          const stored = profile.voices.filter((setting) => {
-            const voice = catalogue.get(setting.voice_id);
-            const side = speechAccentGroup(
-              voice?.locale ?? setting.locale,
-              voice?.accent ?? setting.accent
-            );
-            return (
-              resolved.has(voiceKey(setting)) ||
-              (side === match.side &&
-                (profile.dubbing?.[match.side].mode !== "inherit" ||
-                  !setting.enabled))
-            );
-          });
-          const merged = stored.map((setting) => {
-            const next = resolved.get(voiceKey(setting));
-            resolved.delete(voiceKey(setting));
-            return next ?? { ...setting, enabled: false };
-          });
-          return {
-            side: match.side,
-            sourcePronunciationId: pronunciation.id,
-            channel,
-            sideScoped: true,
-            catalogue,
-            profile: {
-              ...profile,
-              voices: [...merged, ...resolved.values()]
-            }
-          };
-        })
-      );
+          return (
+            resolved.has(voiceKey(setting)) ||
+            (side === match.side &&
+              (profile.dubbing?.[match.side].mode !== "inherit" ||
+                !setting.enabled))
+          );
+        });
+        const merged = stored.map((setting) => {
+          const next = resolved.get(voiceKey(setting));
+          resolved.delete(voiceKey(setting));
+          return next ?? { ...setting, enabled: false };
+        });
+        return {
+          side: match.side,
+          sourcePronunciationId: pronunciation.id,
+          channel,
+          sideScoped: true,
+          catalogue,
+          profile: {
+            ...profile,
+            voices: [...merged, ...resolved.values()]
+          }
+        };
+      });
+      profiles.set(key, request);
+      pending.push(request);
     };
     const spellingSpeech = synthesis.use_spelling
       ? variant.spelling_speech
@@ -162,20 +167,39 @@ export async function resolveFormCopyProfiles(
             )
       }
     );
-    if (synthesis.use_spelling) continue;
-    for (const alphabet of ["ipa", "ups"] as const) {
-      if (match.activeOnly && alphabet !== synthesis.alphabet) continue;
-      const speech = synthesis[`${alphabet}_speech`];
-      if (!speech) continue;
-      add(alphabet, speech.voice_profile, {
-        kind: "phoneme",
-        phoneme_locale: locale,
-        content: speech.content,
-        alphabet,
-        phoneme: synthesis[alphabet],
-        ...(alphabet === "ups" ? { ups_words: synthesis.ups_words ?? [] } : {})
-      });
+    if (!synthesis.use_spelling) {
+      for (const alphabet of ["ipa", "ups"] as const) {
+        if (match.activeOnly && alphabet !== synthesis.alphabet) continue;
+        const speech = synthesis[`${alphabet}_speech`];
+        if (!speech) continue;
+        add(alphabet, speech.voice_profile, {
+          kind: "phoneme",
+          phoneme_locale: locale,
+          content: speech.content,
+          alphabet,
+          phoneme: synthesis[alphabet],
+          ...(alphabet === "ups"
+            ? { ups_words: synthesis.ups_words ?? [] }
+            : {})
+        });
+      }
     }
-  }
+    return Promise.all(pending);
+  };
+  await Promise.all([
+    ...rowCopies.map(resolveCopy),
+    ...sharedSides.map(async ({ side, sources, preferredSources }) => {
+      const resolveShared = (source: (typeof sources)[number]) =>
+        resolveCopy({ side, source, activeOnly: true });
+      const preferred = await Promise.all(preferredSources.map(resolveShared));
+      if (
+        preferred.some((items) =>
+          items.some((item) => item.profile.voices.length)
+        )
+      )
+        return;
+      await Promise.all(sources.map(resolveShared));
+    })
+  ]);
   return Promise.all(profiles.values());
 }

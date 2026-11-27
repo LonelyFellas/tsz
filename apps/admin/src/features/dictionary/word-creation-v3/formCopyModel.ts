@@ -154,7 +154,8 @@ function planSharedSpellingCopies(
   target: FormContentV3,
   from: Record<FormCopySide, FormCopyPronunciationReference[]>,
   to: Record<FormCopySide, FormCopyPronunciationReference[]>,
-  mapping: FormCopyMapping
+  mapping: FormCopyMapping,
+  matches: FormCopyPlan["matches"]
 ): SharedSpellingCopy[] {
   const spellingRecordings = { uk: new Set<string>(), us: new Set<string>() };
   const rowRecordings = new Set<FormCopyPronunciationReference>();
@@ -189,6 +190,17 @@ function planSharedSpellingCopies(
       return true;
     });
     sourcesBySide.set(side, sources);
+  }
+  const assignedRecordings = new Set<FormCopyPronunciationReference>();
+  for (const match of matches) {
+    if (!match.source || !rowRecordings.has(match.source)) continue;
+    const selected = voiceCopySynthesisForSide(
+      pronunciationAt(target, match.target),
+      match.side,
+      match.target.region
+    );
+    if (selected.source !== "none" && !selected.use_spelling)
+      assignedRecordings.add(match.source);
   }
   const copies: SharedSpellingCopy[] = [];
   for (const variant of regionalVariants(target.regional_variants)) {
@@ -238,10 +250,11 @@ function planSharedSpellingCopies(
     );
     if (readingIds.size < 2) continue;
     const automatic = sides.filter(
-      ({ side, sources, targets, preferredSources }) =>
+      ({ side, sources, targets }) =>
         !sources.some((ref) => spellingRecordings[side].has(ref.variantId)) &&
-        (preferredSources.length > 0 ||
-          !sources.some((ref) => rowRecordings.has(ref))) &&
+        !sources.some(
+          (ref) => rowRecordings.has(ref) && !assignedRecordings.has(ref)
+        ) &&
         !targets.some(
           (ref) => mapping[side]?.[ref.pronunciationId] !== undefined
         )
@@ -270,21 +283,7 @@ export function planFormCopy(
     uk: copyReferences(target, "uk"),
     us: copyReferences(target, "us")
   };
-  const sharedSpellings =
-    kind === "voices"
-      ? planSharedSpellingCopies(
-          source,
-          target,
-          sourceBySide,
-          targetBySide,
-          mapping
-        )
-      : [];
-  const sharedTargets = sharedSpellings.flatMap(({ sides }) =>
-    sides.flatMap(({ targets }) => targets)
-  );
-  const automaticTargets = new Set(sharedTargets);
-  const matches: FormCopyPlan["matches"] = [];
+  const readingMatches: FormCopyPlan["matches"] = [];
   let sourceCount = 0;
   for (const side of SIDES) {
     const from = sourceBySide[side];
@@ -293,7 +292,6 @@ export function planFormCopy(
     const sourceStyleCounts = styleCounts(from);
     const targetStyleCounts = styleCounts(to);
     for (const [index, pronunciation] of to.entries()) {
-      if (automaticTargets.has(pronunciation)) continue;
       const explicit = mapping[side]?.[pronunciation.pronunciationId];
       const needsChoice = from.length > 0 && from.length !== to.length;
       const styleKey = pronunciation.style ?? "__missing__";
@@ -316,7 +314,7 @@ export function planFormCopy(
                 : index;
       if (explicit != null && sourceIndex < 0)
         throw new FormCopyError("copy_source_pronunciation_missing");
-      matches.push({
+      readingMatches.push({
         side,
         source: from[sourceIndex] ?? null,
         target: pronunciation,
@@ -324,6 +322,24 @@ export function planFormCopy(
       });
     }
   }
+  const sharedSpellings =
+    kind === "voices"
+      ? planSharedSpellingCopies(
+          source,
+          target,
+          sourceBySide,
+          targetBySide,
+          mapping,
+          readingMatches
+        )
+      : [];
+  const sharedTargets = sharedSpellings.flatMap(({ sides }) =>
+    sides.flatMap(({ targets }) => targets)
+  );
+  const automaticTargets = new Set(sharedTargets);
+  const matches = readingMatches.filter(
+    ({ target }) => !automaticTargets.has(target)
+  );
   // A dedicated IPA/UPS source already assigned to an independent reading
   // of this variant should not compete with its shared spelling profile.
   for (const { variantId, sides } of sharedSpellings) {

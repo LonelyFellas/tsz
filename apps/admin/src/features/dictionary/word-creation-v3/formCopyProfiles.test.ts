@@ -146,6 +146,89 @@ it("共用同一拼写的多条来源读法只解析一次，复制解析后的�
   });
 });
 
+it("共享拼写已有有效配音时不解析被跳过的独立音素", async () => {
+  const forms = fixture(profile);
+  const source = forms.contents[0]!.regional_variants;
+  const target = forms.contents[1]!.regional_variants;
+  if (source.mode !== "common" || target.mode !== "common")
+    throw new Error("fixture");
+  const from = source.common;
+  const to = target.common;
+  from.spelling_speech = {
+    content: { version: 2, text: from.spelling, annotations: [] },
+    voice_profile: {
+      ...profile,
+      dubbing: { ...profile.dubbing!, area: "word" }
+    }
+  };
+  const independent = from.pronunciations[0]!;
+  independent.synthesis!.uk!.source = "ipa";
+  independent.synthesis!.uk!.ipa = "";
+  from.pronunciations.unshift(
+    pronunciationFixture({
+      id: uuidFromInt(660),
+      synthesis: {
+        alphabet: "ipa",
+        ipa: "",
+        ups: "",
+        uk: { source: "spelling", ipa: "", ups: "" },
+        us: { source: "none", ipa: "", ups: "" }
+      }
+    })
+  );
+  const skipped = pronunciationFixture({
+    id: uuidFromInt(662),
+    synthesis: structuredClone(independent.synthesis)
+  });
+  to.pronunciations.push(
+    pronunciationFixture({ id: uuidFromInt(661) }),
+    skipped
+  );
+  resolve.mockImplementation(
+    async ({ source }: { source: { kind: string } }) => {
+      if (source.kind === "phoneme") throw new Error("empty phoneme");
+      return {
+        voices: [
+          {
+            voice_id: "resolved",
+            locale: "en-GB",
+            enabled: true,
+            rate_percent: 20
+          }
+        ]
+      };
+    }
+  );
+  const plan = planFormCopy(
+    forms,
+    forms.pos[0]!.forms[0]!.id,
+    forms.pos[0]!.forms[1]!.id,
+    "voices",
+    {
+      uk: { [skipped.id]: null },
+      us: Object.fromEntries(to.pronunciations.map(({ id }) => [id, null]))
+    }
+  );
+  const resolved = await resolveFormCopyProfiles(
+    plan,
+    new AbortController().signal
+  );
+  const result = applyFormCopy(forms, plan, resolved).contents[1]!
+    .regional_variants;
+  expect(result).toMatchObject({
+    common: {
+      spelling_speech: {
+        voice_profile: {
+          voices: expect.arrayContaining([
+            expect.objectContaining({ voice_id: "resolved", rate_percent: 20 })
+          ])
+        }
+      },
+      pronunciations: [to.pronunciations[0], to.pronunciations[1], skipped]
+    }
+  });
+});
+
 it.each(["ipa", "spelling", "default"] as const)(
   "把来源当前使用的 UPS 配音复制到目标实际使用的 %s，并作为独立局部参数",
   async (targetSource) => {

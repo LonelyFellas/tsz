@@ -478,6 +478,64 @@ describe("词形内容定向复制", () => {
     ]);
   });
 
+  it("来源拼写只有对侧音色时，保留仍需复制到共享读法的独立录音", () => {
+    const { forms, sourceId, targetId } = setup(
+      commonFormFixture({
+        pronunciations: [0, 1, 2].map((index) =>
+          pronunciationFixture({ id: uuidFromInt(520 + index) })
+        )
+      }),
+      commonFormFixture({
+        id: uuidFromInt(700),
+        pronunciations: [0, 1, 2].map((index) =>
+          pronunciationFixture({ id: uuidFromInt(720 + index) })
+        )
+      })
+    );
+    const source = variant(forms.contents[0]!);
+    const target = variant(forms.contents[1]!);
+    const upload = recording("uk-upload");
+    source.pronunciations[0]!.audio_assets = [upload];
+    const us = { source: "none" as const, ipa: "", ups: "" };
+    const setSources = (ref: typeof source, from: boolean) => {
+      for (const [index, row] of ref.pronunciations.entries()) {
+        row.synthesis = {
+          alphabet: "ipa",
+          ipa: "",
+          ups: "",
+          us,
+          uk:
+            index === 2
+              ? {
+                  source: "ipa",
+                  ipa: "test",
+                  ups: "",
+                  ipa_speech: speech(ref.spelling, profile("independent-uk"))
+                }
+              : {
+                  source: from && index === 0 ? "upload" : "spelling",
+                  ipa: "",
+                  ups: ""
+                }
+        };
+      }
+    };
+    setSources(source, true);
+    setSources(target, false);
+    const usProfile = profile("us-only");
+    usProfile.voices.forEach((voice) => {
+      voice.locale = "en-US";
+    });
+    source.spelling_speech = speech(source.spelling, usProfile);
+    const next = applyFormCopy(
+      forms,
+      planFormCopy(forms, sourceId, targetId, "voices")
+    );
+    const copied = variant(next.contents[1]!);
+    expect(copied.pronunciations[0]!.audio_assets).toEqual([upload]);
+    expect(copied.pronunciations[0]!.synthesis?.uk?.source).toBe("upload");
+  });
+
   it.each(["upload", "spelling"] as const)(
     "美式录音沿用原路径（%s），英式共享拼写只复制一次",
     (recordingSource) => {
