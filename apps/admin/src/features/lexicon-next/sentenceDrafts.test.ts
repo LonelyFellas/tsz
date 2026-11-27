@@ -307,6 +307,7 @@ it("停用配音时仅保留仍被引用的例句待补键", async () => {
       senses: [
         {
           id: "sense",
+          part_of_speech: "noun",
           definitions: [],
           equivalents: [],
           sentence_ids: ["retained"]
