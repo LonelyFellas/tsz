@@ -1511,7 +1511,9 @@ export function applyFormCopy(
     const automaticSides = plan.sharedSpellings.find(
       ({ variantId }) => variantId === variant.id
     )?.sides;
-    const sides = (region === "common" ? SIDES : [region]).filter(
+    const availableSides: readonly FormCopySide[] =
+      region === "common" ? SIDES : [region];
+    const sides = availableSides.filter(
       (side) => !automaticSides?.some((copy) => copy.side === side)
     );
     const profiles = variant.pronunciations
