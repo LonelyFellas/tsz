@@ -301,7 +301,14 @@ describe("LexiconNext 与真实 IndexedDB 草稿存储联动", () => {
       .mockResolvedValue(remote);
     api.save
       .mockRejectedValueOnce(
-        new HttpError(409, "revision conflict", [], "revision_conflict")
+        new HttpError(409, "revision conflict", [], "revision_conflict", {
+          type: "urn:tsz:problem:revision_conflict",
+          title: "Revision conflict",
+          status: 409,
+          detail: "revision conflict",
+          code: "revision_conflict",
+          field: "expected_revision"
+        })
       )
       .mockResolvedValue({ ...remote, revision: 3 });
     mount(api);
@@ -355,6 +362,70 @@ describe("LexiconNext 与真实 IndexedDB 草稿存储联动", () => {
       ).resolves.toBeUndefined();
     });
   });
+
+  it.each([
+    {
+      name: "新版配音推荐冲突",
+      detail: "fixture detail in another language",
+      reason: "speech_recommendation_changed",
+      recovery: /重新解析并生成音频/
+    },
+    {
+      name: "旧版配音推荐冲突",
+      detail: "有效推荐已变化，请重新解析并生成音频",
+      recovery: /重新解析并生成音频/
+    },
+    {
+      name: "旧版拓展词引用冲突",
+      detail: "词条或词义仍被其他词条的拓展词引用，请先解除关联",
+      recovery: /请先解除关联/
+    }
+  ])(
+    "$name 显示对应处理说明并保留草稿，允许用同一版本重试",
+    async ({ detail, reason, recovery }) => {
+      const api = requests();
+      const meta = reason ? { code: reason } : undefined;
+      api.save
+        .mockRejectedValueOnce(
+          new HttpError(409, detail, [], "revision_conflict", [], meta, {
+            type: "urn:tsz:problem:revision_conflict",
+            title: "Revision conflict",
+            status: 409,
+            detail,
+            code: "revision_conflict",
+            ...(meta && { meta })
+          })
+        )
+        .mockResolvedValue({ ...entry, revision: 2 });
+      mount(api);
+
+      fireEvent.click(await screen.findByRole("button", { name: "解除配对" }));
+      const save = screen.getByRole("button", { name: "保存完整草稿" });
+      fireEvent.click(save);
+
+      expect(await screen.findByText(recovery)).toHaveTextContent(
+        "本地草稿已保留"
+      );
+      expect(
+        screen.queryByRole("button", { name: "比较服务器版本" })
+      ).toBeNull();
+      expect(save).toBeEnabled();
+      expect(
+        screen.getByRole("button", { name: "选择对应词义" })
+      ).toBeEnabled();
+      expect(api.get).toHaveBeenCalledOnce();
+      fireEvent.click(save);
+
+      await waitFor(() => expect(api.save).toHaveBeenCalledTimes(2));
+      expect(api.save.mock.calls[1]![1]).toMatchObject({
+        expected_revision: 1,
+        dialect_changes: [
+          expect.objectContaining({ sense_id: senseId, target: null })
+        ]
+      });
+      await screen.findByText("草稿已保存");
+    }
+  );
 
   it("恢复基于旧版本的本地草稿后要求比较并继续保存", async () => {
     const api = requests();
