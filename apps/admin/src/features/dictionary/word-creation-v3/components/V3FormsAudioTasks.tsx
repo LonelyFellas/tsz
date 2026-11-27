@@ -1,11 +1,16 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { synthesisForLocale } from "@tsz/shared";
+import { useLayoutEffect, useRef, useState } from "react";
+import {
+  pronunciationLocale,
+  speechAccentGroup,
+  synthesisForLocale
+} from "@tsz/shared";
 import type {
   Dialect,
   PhonemeLocaleV3,
   FormContentVariantV3,
   SharedFormsStepContentV3,
   VoiceProfileV3,
+  VoiceSettingV3,
   RichTextV2
 } from "@tsz/types";
 import { Alert, Button } from "@tsz/ui/admin/display";
@@ -50,6 +55,20 @@ function variants(forms: SharedFormsStepContentV3) {
     }));
 }
 
+function needsVoiceCatalog(
+  setting: VoiceSettingV3,
+  dialect: Dialect,
+  profile: VoiceProfileV3
+) {
+  return (
+    !(profile.dubbing && setting.accent === "none") &&
+    (!setting.locale || !setting.accent) &&
+    (dialect === "common" ||
+      !setting.accent ||
+      speechAccentGroup(undefined, setting.accent) === dialect)
+  );
+}
+
 /** 汇总表没有挂载字段编辑器；在这里承接词典带入、复制和载入的已选配音。 */
 export function V3FormsAudioTasks({
   forms,
@@ -75,27 +94,33 @@ export function V3FormsAudioTasks({
     !paused &&
     env.VOICE_PREVIEW &&
     !voicePreviewIsMock;
-  const [catalog, setCatalog] = useState<VoiceOption[]>([]);
-  const [catalogError, setCatalogError] = useState<unknown>();
+  const [catalog, setCatalog] = useState<VoiceOption[]>();
+  const [catalogError, setCatalogError] = useState<{ reason: unknown }>();
   const [catalogAttempt, retryCatalog] = useState(0);
   const audioTasks = useVoiceAudioTasks();
   const voiceSave = useVoiceSave();
   const copy = useV3FormCopy();
   const catalogReady = useRef<Promise<boolean>>(Promise.resolve(false));
-  const needsCatalog =
-    !rowOnly &&
-    variants(forms).some(({ variant }) =>
-      variant.pronunciations.some(
-        (row) =>
-          !row.synthesis?.uk?.source &&
-          !row.synthesis?.us?.source &&
-          row.voice_profile?.voices.some(
-            (setting) => setting.enabled && !setting.locale
-          )
-      )
-    );
-  useEffect(() => {
-    if (!enabled || !needsCatalog || !loadCatalogOnMount) return;
+  const formVariants = variants(forms);
+  const catalogSettings = formVariants.flatMap(({ variant, dialect }) =>
+    variant.pronunciations.flatMap((row) => {
+      const profile = row.voice_profile;
+      if (!profile || row.synthesis?.uk?.source || row.synthesis?.us?.source)
+        return [];
+      return profile.voices.filter(
+        (setting) =>
+          setting.enabled && needsVoiceCatalog(setting, dialect, profile)
+      );
+    })
+  );
+  const needsCatalog = catalogSettings.length > 0;
+  const catalogRequired = catalogSettings.some((setting) => !setting.locale);
+  const waitingForCatalog =
+    needsCatalog &&
+    catalog === undefined &&
+    (catalogRequired || catalogError === undefined);
+  useLayoutEffect(() => {
+    if (!enabled || !needsCatalog || !loadCatalogOnMount || catalog) return;
     setCatalogError(undefined);
     const controller = new AbortController();
     catalogReady.current = adminVoicePreviewAdapter
@@ -107,19 +132,28 @@ export function V3FormsAudioTasks({
         return true;
       })
       .catch((error) => {
-        if (!controller.signal.aborted) setCatalogError(error);
-        return false;
+        if (controller.signal.aborted) return false;
+        if (catalogRequired) {
+          setCatalogError({ reason: error });
+          return false;
+        }
+        flushSync(() => setCatalogError({ reason: error }));
+        onAudioTaskRetry?.();
+        return true;
       });
     return () => controller.abort();
   }, [
+    catalog,
     catalogAttempt,
+    catalogRequired,
     enabled,
     loadCatalogOnMount,
     needsCatalog,
     onAudioTaskRetry
   ]);
   useLayoutEffect(() => {
-    if (!enabled || !loadCatalogOnMount || !needsCatalog || !audioTasks) return;
+    if (!enabled || !loadCatalogOnMount || !waitingForCatalog || !audioTasks)
+      return;
     const key = "forms:audio-catalog";
     audioTasks.set(key, async () => {
       if (!(await catalogReady.current)) return false;
@@ -131,11 +165,8 @@ export function V3FormsAudioTasks({
     return () => {
       audioTasks.delete(key);
     };
-  }, [audioTasks, enabled, loadCatalogOnMount, needsCatalog]);
-  const ready =
-    enabled &&
-    loadCatalogOnMount &&
-    (rowOnly || !needsCatalog || catalog.length > 0);
+  }, [audioTasks, enabled, loadCatalogOnMount, waitingForCatalog]);
+  const ready = enabled && loadCatalogOnMount && !waitingForCatalog;
   const latest = useRef({ forms, onChange });
   useLayoutEffect(() => {
     latest.current = { forms, onChange };
@@ -157,13 +188,13 @@ export function V3FormsAudioTasks({
   };
   return (
     <>
-      {enabled && catalogError != null && (
+      {enabled && catalogRequired && catalogError && (
         <Alert
           type="error"
           showIcon
           title={
-            catalogError instanceof Error
-              ? catalogError.message
+            catalogError.reason instanceof Error
+              ? catalogError.reason.message
               : t(
                   "panel_default_voices_could_not_be_loaded_you_can_keep_typing_and_select_voices_in"
                 )
@@ -181,7 +212,7 @@ export function V3FormsAudioTasks({
           }
         />
       )}
-      {variants(forms).map(({ variant, dialect, spellingScope }) => (
+      {formVariants.map(({ variant, dialect, spellingScope }) => (
         <div key={variant.id}>
           {!rowOnly &&
             (!spellingScope.activeLocales ||
@@ -250,66 +281,99 @@ export function V3FormsAudioTasks({
             const explicitSources = !!(
               synthesis?.uk?.source || synthesis?.us?.source
             );
-            const rowAudio =
-              pronunciation.voice_profile &&
-              (Boolean(synthesis) || hasLegacyAudio) &&
-              !explicitSources
-                ? [undefined].map((locale) => {
-                    const profile = pronunciation.voice_profile!;
-                    const scoped = {
-                      ...profile,
-                      voices: profile.voices.flatMap((setting) => {
-                        const native =
-                          setting.locale ??
-                          catalog.find((voice) => voice.id === setting.voice_id)
-                            ?.locale;
-                        return [
-                          native
-                            ? { ...setting, locale: native as `en-${string}` }
-                            : setting
-                        ];
-                      })
-                    };
-                    return (
-                      <TextAudioTask
-                        key={`${pronunciation.id}:voice_profile:${locale ?? "all"}`}
-                        target={JSON.stringify([
-                          pronunciation.id,
-                          "voice_profile",
-                          locale
-                        ])}
-                        locale={locale}
-                        content={toRichTextV2(
-                          pronunciation.dict_phonetic_rich ?? {
-                            version: 2,
-                            text: pronunciation.dict_phonetic,
-                            annotations: []
-                          }
-                        )}
-                        profile={scoped}
-                        recommendationArea="word"
-                        enabled={ready}
-                        background={
-                          copy?.backgroundContentIds.has(variant.id) ?? false
-                        }
-                        onRetry={onAudioTaskRetry}
-                        onChange={(voice_profile) =>
-                          patch(
-                            variant.id,
-                            (current) => {
-                              const row = current.pronunciations.find(
-                                (item) => item.id === pronunciation.id
-                              );
-                              if (!row?.voice_profile) return;
-                              row.voice_profile = voice_profile;
-                            },
-                            copy?.backgroundContentIds.has(variant.id) ?? false
-                          )
-                        }
-                      />
-                    );
-                  })
+            const locale =
+              dialect === "common"
+                ? undefined
+                : pronunciationLocale(dialect, dialect);
+            const storedProfile = pronunciation.voice_profile;
+            const profile =
+              storedProfile && catalog
+                ? {
+                    ...storedProfile,
+                    voices: storedProfile.voices.map((setting) => {
+                      if (!needsVoiceCatalog(setting, dialect, storedProfile))
+                        return setting;
+                      const voice = catalog.find(
+                        (voice) => voice.id === setting.voice_id
+                      );
+                      if (!voice) return setting;
+                      const locale =
+                        setting.locale ?? (voice.locale as `en-${string}`);
+                      const accent =
+                        setting.accent ??
+                        (speechAccentGroup(locale) ===
+                        speechAccentGroup(voice.locale, voice.accent)
+                          ? undefined
+                          : voice.accent);
+                      return {
+                        ...setting,
+                        locale,
+                        ...(accent ? { accent } : {})
+                      };
+                    })
+                  }
+                : storedProfile;
+            // 目录不可用时，单侧词形仍可由服务端确认未保存口音的音色。
+            const requiredLocales =
+              locale &&
+              !catalog &&
+              catalogError &&
+              profile?.voices.some(
+                (setting) =>
+                  setting.enabled &&
+                  (!setting.accent ||
+                    speechAccentGroup(setting.locale, setting.accent) ===
+                      dialect)
+              )
+                ? [locale]
                 : [];
+            const rowAudio =
+              profile && !explicitSources ? (
+                <TextAudioTask
+                  key={`${pronunciation.id}:voice_profile`}
+                  target={JSON.stringify([pronunciation.id, "voice_profile"])}
+                  locale={locale}
+                  activeLocales={locale ? [locale] : undefined}
+                  requiredLocales={requiredLocales}
+                  content={toRichTextV2(
+                    pronunciation.dict_phonetic_rich ?? {
+                      version: 2,
+                      text: pronunciation.dict_phonetic,
+                      annotations: []
+                    }
+                  )}
+                  profile={profile}
+                  recommendationArea="word"
+                  enabled={ready}
+                  background={
+                    copy?.backgroundContentIds.has(variant.id) ?? false
+                  }
+                  onRetry={onAudioTaskRetry}
+                  refreshCatalog={
+                    catalogError && !catalogRequired
+                      ? () => {
+                          flushSync(() =>
+                            retryCatalog((attempt) => attempt + 1)
+                          );
+                          return catalogReady.current;
+                        }
+                      : undefined
+                  }
+                  onChange={(voice_profile) =>
+                    patch(
+                      variant.id,
+                      (current) => {
+                        const row = current.pronunciations.find(
+                          (item) => item.id === pronunciation.id
+                        );
+                        if (!row?.voice_profile) return;
+                        row.voice_profile = voice_profile;
+                      },
+                      copy?.backgroundContentIds.has(variant.id) ?? false
+                    )
+                  }
+                />
+              ) : null;
             if (rowOnly || hasLegacyAudio) return rowAudio;
             if (!synthesis) return [];
             const phonemes = (["uk", "us"] as const)
@@ -345,27 +409,8 @@ export function V3FormsAudioTasks({
                     background={
                       copy?.backgroundContentIds.has(variant.id) ?? false
                     }
-                    fallbackVoiceProfile={
-                      pronunciation.voice_profile
-                        ? {
-                            ...pronunciation.voice_profile,
-                            voices: pronunciation.voice_profile.voices.map(
-                              (setting) => {
-                                if (!setting.enabled) return setting;
-                                const sourceLocale =
-                                  setting.locale ??
-                                  catalog.find(
-                                    (voice) => voice.id === setting.voice_id
-                                  )?.locale;
-                                return sourceLocale === "en-GB" ||
-                                  sourceLocale === "en-US"
-                                  ? { ...setting, locale: sourceLocale }
-                                  : setting;
-                              }
-                            )
-                          }
-                        : undefined
-                    }
+                    fallbackVoiceProfile={profile}
+                    fallbackVoiceCatalog={catalog}
                     onAudioTaskRetry={onAudioTaskRetry}
                     onChange={(next) =>
                       patch(
@@ -383,7 +428,7 @@ export function V3FormsAudioTasks({
                   />
                 );
               });
-            return [...rowAudio, ...phonemes];
+            return [rowAudio, ...phonemes];
           })}
         </div>
       ))}
@@ -403,7 +448,8 @@ function TextAudioTask({
   activeLocales,
   requiredLocales,
   background = false,
-  onRetry
+  onRetry,
+  refreshCatalog
 }: {
   target: string;
   content: RichTextV2;
@@ -415,6 +461,7 @@ function TextAudioTask({
   requiredLocales?: readonly PhonemeLocaleV3[];
   background?: boolean;
   onRetry?: () => void;
+  refreshCatalog?: () => Promise<boolean>;
   enabled: boolean;
   onChange: (profile: VoiceProfileV3) => void;
 }) {
@@ -436,6 +483,14 @@ function TextAudioTask({
     waitForSave: !background,
     onChange
   });
+  const retryAudio = useRef(task.retry);
+  useLayoutEffect(() => {
+    retryAudio.current = task.retry;
+  });
+  const retry = async () => {
+    if (refreshCatalog && !(await refreshCatalog())) return;
+    if (await retryAudio.current()) onRetry?.();
+  };
   return task.error == null ? null : (
     <Alert
       type="error"
@@ -446,14 +501,7 @@ function TextAudioTask({
           : t("panel_final_audio_generation_failed")
       }
       action={
-        <Button
-          size="small"
-          onClick={() =>
-            void task.retry().then((succeeded) => {
-              if (succeeded) onRetry?.();
-            })
-          }
-        >
+        <Button size="small" onClick={() => void retry()}>
           {t("panel_retry_final_audio")}
         </Button>
       }

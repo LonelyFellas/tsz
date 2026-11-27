@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { useState, type ReactNode } from "react";
 import { expect, it, vi } from "vitest";
-import type { RichTextV2, VoiceProfileV3 } from "@tsz/types";
+import type { PhonemeLocaleV3, RichTextV2, VoiceProfileV3 } from "@tsz/types";
 import type { AudioAsset, VoicePreviewAdapter } from "@tsz/voice-editor/types";
 import { VoiceAudioTasksContext, VoiceSaveContext } from "./voiceSaveContext";
 import { useSelectedVoiceAudio } from "./useSelectedVoiceAudio";
@@ -91,6 +91,71 @@ it("后台音频立即生成但不注册为保存等待任务", async () => {
   expect(tasks.has("background-field")).toBe(false);
   expect(tasks.size).toBe(0);
 });
+
+it("保存期间切换口音会中止旧解析，迟到错误不会阻断当前口音", async () => {
+  const american = {
+    ...setting,
+    voice_id: "guy",
+    version_id: "version-us",
+    locale: "en-US" as const
+  };
+  const profile: VoiceProfileV3 = {
+    voices: [setting, american],
+    dubbing: { area: "word", uk: { mode: "local" }, us: { mode: "local" } }
+  };
+  const generate = vi.fn().mockResolvedValue(asset("us-ready"));
+  let rejectBritish!: (error: Error) => void;
+  const resolveBritish = new Promise<never>((_, reject) => {
+    rejectBritish = reject;
+  });
+  const resolveVoices = vi.fn<
+    NonNullable<VoicePreviewAdapter["resolveVoices"]>
+  >(({ accent }) =>
+    accent === "gb"
+      ? resolveBritish
+      : Promise.resolve({ source: { kind: "local" }, voices: [american] })
+  );
+  const preview = { ...adapter(generate), resolveVoices };
+  const view = renderHook(
+    ({ locale }: { locale: PhonemeLocaleV3 }) => {
+      const [current, setProfile] = useState(profile);
+      const task = useSelectedVoiceAudio({
+        target: "shared-pronunciation",
+        content,
+        profile: current,
+        adapter: preview,
+        activeLocales: [locale],
+        enabled: true,
+        defer: true,
+        onChange: setProfile
+      });
+      return { task, current };
+    },
+    { initialProps: { locale: "en-GB" } }
+  );
+  let saving!: Promise<boolean>;
+  await act(async () => {
+    saving = view.result.current.task.retry();
+  });
+  expect(resolveVoices.mock.calls[0]![0].accent).toBe("gb");
+  view.rerender({ locale: "en-US" });
+  expect(resolveVoices.mock.calls[0]![1]?.signal?.aborted).toBe(true);
+  await act(async () => {
+    rejectBritish(new Error("已取消口音的迟到错误"));
+    expect(await saving).toBe(true);
+  });
+  expect(resolveVoices.mock.calls.map(([{ accent }]) => accent)).toEqual([
+    "gb",
+    "us"
+  ]);
+  expect(generate).toHaveBeenCalledOnce();
+  expect(view.result.current.task.error).toBeUndefined();
+  expect(view.result.current.current.voices).toEqual([
+    setting,
+    { ...american, audio_asset_id: "us-ready" }
+  ]);
+});
+
 function setup(
   adapter: VoicePreviewAdapter,
   profile = initial,
@@ -484,53 +549,81 @@ it("输入期间暂缓生成，保存仍可主动等待；卸载清除登记并�
   expect(view.changed).not.toHaveBeenCalled();
 });
 
-it("英式生成期间修改美式来源和参数，英式结果仍绑定且美式新状态完整保留", async () => {
-  let finish!: (asset: AudioAsset) => void;
-  const generate = vi.fn(
-    () =>
-      new Promise<AudioAsset>((resolve) => {
-        finish = resolve;
-      })
-  );
-  const american = {
-    ...setting,
-    voice_id: "guy",
-    version_id: "version-us",
-    locale: "en-US" as const,
-    rate_percent: 15,
-    audio_asset_id: "old-us"
-  };
-  const profile: VoiceProfileV3 = {
-    voices: [setting, american],
-    dubbing: { area: "word", uk: { mode: "local" }, us: { mode: "local" } }
-  };
-  const view = setup(adapter(generate), profile);
-  await waitFor(() => expect(generate).toHaveBeenCalledTimes(1));
-  act(() =>
-    view.result.current.setProfile((current) => ({
-      ...current,
-      dubbing: { ...current.dubbing!, us: { mode: "inherit" } },
-      voices: current.voices.map((item) =>
-        item.voice_id === "guy"
-          ? { ...item, rate_percent: 25, version_name: "美式草稿" }
-          : item
+it.each(["解析", "生成"])(
+  "英式%s期间修改美式配置，保留美式新状态",
+  async (phase) => {
+    let finish!: (asset: AudioAsset) => void;
+    const generate = vi.fn(
+      () =>
+        new Promise<AudioAsset>((resolve) => {
+          finish = resolve;
+        })
+    );
+    const american = {
+      ...setting,
+      voice_id: "guy",
+      version_id: "version-us",
+      locale: "en-US" as const,
+      rate_percent: 15,
+      audio_asset_id: "old-us"
+    };
+    const profile: VoiceProfileV3 = {
+      voices: [setting, american],
+      dubbing: { area: "word", uk: { mode: "local" }, us: { mode: "local" } }
+    };
+    const preview = adapter(generate);
+    let finishResolve!: (
+      value: Awaited<
+        ReturnType<NonNullable<VoicePreviewAdapter["resolveVoices"]>>
+      >
+    ) => void;
+    const resolveVoices = vi.fn(
+      () =>
+        new Promise<
+          Awaited<ReturnType<NonNullable<VoicePreviewAdapter["resolveVoices"]>>>
+        >((resolve) => {
+          finishResolve = resolve;
+        })
+    );
+    if (phase === "解析") preview.resolveVoices = resolveVoices;
+    const view = setup(preview, profile);
+    await waitFor(() =>
+      expect(phase === "解析" ? resolveVoices : generate).toHaveBeenCalledTimes(
+        1
       )
-    }))
-  );
-  await act(async () => finish(asset("uk-ready")));
-  await waitFor(() =>
-    expect(view.result.current.profile.voices[0]!.audio_asset_id).toBe(
-      "uk-ready"
-    )
-  );
-  expect(view.result.current.profile.dubbing!.us.mode).toBe("inherit");
-  expect(view.result.current.profile.voices[1]).toEqual({
-    ...american,
-    rate_percent: 25,
-    version_name: "美式草稿"
-  });
-  expect(generate).toHaveBeenCalledTimes(1);
-});
+    );
+    act(() =>
+      view.result.current.setProfile((current) => ({
+        ...current,
+        dubbing: { ...current.dubbing!, us: { mode: "inherit" } },
+        voices: current.voices.map((item) =>
+          item.voice_id === "guy"
+            ? { ...item, rate_percent: 25, version_name: "美式草稿" }
+            : item
+        )
+      }))
+    );
+    if (phase === "解析") {
+      await act(async () =>
+        finishResolve({ source: { kind: "local" }, voices: [setting] })
+      );
+      await waitFor(() => expect(generate).toHaveBeenCalledTimes(1));
+    }
+    await act(async () => finish(asset("uk-ready")));
+    await waitFor(() =>
+      expect(view.result.current.profile.voices[0]!.audio_asset_id).toBe(
+        "uk-ready"
+      )
+    );
+    expect(view.result.current.profile.dubbing!.us.mode).toBe("inherit");
+    expect(view.result.current.profile.voices[1]).toEqual({
+      ...american,
+      rate_percent: 25,
+      version_name: "美式草稿"
+    });
+    expect(generate).toHaveBeenCalledTimes(1);
+  }
+);
 
 it("英式正文变化只使英式继承资产失效，保留美式独立配置和音频", async () => {
   const american = {

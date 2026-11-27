@@ -71,6 +71,7 @@ export function V3PhonemeSpeechSettings({
   locale,
   label,
   fallbackVoiceProfile,
+  fallbackVoiceCatalog,
   audioAssets = [],
   nodeId,
   field,
@@ -86,6 +87,7 @@ export function V3PhonemeSpeechSettings({
   locale: PhonemeLocaleV3;
   label: string;
   fallbackVoiceProfile?: VoiceProfileV3;
+  fallbackVoiceCatalog?: readonly VoiceOption[];
   audioAssets?: AudioAssetV3[];
   nodeId: string;
   field: string;
@@ -136,11 +138,25 @@ export function V3PhonemeSpeechSettings({
   const [open, setOpen] = useState(false);
   const audioTasks = useVoiceAudioTasks();
   const speech = candidate[`${alphabet}_speech`];
+  const side = speechAccentGroup(locale);
+  const fallbackSettings =
+    speech || fallbackVoiceCatalog
+      ? []
+      : (fallbackVoiceProfile?.voices.filter(
+          (setting) =>
+            setting.enabled &&
+            (!setting.locale || setting.locale === locale) &&
+            (!setting.accent ||
+              speechAccentGroup(undefined, setting.accent) === side)
+        ) ?? []);
+  const fallbackCatalogRequired = fallbackSettings.some(
+    (setting) => !setting.locale
+  );
   const needsFallbackCatalog =
-    !speech &&
-    !!fallbackVoiceProfile?.voices.some(
-      (setting) => setting.enabled && !setting.locale
-    );
+    fallbackCatalogRequired ||
+    ((open ||
+      (active && !synthesisInputIssue(alphabet, candidate[alphabet]))) &&
+      fallbackSettings.some((setting) => !setting.accent));
   const fallbackKey = JSON.stringify([
     targetKey,
     fallbackVoiceProfile?.voices.map((setting) => [
@@ -154,39 +170,58 @@ export function V3PhonemeSpeechSettings({
     error?: unknown;
   }>();
   const [fallbackAttempt, retryFallback] = useState(0);
-  const fallbackReady = useRef<Promise<boolean>>(Promise.resolve(false));
+  const fallbackReady = useRef<Promise<boolean> | undefined>(undefined);
+  const startFallbackCatalog = useRef(() => Promise.resolve(false));
   const fallbackNeeded = useRef(needsFallbackCatalog);
   fallbackNeeded.current = needsFallbackCatalog;
-  const fallbackPending =
-    needsFallbackCatalog && fallbackCatalog?.key !== fallbackKey;
-  const fallbackError =
-    needsFallbackCatalog && fallbackCatalog?.key === fallbackKey
-      ? fallbackCatalog.error
-      : undefined;
-  useEffect(() => {
-    if (
-      !needsFallbackCatalog ||
-      !canEdit ||
-      (!loadVoiceCatalogOnMount && !open)
-    )
-      return;
+  const currentFallback =
+    fallbackCatalog?.key === fallbackKey ? fallbackCatalog : undefined;
+  const fallbackPending = needsFallbackCatalog && !currentFallback;
+  const fallbackError = fallbackCatalogRequired
+    ? currentFallback?.error
+    : undefined;
+  useLayoutEffect(() => {
+    if (!needsFallbackCatalog || !canEdit) return;
     const controller = new AbortController();
-    fallbackReady.current = adminVoicePreviewAdapter
-      .listVoices({ language: "en", signal: controller.signal })
-      .then((voices) => {
-        if (controller.signal.aborted) return false;
-        flushSync(() => setFallbackCatalog({ key: fallbackKey, voices }));
-        return true;
-      })
-      .catch((error) => {
-        if (!controller.signal.aborted)
-          setFallbackCatalog({ key: fallbackKey, voices: [], error });
-        return false;
-      });
-    return () => controller.abort();
+    startFallbackCatalog.current = () =>
+      (fallbackReady.current ??= adminVoicePreviewAdapter
+        .listVoices({ language: "en", signal: controller.signal })
+        .then((voices) => {
+          if (controller.signal.aborted) return false;
+          flushSync(() => setFallbackCatalog({ key: fallbackKey, voices }));
+          return true;
+        })
+        .catch((error) => {
+          if (controller.signal.aborted) return false;
+          flushSync(() =>
+            setFallbackCatalog({ key: fallbackKey, voices: [], error })
+          );
+          return !fallbackCatalogRequired;
+        }));
+    return () => {
+      controller.abort();
+      fallbackReady.current = undefined;
+      startFallbackCatalog.current = () => Promise.resolve(false);
+    };
   }, [
     canEdit,
     fallbackAttempt,
+    fallbackCatalogRequired,
+    fallbackKey,
+    needsFallbackCatalog
+  ]);
+  useEffect(() => {
+    if (
+      needsFallbackCatalog &&
+      (loadVoiceCatalogOnMount || open || (background && active))
+    )
+      void startFallbackCatalog.current();
+  }, [
+    active,
+    background,
+    canEdit,
+    fallbackAttempt,
+    fallbackCatalogRequired,
     fallbackKey,
     loadVoiceCatalogOnMount,
     needsFallbackCatalog,
@@ -196,15 +231,15 @@ export function V3PhonemeSpeechSettings({
   useLayoutEffect(() => {
     if (
       !active ||
-      (!loadVoiceCatalogOnMount && !open) ||
       !canGenerateAudio ||
       !needsFallbackCatalog ||
+      (!fallbackPending && fallbackError == null) ||
       !audioTasks
     )
       return;
     const key = `${audioTarget}:native-voices`;
     audioTasks.set(key, async () => {
-      const pending = fallbackReady.current;
+      const pending = startFallbackCatalog.current();
       if (!(await pending)) {
         if (pending !== fallbackReady.current)
           return (await audioTasks.get(key)?.()) ?? false;
@@ -220,21 +255,24 @@ export function V3PhonemeSpeechSettings({
     audioTarget,
     audioTasks,
     canGenerateAudio,
-    loadVoiceCatalogOnMount,
-    needsFallbackCatalog,
-    open
+    fallbackError,
+    fallbackPending,
+    needsFallbackCatalog
   ]);
   const scopedFallback = fallbackVoiceProfile
     ? {
         ...fallbackVoiceProfile,
         voices: fallbackVoiceProfile.voices.flatMap((setting) => {
           if (!setting.enabled) return [setting];
-          const nativeLocale =
-            setting.locale ??
-            fallbackCatalog?.voices.find(
-              (voice) => voice.id === setting.voice_id
-            )?.locale;
-          return nativeLocale === locale ? [{ ...setting, locale }] : [];
+          const voice = (fallbackVoiceCatalog ?? currentFallback?.voices)?.find(
+            (voice) => voice.id === setting.voice_id
+          );
+          const nativeLocale = setting.locale ?? voice?.locale;
+          const accent = setting.accent ?? voice?.accent;
+          return nativeLocale === locale &&
+            speechAccentGroup(nativeLocale, accent) === side
+            ? [{ ...setting, locale }]
+            : [];
         })
       }
     : undefined;
@@ -564,6 +602,7 @@ export function V3PhonemeSpeechSettings({
       : clearVoiceAudio(scopedProfile),
     adapter: closedAdapter,
     locale,
+    requiredLocales: candidate.source === alphabet ? [locale] : [],
     enabled:
       active &&
       !open &&
@@ -589,6 +628,17 @@ export function V3PhonemeSpeechSettings({
         audioAssets
       )
   });
+  const retryAutomaticAudio = useRef(automaticAudio.retry);
+  useLayoutEffect(() => {
+    retryAutomaticAudio.current = automaticAudio.retry;
+  });
+  const retry = async () => {
+    if (needsFallbackCatalog && currentFallback?.error != null) {
+      flushSync(() => retryFallback((attempt) => attempt + 1));
+      if (!(await startFallbackCatalog.current())) return;
+    }
+    if (await retryAutomaticAudio.current()) onAudioTaskRetry?.();
+  };
   return (
     <>
       {fallbackError != null && (
@@ -685,14 +735,7 @@ export function V3PhonemeSpeechSettings({
               : t("panel_final_audio_generation_failed")
           }
           action={
-            <Button
-              size="small"
-              onClick={() =>
-                void automaticAudio.retry().then((succeeded) => {
-                  if (succeeded) onAudioTaskRetry?.();
-                })
-              }
-            >
+            <Button size="small" onClick={() => void retry()}>
               {t("panel_retry_final_audio")}
             </Button>
           }

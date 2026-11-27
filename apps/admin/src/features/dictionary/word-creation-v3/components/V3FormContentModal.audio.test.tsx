@@ -11,7 +11,8 @@ import type {
   GenerateVoiceAudioRequest,
   RichTextV2,
   VoiceSettingV3,
-  SharedFormsStepContentV3
+  SharedFormsStepContentV3,
+  WordPronunciationV3
 } from "@tsz/types";
 import { PronunciationPreviewProvider } from "../../word-creation/PronunciationPreview";
 import { V3FormContentModal } from "./V3FormContentModal";
@@ -25,7 +26,11 @@ import {
 import { applyFormsStructure, expandFormContents } from "../sharedFormsModel";
 import { createStableVariantIdFactory } from "../operations";
 
-const speech = vi.hoisted(() => ({ generate: vi.fn(), resolve: vi.fn() }));
+const speech = vi.hoisted(() => ({
+  catalog: vi.fn(),
+  generate: vi.fn(),
+  resolve: vi.fn()
+}));
 vi.mock("@/lib/auth", () => ({
   usePermission: () => true,
   api: { speech: { generateAudio: speech.generate, resolve: speech.resolve } }
@@ -43,7 +48,7 @@ vi.mock("@/features/settings/useDialectPreference", () => ({
 }));
 vi.mock("../../voice-editor/dataSource", () => ({
   adminVoicePreviewAdapter: {
-    listVoices: async () => [],
+    listVoices: speech.catalog,
     resolveVoices: speech.resolve,
     generateAudio: async (input: {
       content: RichTextV2;
@@ -61,6 +66,7 @@ vi.mock("../../voice-editor/dataSource", () => ({
   voicePreviewIsMock: false
 }));
 beforeEach(() => {
+  speech.catalog.mockReset().mockResolvedValue([]);
   speech.generate
     .mockReset()
     .mockImplementation(async (input: GenerateVoiceAudioRequest) => ({
@@ -90,6 +96,7 @@ function setup(
     save?: () => Promise<boolean>;
     saveAudio?: () => Promise<boolean>;
     onRequestAudioGeneration?: () => void;
+    pronunciation?: Partial<WordPronunciationV3>;
   } = {}
 ) {
   const pronunciation = pronunciationFixture({
@@ -108,7 +115,8 @@ function setup(
         ipa: emptySides.includes("us") ? "" : "sentɚ",
         ups: emptySides.includes("us") ? "" : "S EH N T ER"
       }
-    }
+    },
+    ...options.pronunciation
   });
   const form = distinguish
     ? ukUsFormFixture({
@@ -242,6 +250,72 @@ it.each([
     for (const [input] of speech.generate.mock.calls) {
       expect(input.source).toMatchObject({ kind: "phoneme", alphabet: "ipa" });
     }
+  }
+);
+
+it.each([
+  { alphabet: "ipa", retry: false },
+  { alphabet: "ups", retry: false },
+  { alphabet: "ipa", retry: true }
+] as const)(
+  "弹窗按目录口音判断历史 $alphabet 候选并保留显式无配音（目录重试=$retry）",
+  async ({ alphabet, retry }) => {
+    const catalog = [{ id: "reassigned", locale: "en-US", accent: "gb" }];
+    if (retry) speech.catalog.mockRejectedValue(new Error("目录暂不可用"));
+    else speech.catalog.mockResolvedValue(catalog);
+    speech.resolve.mockImplementation(async ({ source }) => {
+      if (source) throw new Error("此口音无原生音色");
+      return { voices: [] };
+    });
+    const { confirmed } = setup(undefined, [], false, {
+      pronunciation: {
+        voice_profile: {
+          dubbing: {
+            area: "word",
+            uk: { mode: "local" },
+            us: { mode: "local" }
+          },
+          voices: [
+            {
+              voice_id: "reassigned",
+              locale: "en-US",
+              enabled: true,
+              rate_percent: 0
+            }
+          ]
+        },
+        synthesis: {
+          alphabet,
+          ipa: "",
+          ups: "",
+          uk: { source: "none", ipa: "", ups: "" },
+          us: { ipa: "sentɚ", ups: "S EH N T ER" }
+        }
+      }
+    });
+    const apply = () =>
+      fireEvent.click(screen.getByRole("button", { name: "确认，应用到草稿" }));
+    apply();
+    if (retry) {
+      const problem = await screen.findByText("此口音无原生音色");
+      expect(confirmed).not.toHaveBeenCalled();
+      speech.catalog.mockResolvedValue(catalog);
+      fireEvent.click(screen.getByRole("button", { name: "重试生成音频" }));
+      await waitFor(() => expect(problem).not.toBeInTheDocument());
+      apply();
+    }
+    await waitFor(() => expect(confirmed).toHaveBeenCalledOnce());
+    expect(speech.catalog).toHaveBeenCalled();
+    expect(
+      speech.resolve.mock.calls.filter(([input]) => input.source)
+    ).toHaveLength(retry ? 1 : 0);
+    expect(speech.generate).not.toHaveBeenCalled();
+    const saved =
+      confirmed.mock.calls[0]![0].contents[0].regional_variants.common;
+    expect(saved.pronunciations[0].synthesis.uk.source).toBe("none");
+    expect(
+      saved.pronunciations[0].synthesis.us[`${alphabet}_speech`]
+    ).toBeUndefined();
   }
 );
 
