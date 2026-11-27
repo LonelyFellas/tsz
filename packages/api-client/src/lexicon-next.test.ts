@@ -534,6 +534,30 @@ describe("lexicon-next authoritative wire contract", () => {
     expect(paths["/admin/lexicon-next/entries"]).toContain("post");
   });
 
+  it.each([
+    { field: "expected_revision" },
+    { meta: { code: "speech_recommendation_changed" } },
+    {}
+  ])("preserves draft save conflict metadata %j", async (details) => {
+    const problem = {
+      type: "urn:tsz:problem:revision_conflict",
+      title: "Revision conflict",
+      status: 409,
+      detail: "fixture detail",
+      code: "revision_conflict",
+      ...details
+    };
+    const { api } = client(problem, 409);
+    await expect(
+      api.save(entry.id, { expected_revision: 1, draft })
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "revision_conflict",
+      problem,
+      meta: "meta" in details ? details.meta : undefined
+    });
+  });
+
   it("keeps actual fallback locale and missing content explicit", async () => {
     const view = {
       entry_id: entry.id,
