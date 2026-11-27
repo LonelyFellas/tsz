@@ -363,6 +363,7 @@ export const lexiconListMessages = {
     "Could not move the batch to trash"
   ],
   entry_name: ["词条名称", "詞條名稱", "Entry name"],
+  unnamed_entry: ["未命名词条", "未命名詞條", "Unnamed entry"],
   spelling_uk: ["英式拼写", "英式拼寫", "British spelling"],
   spelling_us: ["美式拼写", "美式拼寫", "American spelling"],
   kind: ["类型", "類型", "Type"],

@@ -2705,7 +2705,7 @@ it("新版列表按任务布局显示高级筛选并提交最后更新人", asyn
   );
 });
 
-it("新版列表逐行显示原形，仅单侧拼写加点，旧响应仍有词条名", async () => {
+it("新版列表逐行显示原形和方言标记，并处理未命名和旧响应", async () => {
   grantListPermissions();
   const api = requests();
   api.workspaceList.mockResolvedValue({
@@ -2725,9 +2725,14 @@ it("新版列表逐行显示原形，仅单侧拼写加点，旧响应仍有词�
           { text: "braille", dialects: ["uk", "us"] }
         ]
       }),
-      listRow({ id: "older-entry", headword: "panel" })
+      listRow({ id: "older-entry", headword: "panel" }),
+      listRow({
+        id: "unnamed-entry",
+        headword: "original input",
+        name_variants: []
+      })
     ],
-    pagination: { total: 3, page: 1, page_size: 20, total_pages: 1 }
+    pagination: { total: 4, page: 1, page_size: 20, total_pages: 1 }
   });
 
   mount(api, "/lexicon-next");
@@ -2745,6 +2750,8 @@ it("新版列表逐行显示原形，仅单侧拼写加点，旧响应仍有词�
   ).toEqual(["Braille", "braille"]);
   expect(within(caseVariantCell).queryAllByRole("img")).toHaveLength(0);
   expect(screen.getByText("panel")).toBeVisible();
+  expect(screen.getByText("未命名词条")).toBeVisible();
+  expect(screen.queryByText("original input")).not.toBeInTheDocument();
   expect(
     screen.getByRole("checkbox", { name: "选择「centre / center」" })
   ).toBeVisible();
