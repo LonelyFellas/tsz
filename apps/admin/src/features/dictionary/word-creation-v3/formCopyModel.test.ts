@@ -353,6 +353,171 @@ describe("词形内容定向复制", () => {
     }
   });
 
+  it("同一口音已匹配的独立音素配置不占用共享拼写配置", () => {
+    const form = (id: number, name: string) =>
+      commonFormFixture({
+        id: uuidFromInt(id),
+        spelling: name,
+        pronunciations: [0, 1, 2].map((index) => {
+          const usesSpelling = index !== 2;
+          return pronunciationFixture({
+            id: uuidFromInt(id + index + 10),
+            synthesis: {
+              alphabet: "ipa",
+              ipa: "",
+              ups: "",
+              uk: usesSpelling
+                ? { source: "spelling", ipa: "", ups: "" }
+                : {
+                    source: "ipa",
+                    ipa: "test",
+                    ups: "",
+                    ipa_speech: speech(name, profile(`${name}-ipa`))
+                  },
+              us: { source: "none", ipa: "", ups: "" }
+            }
+          });
+        })
+      });
+    const { forms, sourceId, targetId } = setup(
+      form(500, "source"),
+      form(700, "target")
+    );
+    const source = variant(forms.contents[0]!);
+    source.spelling_speech = speech(
+      source.spelling,
+      profile("source-spelling")
+    );
+
+    const copied = variant(
+      applyFormCopy(forms, planFormCopy(forms, sourceId, targetId, "voices"))
+        .contents[1]!
+    );
+    expect(copied.spelling_speech?.voice_profile.voices[0]?.voice_id).toBe(
+      "source-spelling"
+    );
+    expect(
+      copied.pronunciations[2]!.synthesis?.uk?.ipa_speech?.voice_profile
+        .voices[0]?.voice_id
+    ).toBe("source-ipa");
+  });
+
+  it("同口音的多拼写各自采用对应拼写的配音配置", () => {
+    const form = (id: number, prefix: string): WordConcreteFormV3 => {
+      const base = ukUsFormFixture({ id: uuidFromInt(id) });
+      return {
+        ...base,
+        regional_variants: {
+          mode: "uk_us_many",
+          uk: [0, 1].map((index) => {
+            const name = `${prefix}-${index}`;
+            return {
+              ...base.regional_variants.uk,
+              id: uuidFromInt(id + 10 + index),
+              spelling: name,
+              pronunciations: ["citation", "normal"].map((style, row) =>
+                pronunciationFixture({
+                  id: uuidFromInt(id + 20 + index * 2 + row),
+                  style: style === "citation" ? "citation" : "normal"
+                })
+              ),
+              spelling_speech: speech(name, profile(name))
+            };
+          }),
+          us: [{ ...base.regional_variants.us, pronunciations: [] }]
+        }
+      };
+    };
+    const { forms, sourceId, targetId } = setup(
+      form(500, "source"),
+      form(700, "target")
+    );
+    const next = applyFormCopy(
+      forms,
+      planFormCopy(forms, sourceId, targetId, "voices")
+    );
+    const regions = next.contents[1]!.regional_variants;
+    if (regions.mode !== "uk_us_many") throw new Error("fixture");
+    expect(
+      regions.uk.map((variant) => [
+        variant.spelling,
+        variant.spelling_speech?.voice_profile.voices[0]?.voice_id
+      ])
+    ).toEqual([
+      ["target-0", "source-0"],
+      ["target-1", "source-1"]
+    ]);
+  });
+
+  it.each(["upload", "spelling"] as const)(
+    "美式录音沿用原路径（%s），英式共享拼写只复制一次",
+    (recordingSource) => {
+      const { forms, sourceId, targetId } = setup(
+        commonFormFixture(),
+        commonFormFixture({
+          id: uuidFromInt(700),
+          pronunciations: [
+            pronunciationFixture({ id: uuidFromInt(701), style: "citation" }),
+            pronunciationFixture({ id: uuidFromInt(702), style: undefined })
+          ]
+        })
+      );
+      const from = variant(forms.contents[0]!);
+      const to = variant(forms.contents[1]!);
+      const source = from.pronunciations[0]!;
+      const recording = recordingFor("us-recording", "en-US");
+      const incomingUs = {
+        ...profile("source-us").voices[0]!,
+        locale: "en-US" as const
+      };
+      const previousUs = {
+        ...profile("target-us").voices[0]!,
+        locale: "en-US" as const
+      };
+      from.spelling_speech = speech(from.spelling, {
+        voices: [...profile("source-uk").voices, incomingUs]
+      });
+      to.spelling_speech = speech(to.spelling, { voices: [previousUs] });
+      source.synthesis = {
+        alphabet: "ipa",
+        ipa: "",
+        ups: "",
+        uk: { source: "spelling", ipa: "", ups: "" },
+        us: { source: recordingSource, ipa: "", ups: "" }
+      };
+      if (recordingSource === "upload") source.audio_assets = [recording];
+      else from.spelling_speech.audio_assets = [recording];
+
+      const plan = planFormCopy(forms, sourceId, targetId, "voices");
+      expect(plan.matches.map((match) => match.side)).toEqual(["us", "us"]);
+      const mapped = planFormCopy(forms, sourceId, targetId, "voices", {
+        us: {
+          [to.pronunciations[0]!.id]: source.id,
+          [to.pronunciations[1]!.id]:
+            recordingSource === "upload" ? null : source.id
+        }
+      });
+      const copied = variant(applyFormCopy(forms, mapped).contents[1]!);
+      const spellingVoices = copied.spelling_speech!.voice_profile.voices;
+      expect(spellingVoices.map((setting) => setting.voice_id)).toEqual(
+        expect.arrayContaining(["source-uk", "source-uk-disabled"])
+      );
+      if (recordingSource === "upload") {
+        expect(copied.pronunciations[0]!.audio_assets).toEqual([recording]);
+        expect(copied.pronunciations[1]!.audio_assets).toBeUndefined();
+        expect(spellingVoices).toContainEqual(previousUs);
+      } else {
+        expect(copied.spelling_speech?.audio_assets).toEqual([recording]);
+        expect(spellingVoices).toContainEqual(
+          expect.objectContaining({
+            voice_id: "source-us",
+            locale: "en-US"
+          })
+        );
+      }
+    }
+  );
+
   it.each(["uk", "us"] as const)(
     "单侧复制%s音色保留跳过侧的无locale旧格式合成",
     (side) => {

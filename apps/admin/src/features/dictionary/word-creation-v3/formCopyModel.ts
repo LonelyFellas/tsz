@@ -155,7 +155,7 @@ function planSharedSpellingCopies(
   to: Record<FormCopySide, FormCopyPronunciationReference[]>,
   mapping: FormCopyMapping
 ): SharedSpellingCopy[] {
-  const recordedSides = new Set<FormCopySide>();
+  const recordedVariants = { uk: new Set<string>(), us: new Set<string>() };
   const sourcesBySide = new Map<
     FormCopySide,
     FormCopyPronunciationReference[]
@@ -168,7 +168,7 @@ function planSharedSpellingCopies(
       const selected = voiceCopySynthesisForSide(row, side, ref.region);
       const hasRecording = audioAssetsForSide(row, side).length > 0;
       if (hasRecording && usesUploadForCopy(selected, hasRecording))
-        recordedSides.add(side);
+        recordedVariants[side].add(variant.id);
       if (
         selected.source === "none" ||
         selected.source === "upload" ||
@@ -176,7 +176,7 @@ function planSharedSpellingCopies(
       )
         return true;
       if (audioAssetsForSide(variant.spelling_speech, side).length)
-        recordedSides.add(side);
+        recordedVariants[side].add(variant.id);
       // All spelling readings on this variant resolve the same profile.
       if (spellingVariants.has(variant.id)) return false;
       spellingVariants.add(variant.id);
@@ -186,10 +186,8 @@ function planSharedSpellingCopies(
   }
   const copies: SharedSpellingCopy[] = [];
   for (const variant of regionalVariants(target.regional_variants)) {
-    const sides = SIDES.map((side) => ({
-      side,
-      sources: sourcesBySide.get(side)!,
-      targets: to[side].filter((ref) => {
+    const sides = SIDES.flatMap((side) => {
+      const targets = to[side].filter((ref) => {
         if (ref.variantId !== variant.id) return false;
         const selected = voiceCopySynthesisForSide(
           variant.pronunciations[ref.index]!,
@@ -201,25 +199,34 @@ function planSharedSpellingCopies(
           selected.source !== "none" &&
           selected.source !== "upload"
         );
-      })
-    })).filter(({ targets }) => targets.length > 0);
+      });
+      if (!targets.length) return [];
+      const sourceVariants = regionalVariants(source.regional_variants, side);
+      const targetVariants = regionalVariants(target.regional_variants, side);
+      const corresponding =
+        sourceVariants.length === targetVariants.length
+          ? sourceVariants[targetVariants.indexOf(variant)]
+          : undefined;
+      const sources = sourcesBySide
+        .get(side)!
+        .filter((ref) => !corresponding || ref.variantId === corresponding.id);
+      return [{ side, sources, targets }];
+    });
     const readingIds = new Set(
       sides.flatMap(({ targets }) =>
         targets.map(({ pronunciationId }) => pronunciationId)
       )
     );
     if (readingIds.size < 2) continue;
-    if (
-      sides.some(
-        ({ side, targets }) =>
-          recordedSides.has(side) ||
-          targets.some(
-            (ref) => mapping[side]?.[ref.pronunciationId] !== undefined
-          )
-      )
-    )
-      continue;
-    copies.push({ variantId: variant.id, sides });
+    const automatic = sides.filter(
+      ({ side, sources, targets }) =>
+        !sources.some((ref) => recordedVariants[side].has(ref.variantId)) &&
+        !targets.some(
+          (ref) => mapping[side]?.[ref.pronunciationId] !== undefined
+        )
+    );
+    if (automatic.length)
+      copies.push({ variantId: variant.id, sides: automatic });
   }
   return copies;
 }
@@ -255,13 +262,6 @@ export function planFormCopy(
   const sharedTargets = sharedSpellings.flatMap(({ sides }) =>
     sides.flatMap(({ targets }) => targets)
   );
-  const sharedMatched = sharedSpellings
-    .flatMap(({ sides }) => sides)
-    .reduce(
-      (count, { sources, targets }) =>
-        count + (sources.length ? targets.length : 0),
-      0
-    );
   const automaticTargets = new Set(sharedTargets);
   const matches: FormCopyPlan["matches"] = [];
   let sourceCount = 0;
@@ -303,6 +303,51 @@ export function planFormCopy(
       });
     }
   }
+  // A dedicated IPA/UPS source already assigned to an independent reading
+  // of this variant should not compete with its shared spelling profile.
+  for (const { variantId, sides } of sharedSpellings) {
+    for (const sideCopy of sides) {
+      const assigned = new Set<string>();
+      for (const match of matches) {
+        if (
+          !match.source ||
+          match.side !== sideCopy.side ||
+          match.target.variantId !== variantId
+        )
+          continue;
+        const destination = voiceCopySynthesisForSide(
+          pronunciationAt(target, match.target),
+          match.side,
+          match.target.region
+        );
+        const origin = voiceCopySynthesisForSide(
+          pronunciationAt(source, match.source),
+          match.side,
+          match.source.region
+        );
+        if (
+          !destination.use_spelling &&
+          destination.source !== "none" &&
+          destination.source !== "upload" &&
+          !origin.use_spelling &&
+          origin.source !== "none" &&
+          origin.source !== "upload"
+        )
+          assigned.add(match.source.pronunciationId);
+      }
+      const unassigned = sideCopy.sources.filter(
+        (ref) => !assigned.has(ref.pronunciationId)
+      );
+      if (unassigned.length) sideCopy.sources = unassigned;
+    }
+  }
+  const sharedMatched = sharedSpellings
+    .flatMap(({ sides }) => sides)
+    .reduce(
+      (count, { sources, targets }) =>
+        count + (sources.length ? targets.length : 0),
+      0
+    );
 
   const sameContent = source.id === target.id;
   const hasRecordings = matches.some((match) => {
@@ -1300,10 +1345,11 @@ function copyVoices(
       copied = true;
     }
   }
+  const sideCount = matches[0]!.target.region === "common" ? SIDES.length : 1;
   if (fallbacks.length) {
     target.voice_profile = mergeFallbacks(
       before.voice_profile,
-      matches[0]!.target.region === "common" ? SIDES.length : 1,
+      sideCount,
       fallbacks
     );
     copied = true;
@@ -1311,7 +1357,7 @@ function copyVoices(
   if (spellingFallbacks.length) {
     const spelling = mergeSpellingProfiles(
       targetVariant.spelling_speech?.voice_profile,
-      matches.length,
+      sideCount,
       spellingFallbacks,
       resolved,
       versions
@@ -1320,6 +1366,7 @@ function copyVoices(
     if (
       !fallbacks.length &&
       target.synthesis &&
+      matches.length === sideCount &&
       matches.every(
         (match) =>
           voiceCopySynthesisForSide(before, match.side, match.target.region)
@@ -1413,8 +1460,12 @@ export function applyFormCopy(
         : regionalVariants(regions, "uk").includes(variant)
           ? "uk"
           : "us";
-    const sides: readonly FormCopySide[] =
-      region === "common" ? SIDES : [region];
+    const automaticSides = plan.sharedSpellings.find(
+      ({ variantId }) => variantId === variant.id
+    )?.sides;
+    const sides = (region === "common" ? SIDES : [region]).filter(
+      (side) => !automaticSides?.some((copy) => copy.side === side)
+    );
     const profiles = variant.pronunciations
       .filter((row) =>
         sides.some(
