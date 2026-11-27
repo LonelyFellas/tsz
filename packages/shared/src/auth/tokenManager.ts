@@ -18,6 +18,7 @@ export class SessionRefreshHttpError extends HttpError {}
 
 export interface TokenManager {
   getToken: () => string | undefined;
+  getTokenForRequest: () => string | undefined | Promise<string>;
   getSessionGeneration: () => number;
   setAccessToken: (token: string | null) => void;
   clearSession: () => void;
@@ -452,6 +453,24 @@ export function createTokenManager({
     refreshTimer = setTimeout(refreshInBackground, delay);
   }
 
+  function getToken() {
+    try {
+      checkSharedSession();
+    } catch {
+      // 请求层会检查已递增的代次；可见性事件的只读检查不应抛错。
+      return undefined;
+    }
+    return accessToken ?? undefined;
+  }
+
+  function getTokenForRequest() {
+    const token = getToken();
+    if (refreshingPromise) return refreshingPromise;
+    if (token && tokenExpiresAt !== 0 && Date.now() >= tokenExpiresAt)
+      return refreshTokens();
+    return token;
+  }
+
   if (typeof window !== "undefined") {
     const resume = () => {
       if (
@@ -475,15 +494,8 @@ export function createTokenManager({
   }
 
   return {
-    getToken: () => {
-      try {
-        checkSharedSession();
-      } catch {
-        // 请求层会检查已递增的代次；可见性事件的只读检查不应抛错。
-        return undefined;
-      }
-      return accessToken ?? undefined;
-    },
+    getToken,
+    getTokenForRequest,
     getSessionGeneration: () => sessionGeneration,
     setAccessToken,
     clearSession,
