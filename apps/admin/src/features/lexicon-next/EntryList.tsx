@@ -62,10 +62,6 @@ import { useLexiconLanguages } from "./LanguageSelection";
 import "@/features/dictionary/smart-dictionary.css";
 import "@/features/dictionary/word-list-controls.css";
 
-function workspaceEntryLabel(row: NextWorkspaceEntry) {
-  return entryNameLabel(row.name_variants, row.headword);
-}
-
 function cefrLevelColor(level: string) {
   return CEFR_LEVELS.includes(level as CefrLevel)
     ? cefrColor(level as CefrLevel)
@@ -89,6 +85,12 @@ export function EntryList({
   partOfSpeechCodes: string[];
 }) {
   const { t, i18n } = useLexiconListTranslation();
+  function fallbackEntryName(row: NextWorkspaceEntry) {
+    return row.name_variants === undefined ? row.headword : t("unnamed_entry");
+  }
+  function workspaceEntryLabel(row: NextWorkspaceEntry) {
+    return entryNameLabel(row.name_variants, fallbackEntryName(row));
+  }
   const { t: editorT } = useLexiconEditorTranslation();
   const {
     search: languageSearch,
@@ -433,7 +435,7 @@ export function EntryList({
       ellipsis: true,
       render: (row) => (
         <WordListNames
-          fallbackName={row.headword}
+          fallbackName={fallbackEntryName(row)}
           variants={row.name_variants}
           annotation={row.annotation_visible ? row.annotation : null}
           kindLabel={kindLabel(row.kind)}
