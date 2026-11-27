@@ -1023,7 +1023,7 @@ describe("SmartDictionary", () => {
   });
 
   it.each([undefined, "trash"] as const)(
-    "列表 %s 使用结构化名称并保留每侧标注、圆点及行操作",
+    "列表 %s 保留标注和行操作，仅单侧拼写显示圆点",
     async (mode) => {
       matchViewport(1440);
       const row: AdminWordListItemV3 = {
@@ -1063,7 +1063,7 @@ describe("SmartDictionary", () => {
             dot.getAttribute("data-spelling-dialect")
           )
         )
-      ).toEqual([["uk"], ["us"], ["uk", "us"]]);
+      ).toEqual([["uk"], ["us"], []]);
       expect(
         names.map((name) => name.querySelector("sup")?.textContent)
       ).toEqual(["词义", "词义", "词义"]);
