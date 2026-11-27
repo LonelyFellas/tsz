@@ -71,7 +71,6 @@ export function RecommendationEditor({
   const [ssmlDrafts, setSsmlDrafts] = useState<Record<string, SsmlDraft>>({});
   const voiceDrafts = useRef(new Map<string, RecommendationSeed>());
   const [selectedAliases, setSelectedAliases] = useState<string[]>([]);
-  const showSingleFields = !bulkAdd || selectedAliases.length === 1;
   const atCapacity =
     !!bulkAdd && selectedAliases.length >= bulkAdd.remainingSlots;
   const selectionExceedsCapacity =
@@ -96,13 +95,9 @@ export function RecommendationEditor({
       voiceDrafts.current.set(current.voice_alias, current);
     const next = newRecommendationVoice(chosen);
     const saved = voiceDrafts.current.get(chosen.alias);
-    if (bulkAdd) {
-      setValue(saved ?? next);
-    } else {
-      if (saved?.parameters) next.parameters = saved.parameters;
-      if (current.id) next.id = current.id;
-      setValue((previous) => ({ ...previous, ...next }));
-    }
+    if (saved?.parameters) next.parameters = saved.parameters;
+    if (current.id) next.id = current.id;
+    setValue((previous) => ({ ...previous, ...next }));
     setError(undefined);
   }
   function toggleVoice(alias: string) {
@@ -113,16 +108,9 @@ export function RecommendationEditor({
       : [...selectedAliases, alias];
     setSelectedAliases(next);
     setError(undefined);
-    if (next.length === 1) {
-      const chosen = voices.find((candidate) => candidate.alias === next[0]);
-      if (chosen) chooseVoice(chosen);
-    }
   }
   const item =
-    showSingleFields &&
-    value.voice_alias &&
-    value.parameters &&
-    (!bulkAdd || value.voice_alias === selectedAliases[0])
+    !bulkAdd && value.voice_alias && value.parameters
       ? (value as AdminDubbingRecommendation)
       : undefined;
   const voice = voices.find((v) => v.alias === item?.voice_alias);
@@ -167,7 +155,7 @@ export function RecommendationEditor({
     (!!bulkAdd && (!selectedAliases.length || selectionExceedsCapacity));
   function save() {
     if (saveDisabled) return;
-    if (bulkAdd && selectedAliases.length > 1) {
+    if (bulkAdd) {
       const recommendations: AdminDubbingRecommendation[] = [];
       for (const alias of selectedAliases) {
         const candidate = voices.find((voice) => voice.alias === alias);
@@ -188,10 +176,6 @@ export function RecommendationEditor({
       bulkAdd.onSave(recommendations);
       return;
     }
-    if (bulkAdd && (!item || !voice)) {
-      setError(voiceMessage("recommendation_catalog_changed"));
-      return;
-    }
     const name = value.name?.trim() || t("unnamed_recommendation");
     if (Array.from(name).length > 40) {
       setError(
@@ -206,10 +190,7 @@ export function RecommendationEditor({
       return;
     }
     const recommendation = { ...item, name, selected: value.selected ?? true };
-    if (validate(recommendation, voice)) {
-      if (bulkAdd) bulkAdd.onSave([recommendation]);
-      else onSave(recommendation);
-    }
+    if (validate(recommendation, voice)) onSave(recommendation);
   }
 
   // 只在切换声音或口音时回填，避免逐字输入时重设表单打断编辑。
@@ -343,6 +324,7 @@ export function RecommendationEditor({
   const content = (
     <Form
       component="div"
+      className={bulkAdd ? "dubbing-recommendation-picker" : undefined}
       form={parameterForm}
       onValuesChange={(_, fields: ParameterFormValues) =>
         parameters({
@@ -476,8 +458,7 @@ export function RecommendationEditor({
           );
         })}
       </div>
-      {bulkAdd && showSingleFields && singleFields}
-      {showSingleFields && controls}
+      {!bulkAdd && controls}
     </Form>
   );
 
@@ -512,7 +493,7 @@ export function RecommendationEditor({
           disabled={saveDisabled}
           onClick={save}
         >
-          {t("save_to_this_group")}
+          {t(bulkAdd ? "add_to_this_group" : "save_to_this_group")}
         </Button>
       </Space>
     </div>
