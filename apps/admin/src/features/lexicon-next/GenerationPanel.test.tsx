@@ -759,7 +759,7 @@ it("用参考轮播和紧凑词形表展示同一批生成结果", async () => {
             source: "有道",
             locator: "https://dict.youdao.com/w/eng/center/",
             excerpt:
-              "center · 英 [ˈsentə(r)] / 美 [ˈsentər] · 词性 n.、v. · [ 复数 centers ]",
+              "center · 英 [ˈsentə(r)] / 美 [ˈsentər] · 词性 n.、v. · [ 复数 centers ] · 例句证据 （柯林斯）They met in the center.",
             status: "found"
           },
           {
@@ -845,6 +845,7 @@ it("用参考轮播和紧凑词形表展示同一批生成结果", async () => {
   expect(references.getByText("centers")).toBeVisible();
   const youdao = within(references.getByRole("group", { name: "有道" }));
   expect(youdao.getByText("发音")).toBeVisible();
+  expect(youdao.getByText("（柯林斯）They met in the center.")).toBeVisible();
   expect(
     within(youdao.getByRole("group", { name: "名词" })).getByText("复数")
   ).toBeVisible();
@@ -900,6 +901,41 @@ it("用参考轮播和紧凑词形表展示同一批生成结果", async () => {
   expect(onFill).toHaveBeenCalledOnce();
   expect(generate).toHaveBeenCalledOnce();
   expect(generate.mock.calls[0]?.[1].senses).toEqual([]);
+});
+
+it("有道刷新后显示短语释义和例句，缺失的词形资料留空", async () => {
+  const locator = "https://dict.youdao.com/w/eng/warm%20welcome/";
+  const refreshReference = vi.fn().mockResolvedValue({
+    source: "有道",
+    locator,
+    status: "found",
+    excerpt:
+      "warm welcome · 释义 热烈欢迎 · 例句 They gave us a warm welcome. — 他们热情地欢迎了我们。"
+  });
+  render(
+    <GenerationResult
+      section="forms"
+      headword="warm welcome"
+      sources={[
+        { source: "有道", locator, status: "unavailable", excerpt: "" }
+      ]}
+      forms={[]}
+      refreshReference={refreshReference}
+    />
+  );
+
+  const youdao = within(screen.getByRole("group", { name: "有道" }));
+  expect(youdao.getByText("未能取得资料")).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "刷新有道资料" }));
+  expect(await youdao.findByText("热烈欢迎")).toBeVisible();
+  expect(
+    youdao.getByText("They gave us a warm welcome. — 他们热情地欢迎了我们。")
+  ).toBeVisible();
+  expect(youdao.getByText("已取得参考")).toBeVisible();
+  expect(youdao.queryByText("未能取得资料")).not.toBeInTheDocument();
+  for (const label of ["词性", "发音", "词形"]) {
+    expect(youdao.getByText(label).nextElementSibling).toBeEmptyDOMElement();
+  }
 });
 
 it("已加载旧文案的页面仍按词性显示韦氏变形和候选词形计数", () => {

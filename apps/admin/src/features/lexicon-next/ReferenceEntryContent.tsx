@@ -79,11 +79,16 @@ export function ReferenceEntryContent({
   const labelForPos = (pos: string) =>
     dictionaryMatchPosLabel(pos, undefined, posLabel);
 
-  const missing = (
-    <span className="lexicon-reference-missing">
-      {form("entry_ai_source_missing")}
-    </span>
-  );
+  const isYoudao = source?.source === "有道";
+  const examples =
+    entry.examples ??
+    (isYoudao && !showGrammar ? entry.grammarExamples : undefined);
+  const missing =
+    isYoudao && source.status === "found" ? null : (
+      <span className="lexicon-reference-missing">
+        {form("entry_ai_source_missing")}
+      </span>
+    );
   const pronunciations = [
     { label: editor("dialect_uk"), value: entry.pronunciation?.uk },
     { label: editor("dialect_us"), value: entry.pronunciation?.us },
@@ -202,14 +207,24 @@ export function ReferenceEntryContent({
         <div className="lexicon-reference-definitions">
           <h4>{t("meaning")}</h4>
           {entry.definitions.length === 1 ? (
-            <p lang="en">{entry.definitions[0]}</p>
+            <p lang={isYoudao ? "zh-Hans" : "en"}>{entry.definitions[0]}</p>
           ) : (
-            <ol lang="en">
+            <ol lang={isYoudao ? "zh-Hans" : "en"}>
               {entry.definitions.map((definition, index) => (
                 <li key={index}>{definition}</li>
               ))}
             </ol>
           )}
+        </div>
+      )}
+      {!!examples?.length && (
+        <div className="lexicon-reference-definitions">
+          <h4>{editor("entry_ai_examples")}</h4>
+          <ol>
+            {examples.map((example, index) => (
+              <li key={index}>{example}</li>
+            ))}
+          </ol>
         </div>
       )}
       {entry.summary && (
