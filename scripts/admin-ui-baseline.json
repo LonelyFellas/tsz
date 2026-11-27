@@ -228,7 +228,7 @@
     "raw-font-size": 1
   },
   "apps/admin/src/features/voices/voice-library.css": {
-    "raw-font-weight": 3,
+    "raw-font-weight": 2,
     "raw-font-size": 4,
     "raw-color": 1,
     "raw-radius": 2

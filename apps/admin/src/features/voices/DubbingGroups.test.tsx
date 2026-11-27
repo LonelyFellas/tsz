@@ -147,6 +147,7 @@ function mount(initial = data(), voices = [uk, us]) {
       element: (
         <DubbingDrafts>
           <DubbingGroups
+            auditionPanel={null}
             voices={voices}
             canAudition
             onAudition={onAudition}

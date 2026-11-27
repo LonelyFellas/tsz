@@ -37,7 +37,7 @@ import {
 } from "@tsz/ui/admin/display";
 import { App, Modal, Popconfirm } from "@tsz/ui/admin/overlays";
 import { Checkbox, Form, Input, Select } from "@tsz/ui/admin/forms";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useUnsavedChanges } from "@tsz/shared/recovery";
 import { useBlocker } from "react-router-dom";
 import { api, useAuthStore, usePermission } from "@/lib/auth";
@@ -74,12 +74,14 @@ type Editing = {
 };
 
 export function DubbingGroups({
+  auditionPanel,
   voices,
   onAudition,
   canAudition,
   onInvalidatePreview,
   onDirtyChange
 }: {
+  auditionPanel: ReactNode;
   voices: AdminSpeechVoice[];
   onAudition: (
     voice: AdminSpeechVoice,
@@ -826,8 +828,48 @@ export function DubbingGroups({
     );
   }
 
-  if (groups.isError && !dirty)
+  function renderPage(content: ReactNode) {
     return (
+      <div className="dubbing-groups">
+        <PageHeader
+          className="dubbing-page-heading"
+          title={t("group_dubbing")}
+          actions={
+            groups.data &&
+            (!groups.isError || dirty) && (
+              <Space wrap>
+                <Button onClick={() => setPreviewArea("word")}>
+                  {t("lexicon_preview")}
+                </Button>
+                {canEdit && (
+                  <Button
+                    type="primary"
+                    icon={<PlusIcon aria-hidden />}
+                    disabled={
+                      saving ||
+                      current.filter((group) => !group.is_global).length >= 5
+                    }
+                    onClick={addGroup}
+                  >
+                    {t("add_group")}
+                  </Button>
+                )}
+              </Space>
+            )
+          }
+        >
+          {t(
+            "set_british_and_american_voices_for_each_area_global_defaults_app"
+          )}
+        </PageHeader>
+        {auditionPanel}
+        {content}
+      </div>
+    );
+  }
+
+  if (groups.isError && !dirty)
+    return renderPage(
       <Alert
         type="error"
         showIcon
@@ -839,9 +881,9 @@ export function DubbingGroups({
         }
       />
     );
-  if (!groups.data) return <Card loading />;
-  return (
-    <div className="dubbing-groups">
+  if (!groups.data) return renderPage(<Card loading />);
+  return renderPage(
+    <>
       {blocker.state === "blocked" && (
         <Modal
           open
@@ -867,32 +909,6 @@ export function DubbingGroups({
           {t("leaving_discards_the_current_group_drafts")}
         </Modal>
       )}
-      <PageHeader
-        className="dubbing-page-heading"
-        title={t("group_dubbing")}
-        actions={
-          <Space wrap>
-            <Button onClick={() => setPreviewArea("word")}>
-              {t("lexicon_preview")}
-            </Button>
-            {canEdit && (
-              <Button
-                type="primary"
-                icon={<PlusIcon aria-hidden />}
-                disabled={
-                  saving ||
-                  current.filter((group) => !group.is_global).length >= 5
-                }
-                onClick={addGroup}
-              >
-                {t("add_group")}
-              </Button>
-            )}
-          </Space>
-        }
-      >
-        {t("set_british_and_american_voices_for_each_area_global_defaults_app")}
-      </PageHeader>
       {error && (
         <Alert
           type="error"
@@ -1189,6 +1205,6 @@ export function DubbingGroups({
           )}
         </div>
       </Modal>
-    </div>
+    </>
   );
 }

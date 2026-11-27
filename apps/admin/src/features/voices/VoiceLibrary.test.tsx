@@ -328,7 +328,7 @@ describe("配音中心", () => {
     const { router } = mount(false);
     await screen.findByText("尚未设置分组推荐");
     expect(namedButton("新增分组")).toBeVisible();
-    expect(screen.queryByLabelText("共用试听文本")).toBeNull();
+    expect(screen.getByLabelText("共用试听文本")).toBeVisible();
     expect(screen.queryByRole("button", { name: /刷新音色/ })).toBeNull();
     expect(api.speech.audioUpdateSettings).not.toHaveBeenCalled();
     expect(api.speech.allAudioUpdates).not.toHaveBeenCalled();
@@ -340,6 +340,101 @@ describe("配音中心", () => {
     expect(namedButton(/刷新音色/)).toBeVisible();
     expect(screen.queryByRole("tab", { name: "音色库" })).toBeNull();
     expect(screen.queryByText("尚未设置分组推荐")).toBeNull();
+  });
+
+  it("分组行用页头下方的共用文本试听，并按所点推荐项生成", async () => {
+    vi.mocked(api.speech.groupsV3).mockResolvedValue({
+      revision: 1,
+      order_revision: 1,
+      groups: [
+        {
+          id: "word-group",
+          name: "词形推荐",
+          revision: 1,
+          is_global: false,
+          areas: ["word"],
+          uk: [
+            {
+              id: "uk-item",
+              name: "推荐",
+              selected: true,
+              voice_alias: sonia.alias,
+              parameters: {
+                rate_percent: -10,
+                pitch_semitones: 0,
+                style: null
+              }
+            }
+          ],
+          us: [
+            {
+              id: "us-item",
+              name: "推荐",
+              selected: true,
+              voice_alias: guy.alias,
+              parameters: {
+                rate_percent: 5,
+                pitch_semitones: 2,
+                volume_percent: 80,
+                style: null
+              }
+            }
+          ]
+        }
+      ]
+    });
+    const first = deferred<AdminSpeechPreviewResponse>();
+    const preview = vi.mocked(api.speech.preview);
+    preview
+      .mockImplementationOnce(() => first.promise)
+      .mockResolvedValueOnce(result("guy"));
+
+    mount(false);
+    const panel = await screen.findByRole("region", {
+      name: "词形推荐 分组配置"
+    });
+    const audition = screen.getByRole("region", { name: "音色试听" });
+    const input = within(audition).getByLabelText("共用试听文本");
+    const uk = within(panel).getByRole("button", { name: "试听英式 推荐" });
+    const us = within(panel).getByRole("button", { name: "试听美式 推荐" });
+    expect(screen.getByRole("heading", { name: "分组配音" })).toAppearBefore(
+      audition
+    );
+    expect(audition).toAppearBefore(panel);
+    expect(within(audition).queryByLabelText(/试听播放器/)).toBeNull();
+
+    fireEvent.change(input, { target: { value: "Compare both voices." } });
+    fireEvent.click(uk);
+    fireEvent.click(us);
+    expect(preview.mock.calls.map(([payload]) => payload)).toEqual([
+      {
+        content: { version: 2, text: "Compare both voices.", annotations: [] },
+        voice_alias: sonia.alias,
+        rate_percent: -10,
+        pitch_semitones: 0
+      },
+      {
+        content: { version: 2, text: "Compare both voices.", annotations: [] },
+        voice_alias: guy.alias,
+        rate_percent: 5,
+        pitch_semitones: 2,
+        volume_percent: 80
+      }
+    ]);
+    expect(preview.mock.calls[0]![1]?.aborted).toBe(true);
+    const player = await within(audition).findByLabelText("Guy 试听播放器");
+    expect(input).toAppearBefore(player);
+    await act(async () => first.resolve(result("old-sonia")));
+    expect(player).toBeVisible();
+    expect(within(audition).queryByLabelText("Sonia 试听播放器")).toBeNull();
+
+    fireEvent.change(input, { target: { value: "   " } });
+    expect(uk).toBeDisabled();
+    expect(us).toBeDisabled();
+    expect(player).not.toBeInTheDocument();
+    fireEvent.change(input, { target: { value: "a".repeat(501) } });
+    expect(uk).toBeDisabled();
+    expect(us).toBeDisabled();
   });
 
   it("音色库加入推荐后切回工作台，完整草稿仍在且没有提前写入服务器", async () => {
