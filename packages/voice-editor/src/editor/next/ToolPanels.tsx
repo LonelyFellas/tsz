@@ -651,7 +651,7 @@ export interface UploadPanelProps {
   downloadingAssetId?: string;
   /** 试听失败的说明；只在这块面板里显示。 */
   playbackMessage?: string;
-  genderUpdatePending?: boolean;
+  genderUpdateAssetId?: string;
   genderUpdateMessage?: string;
 }
 
@@ -685,7 +685,7 @@ export function UploadPanel({
   onPlayAsset,
   playingAssetId,
   playbackMessage,
-  genderUpdatePending,
+  genderUpdateAssetId,
   downloadingAssetId,
   genderUpdateMessage
 }: UploadPanelProps) {
@@ -697,7 +697,10 @@ export function UploadPanel({
     (asset) =>
       speechAccentGroup(asset.locale) === speechAccentGroup(upload.locale)
   );
-  const uploadGender = currentAsset?.gender ?? upload.gender;
+  const uploadGender =
+    currentAsset && currentAsset.id !== genderUpdateAssetId
+      ? currentAsset.gender
+      : upload.gender;
   const canAdd =
     available &&
     uploadAllowed &&
@@ -767,7 +770,10 @@ export function UploadPanel({
           aria-label={t("upload_audio_gender")}
           value={uploadGender}
           disabled={
-            readOnly || !available || !uploadAllowed || genderUpdatePending
+            readOnly ||
+            !available ||
+            !uploadAllowed ||
+            genderUpdateAssetId !== undefined
           }
           onChange={(event) => {
             const gender = event.target.value as AudioAssetGender;

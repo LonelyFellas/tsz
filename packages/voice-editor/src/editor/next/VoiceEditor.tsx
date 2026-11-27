@@ -3837,7 +3837,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
             playingAssetId={playingAssetId}
             downloadingAssetId={downloadingAssetId}
             playbackMessage={playbackMessage}
-            genderUpdatePending={Boolean(genderUpdateAssetId)}
+            genderUpdateAssetId={genderUpdateAssetId}
             genderUpdateMessage={genderUpdateMessage}
           />
           {assetReview && (
@@ -4056,7 +4056,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                     playingAssetId={playingAssetId}
                     downloadingAssetId={downloadingAssetId}
                     playbackMessage={playbackMessage}
-                    genderUpdatePending={genderUpdateAssetId !== undefined}
+                    genderUpdateAssetId={genderUpdateAssetId}
                     genderUpdateMessage={genderUpdateMessage}
                   />
                   {assetReview && (
