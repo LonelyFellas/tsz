@@ -292,3 +292,35 @@ it("未保存的正文和配音变更不预览旧录音，原草稿绑定保留�
   act(() => result.current.update(audioSource, audioSource.draft.variants[0]!));
   expect(variant().voice_profile?.voices[0]!.audio_asset_id).toBe("old-audio");
 });
+
+it("停用配音时仅保留仍被引用的例句待补键", async () => {
+  const key = "test-pending-audio-references";
+  localStorage.setItem(
+    key,
+    JSON.stringify(["removed:en-GB", "retained:en-US"])
+  );
+  try {
+    const word: NextDraft = {
+      schema_version: 1,
+      headword: "centre",
+      forms: [],
+      senses: [
+        {
+          id: "sense",
+          definitions: [],
+          equivalents: [],
+          sentence_ids: ["retained"]
+        }
+      ]
+    };
+    const { result } = renderHook(() =>
+      useSentenceDrafts([], word, "zh-Hans", key)
+    );
+    expect(result.current.audioAvailable).toBe(false);
+    const saved = await result.current.prepare(false);
+    act(() => result.current.reset(saved.pendingAudio));
+    expect(JSON.parse(localStorage.getItem(key)!)).toEqual(["retained:en-US"]);
+  } finally {
+    localStorage.removeItem(key);
+  }
+});

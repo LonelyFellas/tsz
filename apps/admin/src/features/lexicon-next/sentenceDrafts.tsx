@@ -200,8 +200,8 @@ export function useSentenceDrafts(
       ),
     [allBase, resources]
   );
-  const refs = word.senses.flatMap((v) => v.sentence_ids ?? []);
-  const changes = sentenceChanges(allBase, drafts, refs, medium);
+  const refs = new Set(word.senses.flatMap((v) => v.sentence_ids ?? []));
+  const changes = sentenceChanges(allBase, drafts, [...refs], medium);
   const [pendingAudio, setPendingAudio] = useState<string[]>(() => {
     try {
       const keys = JSON.parse(
@@ -219,7 +219,7 @@ export function useSentenceDrafts(
   const audioQueue = [...changes];
   const changedKeys = new Set(changes.map(audioKey));
   if (pendingKeys.size)
-    for (const id of new Set(refs)) {
+    for (const id of refs) {
       for (const variant of resources[id]?.draft.variants ?? []) {
         const key = `${id}:${variant.locale}`;
         if (pendingKeys.has(key) && !changedKeys.has(key))
@@ -323,7 +323,13 @@ export function useSentenceDrafts(
     async prepare(retryPending: boolean) {
       const error = draftSentenceError(latest.current);
       if (error) throw new Error(error);
-      if (!audioAvailable) return { changes: latest.current, pendingAudio };
+      if (!audioAvailable)
+        return {
+          changes: latest.current,
+          pendingAudio: pendingAudio.filter((key) =>
+            refs.has(key.slice(0, key.lastIndexOf(":")))
+          )
+        };
       const queue = retryPending ? audioQueue : changes;
       for (const [index, change] of queue.entries()) {
         const task = prepareTasks.current.get(audioKey(change));
