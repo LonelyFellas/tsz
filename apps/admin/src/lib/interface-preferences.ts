@@ -30,3 +30,11 @@ export const interfacePreferences = createInterfacePreferences({
   getStorage: () => window.localStorage,
   browserLanguages: () => navigator.languages
 });
+
+export function refreshAdminProfileAndInterfacePreferences() {
+  if (!authRuntime.tokens.getToken()) return interfacePreferences.refresh();
+  const accountPreference = authRuntime
+    .refreshProfile()
+    .then(() => useAuthStore.getState().profile?.preferences?.interface_locale);
+  return interfacePreferences.refresh(accountPreference);
+}

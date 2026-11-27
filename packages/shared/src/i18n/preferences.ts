@@ -117,11 +117,22 @@ export function createInterfacePreferences({
     return directory.default_locale;
   }
 
-  async function refresh(): Promise<void> {
+  async function refresh(
+    accountPreference?: ReturnType<typeof read>
+  ): Promise<void> {
     const owner = sessionKey();
+    // 调用方可提前请求账号资料，目录等待或失败时仍需接住读取错误。
+    void accountPreference?.catch(() => undefined);
     if (pending?.owner === owner) {
-      await pending.promise.catch(() => undefined);
-      return refresh();
+      const save = pending;
+      const saved = await save.promise.then(
+        () => true,
+        () => false
+      );
+      if (!accountPreference) return refresh();
+      if (!saved || sessionKey() !== owner || readEpoch !== save.epoch) return;
+      // 用已确认的保存结果，避免保存前发出的账号读取覆盖它。
+      return refresh(Promise.resolve(snapshot.preference));
     }
     const epoch = ++readEpoch;
     const current = () => sessionKey() === owner && epoch === readEpoch;
@@ -146,7 +157,7 @@ export function createInterfacePreferences({
               locale === getPublicLocale?.() && supported.includes(locale)
           );
       const preference = accountId
-        ? ((await read()) ?? null)
+        ? ((await (accountPreference ?? read())) ?? null)
         : (cached(null) ?? null);
       if (!current()) return;
       // read 的 undefined 仅兼容旧 admin profile 缺字段；其他值仍须校验。

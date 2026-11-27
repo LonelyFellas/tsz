@@ -1,5 +1,11 @@
-import { useLayoutEffect } from "react";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { useLayoutEffect, type ReactNode } from "react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor
+} from "@testing-library/react";
 import {
   createMemoryRouter,
   MemoryRouter,
@@ -8,10 +14,11 @@ import {
   Routes
 } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { AdminProfile } from "@tsz/types";
+import type { AdminProfile, UpdateAdminPreferencesResponse } from "@tsz/types";
 import { InterfacePreferencesProvider } from "@tsz/shared/i18n/react";
 import { api, authRuntime, useAuthStore } from "@/lib/auth";
 import { interfacePreferences } from "@/lib/interface-preferences";
+import { InterfaceLanguage } from "@/features/settings/InterfaceLanguage";
 import { RootProviders } from "@/providers";
 import { RouteErrorPage } from "@/pages/RouteError";
 import { adminShellResources, useAdminTranslation } from "./index";
@@ -56,7 +63,7 @@ function Probe() {
     </>
   );
 }
-function Harness() {
+function Harness({ page = <Probe /> }: { page?: ReactNode }) {
   const sessionKey = useAuthStore(() => interfacePreferences.sessionKey());
   return (
     <InterfacePreferencesProvider
@@ -68,7 +75,7 @@ function Harness() {
       <MemoryRouter>
         <Routes>
           <Route element={<RootProviders />}>
-            <Route path="/" element={<Probe />} />
+            <Route path="/" element={page} />
           </Route>
         </Routes>
       </MemoryRouter>
@@ -77,8 +84,12 @@ function Harness() {
 }
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((done) => (resolve = done));
-  return { promise, resolve };
+  let reject!: (reason: Error) => void;
+  const promise = new Promise<T>((done, fail) => {
+    resolve = done;
+    reject = fail;
+  });
+  return { promise, resolve, reject };
 }
 beforeEach(async () => {
   frames.length = 0;
@@ -117,6 +128,109 @@ it("大刷新等待身份和账号偏好，首个业务画面直接使用英文"
   expect(new Set(frames)).toEqual(new Set(["en-US"]));
   expect(document.documentElement.lang).toBe("en-US");
 });
+
+it("同一次回焦共用 profile，语言目录未返回时仍能在下次回焦同步权限", async () => {
+  vi.mocked(api.profile).mockRestore();
+  authRuntime.persistSession({ access_token: "locale-focus", expires_in: 900 });
+  useAuthStore.getState().setProfile(profile);
+  const fetchMock = vi.mocked(fetch);
+  fetchMock.mockImplementation(async (url) =>
+    Response.json(String(url).endsWith("/admin/profile") ? profile : directory)
+  );
+  render(<Harness />);
+  await screen.findByRole("heading");
+  expect(document.documentElement.lang).toBe("en-US");
+
+  const capabilities = deferred<void>();
+  let permissions = ["words.access"];
+  const profileRequests = () =>
+    fetchMock.mock.calls.filter(([url]) =>
+      String(url).endsWith("/admin/profile")
+    );
+  fetchMock.mockClear();
+  fetchMock.mockImplementation(async (url) =>
+    String(url).endsWith("/admin/profile")
+      ? Response.json({
+          ...profile,
+          permission_version: permissions.length + 1,
+          permissions,
+          preferences: { dialect: "uk", interface_locale: "zh-Hans" }
+        })
+      : capabilities.promise.then(() => Response.json(directory))
+  );
+  await act(async () => {
+    window.dispatchEvent(new Event("focus"));
+  });
+  expect(useAuthStore.getState().profile?.permissions).toEqual([
+    "words.access"
+  ]);
+  vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
+  await act(async () => {
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  expect(profileRequests()).toHaveLength(1);
+
+  permissions = ["words.access", "words.edit"];
+  await act(async () => {
+    window.dispatchEvent(new Event("blur"));
+    document.dispatchEvent(new Event("visibilitychange"));
+    window.dispatchEvent(new Event("focus"));
+  });
+  expect(useAuthStore.getState().profile?.permissions).toEqual(permissions);
+  await act(async () => capabilities.resolve());
+  expect(document.documentElement.lang).toBe("zh-Hans");
+  expect(profileRequests()).toHaveLength(2);
+});
+
+it.each(["成功", "响应丢失"])(
+  "保存语言期间回焦仍会更新权限，保存%s后采用服务端语言",
+  async (outcome) => {
+    authRuntime.persistSession({
+      access_token: "locale-focus",
+      expires_in: 900
+    });
+    useAuthStore.getState().setProfile(profile);
+    render(<Harness page={<InterfaceLanguage />} />);
+    const select = await screen.findByRole("combobox");
+    await waitFor(() => expect(select).toBeEnabled());
+    expect(document.documentElement.lang).toBe("en-US");
+
+    const saved = deferred<UpdateAdminPreferencesResponse>();
+    const update = vi
+      .spyOn(api, "updateProfilePreferences")
+      .mockReturnValue(saved.promise);
+    fireEvent.keyDown(select, { key: "ArrowDown", keyCode: 40 });
+    fireEvent.click(await screen.findByText("简体中文"));
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+
+    const refreshed = {
+      ...profile,
+      permission_version: 2,
+      permissions: ["words.access"]
+    };
+    vi.mocked(api.profile).mockClear().mockResolvedValue(refreshed);
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+    });
+    expect(useAuthStore.getState().profile?.permissions).toEqual([
+      "words.access"
+    ]);
+
+    const preferences = { dialect: "uk", interface_locale: "zh-Hans" } as const;
+    await act(async () => {
+      if (outcome === "成功") saved.resolve({ preferences });
+      else {
+        vi.mocked(api.profile).mockResolvedValue({ ...refreshed, preferences });
+        saved.reject(new TypeError("response lost"));
+      }
+    });
+    await waitFor(() => expect(document.documentElement.lang).toBe("zh-Hans"));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(vi.mocked(api.profile)).toHaveBeenCalledTimes(
+      outcome === "成功" ? 1 : 2
+    );
+  }
+);
 
 it("目录后台刷新不卸载草稿，换账号在新语言确认前隐藏旧界面", async () => {
   useAuthStore.getState().setProfile(profile);
