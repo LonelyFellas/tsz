@@ -127,11 +127,13 @@ async function applyAudioTasks() {
 function Host({
   initial = fixture(),
   paused = false,
-  onAudioTaskRetry
+  onAudioTaskRetry,
+  rowOnly = false
 }: {
   initial?: SharedFormsStepContentV3;
   paused?: boolean;
   onAudioTaskRetry?: () => void;
+  rowOnly?: boolean;
 }) {
   const [forms, setForms] = useState(initial);
   return (
@@ -142,6 +144,7 @@ function Host({
         <V3FormsAudioTasks
           forms={forms}
           paused={paused}
+          rowOnly={rowOnly}
           onChange={setForms}
           onAudioTaskRetry={onAudioTaskRetry}
         />
@@ -194,6 +197,371 @@ beforeEach(() => {
     );
   speech.synthesize.mockReset();
 });
+
+it.each([
+  { rowOnly: false, withStaleVoice: false },
+  { rowOnly: true, withStaleVoice: false },
+  { rowOnly: false, withStaleVoice: true },
+  { rowOnly: true, withStaleVoice: true }
+])(
+  "独立英美词形只解析各自口音（弹窗任务=$rowOnly，异侧旧音色=$withStaleVoice）",
+  async ({ rowOnly, withStaleVoice }) => {
+    const forms = fixture();
+    const content = forms.contents[0]!;
+    const regions = content.regional_variants;
+    if (regions.mode !== "common") throw new Error("expected common fixture");
+    const variant = (side: "uk" | "us", spelling: string) => ({
+      ...regions.common,
+      id: side,
+      spelling,
+      pronunciations: [
+        {
+          ...regions.common.pronunciations[0]!,
+          id: `pronunciation-${side}`,
+          dict_phonetic: spelling,
+          synthesis: {
+            ...regions.common.pronunciations[0]!.synthesis!,
+            uk: { ipa: "", ups: "" },
+            us: { ipa: "", ups: "" }
+          },
+          voice_profile: {
+            dubbing: {
+              area: "word" as const,
+              uk: { mode: "local" as const },
+              us: { mode: "local" as const }
+            },
+            voices: [
+              {
+                ...voices[side === "uk" ? 0 : 1]!,
+                ...(withStaleVoice
+                  ? {
+                      accent: side === "uk" ? ("gb" as const) : ("us" as const)
+                    }
+                  : {})
+              },
+              ...(withStaleVoice
+                ? [
+                    {
+                      voice_id: `stale-${side}`,
+                      accent: side === "uk" ? ("us" as const) : ("gb" as const),
+                      enabled: true,
+                      rate_percent: 0
+                    }
+                  ]
+                : [])
+            ]
+          }
+        }
+      ]
+    });
+    content.dialect_rules.spelling_mode = "distinguish";
+    content.regional_variants = {
+      mode: "uk_us",
+      uk: variant("uk", "colour"),
+      us: variant("us", "color")
+    };
+    speech.catalog.mockRejectedValue(new Error("目录暂不可用"));
+    speech.resolve.mockImplementation(async ({ profile, accent }) => {
+      const selected = profile.voices.filter(
+        (setting: VoiceSettingV3) =>
+          setting.enabled &&
+          setting.locale === (accent === "gb" ? "en-GB" : "en-US")
+      );
+      if (!selected.length) throw new Error("此口音未配置音色");
+      return { voices: selected };
+    });
+    render(<Host initial={forms} rowOnly={rowOnly} />);
+    await applyAudioTasks();
+
+    expect(speech.catalog).toHaveBeenCalledTimes(withStaleVoice ? 0 : 1);
+    expect(
+      speech.resolve.mock.calls.map(([{ content, accent }]) => [
+        content.text,
+        accent
+      ])
+    ).toEqual([
+      ["colour", "gb"],
+      ["color", "us"]
+    ]);
+    expect(speech.generate).toHaveBeenCalledTimes(2);
+    expect(screen.getByTestId("saved-forms")).toHaveTextContent(
+      "formal-row-en-GB"
+    );
+    expect(screen.getByTestId("saved-forms")).toHaveTextContent(
+      "formal-row-en-US"
+    );
+    expect(screen.queryByText("此口音未配置音色")).toBeNull();
+  }
+);
+
+it.each([
+  { name: "单侧启用并复用资产", enabled: [true, false], accents: ["gb"] },
+  { name: "双侧启用且都可用", enabled: [true, true], accents: ["gb", "us"] },
+  {
+    name: "必需美式不可用",
+    enabled: [true, true],
+    accents: ["gb", "us"],
+    unavailable: true
+  },
+  { name: "显式局部池未启用配音", enabled: [false, false], accents: [] }
+])("共享词形逐侧解析 · $name", async ({ enabled, accents, unavailable }) => {
+  const forms = fixture();
+  const regions = forms.contents[0]!.regional_variants;
+  if (regions.mode !== "common") throw new Error("expected common fixture");
+  const row = regions.common.pronunciations[0]!;
+  const profile = {
+    dubbing: {
+      area: "word" as const,
+      uk: { mode: "local" as const },
+      us: { mode: "local" as const }
+    },
+    voices: [
+      { ...voices[0]!, enabled: enabled[0]!, audio_asset_id: "stored-uk" },
+      { ...voices[1]!, enabled: enabled[1]! }
+    ]
+  };
+  row.voice_profile = profile;
+  speech.resolve.mockImplementation(async ({ accent }) => {
+    const selected = profile.voices.filter(
+      (voice) =>
+        voice.enabled && voice.locale === (accent === "gb" ? "en-GB" : "en-US")
+    );
+    if (!selected.length || (accent === "us" && unavailable))
+      throw new Error("当前口音不可用");
+    return { voices: selected };
+  });
+  render(<Host initial={forms} rowOnly />);
+  await act(async () => {
+    expect(await [...tasks.values()][0]!()).toBe(!unavailable);
+  });
+  expect(speech.resolve.mock.calls.map(([{ accent }]) => accent)).toEqual(
+    accents
+  );
+  const requiresNewAsset = enabled[1] && !unavailable;
+  expect(speech.generate).toHaveBeenCalledTimes(requiresNewAsset ? 1 : 0);
+  if (requiresNewAsset)
+    expect(speech.generate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        setting: expect.objectContaining({ locale: "en-US" })
+      })
+    );
+  const saved = JSON.parse(screen.getByTestId("saved-forms").textContent!)
+    .contents[0].regional_variants.common.pronunciations[0].voice_profile;
+  expect(saved).toEqual(
+    requiresNewAsset
+      ? {
+          ...profile,
+          voices: [
+            profile.voices[0],
+            { ...profile.voices[1], audio_asset_id: "formal-row-en-US" }
+          ]
+        }
+      : profile
+  );
+  if (unavailable) expect(screen.getByText("当前口音不可用")).toBeVisible();
+  else expect(screen.queryByText("当前口音不可用")).toBeNull();
+});
+
+it.each([
+  { dialect: "common", catalogUnavailable: false },
+  { dialect: "uk", catalogUnavailable: false },
+  { dialect: "uk", catalogUnavailable: true }
+] as const)(
+  "缺少已存口音时解析人工归类的 $dialect 词形（目录故障=$catalogUnavailable）",
+  async ({ dialect, catalogUnavailable }) => {
+    const forms = fixture();
+    const content = forms.contents[0]!;
+    const regions = content.regional_variants;
+    if (regions.mode !== "common") throw new Error("expected common fixture");
+    const row = regions.common.pronunciations[0]!;
+    const reassigned = { ...voices[1]!, voice_id: "reassigned" };
+    row.voice_profile = {
+      dubbing: { area: "word", uk: { mode: "local" }, us: { mode: "local" } },
+      voices: [reassigned]
+    };
+    if (dialect === "uk") {
+      content.dialect_rules.spelling_mode = "distinguish";
+      content.regional_variants = {
+        mode: "uk_us",
+        uk: regions.common,
+        us: { ...regions.common, id: "empty-us", pronunciations: [] }
+      };
+    }
+    if (catalogUnavailable)
+      speech.catalog.mockRejectedValue(new Error("目录暂不可用"));
+    else
+      speech.catalog.mockResolvedValue([
+        { id: reassigned.voice_id, locale: "en-US", accent: "gb" }
+      ]);
+    speech.resolve.mockImplementation(async ({ profile, accent }) => {
+      if (
+        accent !== "gb" ||
+        profile.voices[0].locale !== "en-US" ||
+        (!catalogUnavailable && profile.voices[0].accent !== "gb")
+      )
+        throw new Error("口音未配置");
+      return { voices: [{ ...reassigned, accent: "gb" }] };
+    });
+    render(<Host initial={forms} rowOnly />);
+    await applyAudioTasks();
+    expect(speech.resolve.mock.calls.map(([{ accent }]) => accent)).toEqual([
+      "gb"
+    ]);
+    expect(speech.generate).toHaveBeenCalledOnce();
+    expect(speech.generate).toHaveBeenCalledWith(
+      expect.objectContaining({ setting: { ...reassigned, accent: "gb" } })
+    );
+  }
+);
+
+it("共享词形按旧地区解析失败后，重试读取恢复的目录并生成有效口音", async () => {
+  const forms = fixture();
+  const regions = forms.contents[0]!.regional_variants;
+  if (regions.mode !== "common") throw new Error("expected common fixture");
+  const reassigned = { ...voices[1]!, voice_id: "reassigned" };
+  regions.common.pronunciations[0]!.voice_profile = {
+    dubbing: { area: "word", uk: { mode: "local" }, us: { mode: "local" } },
+    voices: [reassigned]
+  };
+  speech.catalog.mockRejectedValueOnce(new Error("目录暂不可用"));
+  speech.catalog.mockResolvedValue([
+    { id: reassigned.voice_id, locale: "en-US", accent: "gb" }
+  ]);
+  speech.resolve.mockImplementation(async ({ accent }) => {
+    if (accent !== "gb") throw new Error("旧口音不可用");
+    return { voices: [{ ...reassigned, accent: "gb" }] };
+  });
+  render(<Host initial={forms} rowOnly />);
+  await applyAudioTasks();
+  expect(screen.getByText("旧口音不可用")).toBeVisible();
+  expect(speech.generate).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "重试生成音频" }));
+  await waitFor(() => expect(speech.generate).toHaveBeenCalledOnce());
+  expect(speech.resolve.mock.calls.map(([{ accent }]) => accent)).toEqual([
+    "us",
+    "gb"
+  ]);
+  expect(speech.catalog).toHaveBeenCalledTimes(2);
+});
+
+it.each(["missing", "none", "stored-none"] as const)(
+  "历史音色的目录归类为 %s 时保留已解析的英式音频",
+  async (catalogAccent) => {
+    const forms = fixture();
+    const regions = forms.contents[0]!.regional_variants;
+    if (regions.mode !== "common") throw new Error("expected common fixture");
+    const { locale: _locale, ...unknown } = voices[1]!;
+    const disabledAccent =
+      catalogAccent === "stored-none"
+        ? { ...unknown, accent: "none" as const }
+        : unknown;
+    const british = { ...voices[0]!, accent: "gb" as const };
+    const profile = {
+      dubbing: {
+        area: "word" as const,
+        uk: { mode: "local" as const },
+        us: { mode: "local" as const }
+      },
+      voices: [british, disabledAccent]
+    };
+    regions.common.pronunciations[0]!.voice_profile = profile;
+    if (catalogAccent === "stored-none")
+      speech.catalog.mockRejectedValue(new Error("目录暂不可用"));
+    else
+      speech.catalog.mockResolvedValue(
+        catalogAccent === "none"
+          ? [{ id: unknown.voice_id, locale: "en-US", accent: "none" }]
+          : []
+      );
+    speech.resolve.mockImplementation(async ({ accent }) => {
+      if (accent === "us") throw new Error("历史音色不可用");
+      return { voices: [british] };
+    });
+    render(<Host initial={forms} rowOnly />);
+    await applyAudioTasks();
+    if (catalogAccent === "stored-none")
+      expect(speech.catalog).not.toHaveBeenCalled();
+    expect(speech.resolve.mock.calls.map(([{ accent }]) => accent)).toEqual(
+      catalogAccent === "missing" ? ["gb", "us"] : ["gb"]
+    );
+    expect(speech.generate).toHaveBeenCalledOnce();
+    expect(speech.generate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        setting: expect.objectContaining({ locale: "en-GB" })
+      })
+    );
+    expect(screen.queryByText("历史音色不可用")).toBeNull();
+    const saved = JSON.parse(screen.getByTestId("saved-forms").textContent!)
+      .contents[0].regional_variants.common.pronunciations[0].voice_profile;
+    expect(saved.voices[1]).toEqual(
+      catalogAccent === "none"
+        ? { ...unknown, locale: "en-US", accent: "none" }
+        : disabledAccent
+    );
+  }
+);
+
+it.each([
+  { alphabet: "ipa", explicitUs: false },
+  { alphabet: "ups", explicitUs: false },
+  { alphabet: "ups", explicitUs: true }
+] as const)(
+  "共享词形校验 $alphabet 的原生音色（显式选用美式=$explicitUs）",
+  async ({ alphabet, explicitUs }) => {
+    const forms = fixture();
+    const regions = forms.contents[0]!.regional_variants;
+    if (regions.mode !== "common") throw new Error("expected common fixture");
+    const row = regions.common.pronunciations[0]!;
+    row.synthesis!.alphabet = alphabet;
+    row.synthesis!.uk!.ups = "HH AH L OW";
+    row.synthesis!.us!.ups = "HH EH L OW";
+    if (explicitUs) row.synthesis!.us!.source = alphabet;
+    row.voice_profile = {
+      dubbing: {
+        area: "word",
+        uk: { mode: "local" },
+        us: { mode: "local" }
+      },
+      voices: [
+        { ...voices[0]!, audio_asset_id: "stored-uk" },
+        { ...voices[1]!, accent: "gb", audio_asset_id: "stored-assigned-uk" }
+      ]
+    };
+    speech.resolve.mockImplementation(async ({ profile, accent, source }) => {
+      const selected = profile.voices.filter(
+        (voice: VoiceSettingV3) =>
+          voice.enabled &&
+          (voice.accent ?? (voice.locale === "en-GB" ? "gb" : "us")) ===
+            accent &&
+          (!source || source.phoneme_locale === voice.locale)
+      );
+      if (!selected.length) throw new Error("此口音无原生音色");
+      return { voices: selected };
+    });
+    render(<Host initial={forms} />);
+    const results: boolean[] = [];
+    await act(async () => {
+      for (const wait of [...tasks.values()]) results.push(await wait());
+    });
+    expect(results.includes(false)).toBe(explicitUs);
+    expect(speech.resolve.mock.calls.map(([{ accent }]) => accent)).toEqual(
+      explicitUs ? ["gb", "us"] : ["gb", "gb"]
+    );
+    if (explicitUs) expect(screen.getByText("此口音无原生音色")).toBeVisible();
+    expect(speech.generate).toHaveBeenCalledOnce();
+    expect(speech.generate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: expect.objectContaining({
+          kind: "phoneme",
+          alphabet,
+          phoneme_locale: "en-GB"
+        }),
+        setting: expect.objectContaining({ locale: "en-GB" })
+      }),
+      expect.any(AbortSignal)
+    );
+  }
+);
 
 it("未配置音标只在保存时生成当前推荐并保留继承，浏览不生成", async () => {
   const initial = fixture();
@@ -358,37 +726,40 @@ it("内容弹窗打开时暂停汇总表任务，关闭后仍等待保存补齐�
   await waitFor(() => expect(speech.generate).toHaveBeenCalledTimes(4));
 });
 
-it("旧勾选缺少地区时先读取目录，快速保存也等待地区解析和正式音频", async () => {
-  const forms = fixture();
-  const variant = forms.contents[0]!.regional_variants;
-  if (variant.mode !== "common") throw new Error("expected common fixture");
-  variant.common.pronunciations[0]!.voice_profile = {
-    voices: voices.map(({ locale: _locale, ...setting }) => setting)
-  };
-  let finish!: (value: unknown) => void;
-  speech.catalog.mockImplementationOnce(
-    () =>
-      new Promise((resolve) => {
-        finish = resolve;
-      })
-  );
-  render(<Host initial={forms} />);
-  expect(speech.generate).not.toHaveBeenCalled();
-  const waiting = tasks.get("forms:audio-catalog")!();
-  await act(async () => {
-    finish(
-      voices.map((setting) => ({
-        id: setting.voice_id,
-        locale: setting.locale
-      }))
+it.each([false, true])(
+  "旧勾选缺少地区时快速保存也等待地区解析和正式音频（弹窗任务=%s）",
+  async (rowOnly) => {
+    const forms = fixture();
+    const variant = forms.contents[0]!.regional_variants;
+    if (variant.mode !== "common") throw new Error("expected common fixture");
+    variant.common.pronunciations[0]!.voice_profile = {
+      voices: voices.map(({ locale: _locale, ...setting }) => setting)
+    };
+    let finish!: (value: unknown) => void;
+    speech.catalog.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        })
     );
-    expect(await waiting).toBe(true);
-  });
-  expect(speech.generate).toHaveBeenCalledTimes(4);
-  expect(screen.getByTestId("saved-forms")).toHaveTextContent(
-    "formal-phoneme-en-US"
-  );
-});
+    render(<Host initial={forms} rowOnly={rowOnly} />);
+    expect(speech.generate).not.toHaveBeenCalled();
+    const waiting = tasks.get("forms:audio-catalog")!();
+    await act(async () => {
+      finish(
+        voices.map((setting) => ({
+          id: setting.voice_id,
+          locale: setting.locale
+        }))
+      );
+      expect(await waiting).toBe(true);
+    });
+    expect(speech.generate).toHaveBeenCalledTimes(rowOnly ? 2 : 4);
+    expect(screen.getByTestId("saved-forms")).toHaveTextContent(
+      "formal-row-en-US"
+    );
+  }
+);
 
 it("旧配置的目录加载失败保留草稿、阻止保存，重试后继续生成", async () => {
   const forms = fixture();
@@ -636,6 +1007,9 @@ it("无显式来源的旧拼写单侧池不要求缺少音色的另一侧解析�
   await act(async () => {
     for (const wait of [...tasks.values()]) expect(await wait()).toBe(true);
   });
+  expect(speech.resolve.mock.calls.map(([{ accent }]) => accent)).toEqual([
+    "gb"
+  ]);
   expect(speech.generate).not.toHaveBeenCalled();
   expect(screen.queryByText("此口音未配置音色")).toBeNull();
   const saved = JSON.parse(screen.getByTestId("saved-forms").textContent!)

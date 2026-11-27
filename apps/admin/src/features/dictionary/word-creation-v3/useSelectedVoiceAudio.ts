@@ -34,6 +34,11 @@ function enqueue<T>(run: () => Promise<T>): Promise<T> {
   return result;
 }
 
+const resolveAccents = [
+  { locale: "en-GB", side: "uk", accent: "gb" },
+  { locale: "en-US", side: "us", accent: "us" }
+] as const;
+
 function inScope(
   setting: VoiceSettingV3,
   profile: VoiceProfileV3,
@@ -76,8 +81,10 @@ function selectionSignature(
   activeLocales?: readonly PhonemeLocaleV3[],
   requiredLocales?: readonly PhonemeLocaleV3[]
 ) {
-  const sides = (["uk", "us"] as const).filter(
-    (side) => !locale || speechAccentGroup(locale) === side
+  const sides = resolveAccents.filter(
+    (scope) =>
+      (!locale || speechAccentGroup(locale) === scope.side) &&
+      (!activeLocales || activeLocales.includes(scope.locale))
   );
   return v3ContentFingerprint([
     sourceKey,
@@ -86,13 +93,15 @@ function selectionSignature(
     requiredLocales,
     profile?.dubbing && [
       profile.dubbing.area,
-      sides.map((side) => profile.dubbing![side].mode)
+      sides.map(({ side }) => profile.dubbing![side].mode)
     ],
     profile?.voices
       .filter(
         (setting) =>
           setting.enabled &&
-          inScope(setting, profile, locale, activeLocales) &&
+          (inScope(setting, profile, locale, activeLocales) ||
+            (activeLocales?.length &&
+              !speechAccentGroup(setting.locale, setting.accent))) &&
           !inheritedSetting(setting, profile, locale)
       )
       .map((setting) => [voiceSettingKey(setting), voiceEffectKey(setting)])
@@ -150,7 +159,10 @@ export function useSelectedVoiceAudio({
   const audioTasks = useVoiceAudioTasks();
   const inContentDialog = useContext(VoiceAudioTasksContext) !== null;
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<unknown>();
+  const [failure, setFailure] = useState<{
+    signature: string;
+    error: unknown;
+  }>();
   const requests = useRef(new Map<string, { input: string; id: string }>());
   const running = useRef<{
     signature: string;
@@ -244,11 +256,12 @@ export function useSelectedVoiceAudio({
       flushSync(() => latest.current.onChange?.(next));
     };
     setBusy(true);
-    setError(undefined);
+    setFailure(undefined);
     const result = (async () => {
       try {
         await Promise.resolve();
-        let stored = profile;
+        if (!isCurrent()) return resumeCurrent();
+        let stored = latest.current.profile ?? profile;
         if (lastSource.current.target === target) {
           stored = {
             ...stored,
@@ -279,24 +292,50 @@ export function useSelectedVoiceAudio({
               return next;
             })
           };
-          if (JSON.stringify(stored) !== JSON.stringify(profile))
+          if (JSON.stringify(stored) !== JSON.stringify(latest.current.profile))
             commit(stored);
         }
         lastSource.current = { target, sourceKeys, effects };
+        const profileBeforeResolve = latest.current.profile;
+        const hasExplicitScope =
+          activeLocales !== undefined || requiredLocales !== undefined;
         let resolved = stored.voices;
         if (adapter.resolveVoices) {
-          const accents = (["gb", "us"] as const).filter(
-            (accent) =>
-              !locale ||
-              (locale === "en-GB" ? accent === "gb" : accent === "us")
+          const selectedSides = new Set(
+            stored.voices
+              .filter((setting) => setting.enabled)
+              .map((setting) =>
+                speechAccentGroup(setting.locale, setting.accent)
+              )
           );
+          const accents = resolveAccents
+            .filter(
+              (scope) =>
+                (!locale ||
+                  scope.locale === (locale === "en-GB" ? "en-GB" : "en-US")) &&
+                (!activeLocales || activeLocales.includes(scope.locale))
+            )
+            .map((scope) => ({
+              ...scope,
+              required: hasExplicitScope
+                ? requiredLocales?.includes(scope.locale) ||
+                  stored.dubbing?.[scope.side].mode === "inherit" ||
+                  selectedSides.has(scope.side)
+                : !!stored.dubbing
+            }))
+            // 未归类的旧音色交给服务端解析；已知为空的局部池无需请求。
+            .filter(
+              (scope) =>
+                !hasExplicitScope ||
+                scope.required ||
+                selectedSides.has(undefined)
+            );
           const results = await Promise.allSettled(
-            accents.map((accent) =>
+            accents.map(({ accent, side }) =>
               adapter.resolveVoices!(
                 {
                   profile: stored,
-                  content:
-                    contentByAccent?.[accent === "gb" ? "uk" : "us"] ?? content,
+                  content: contentByAccent?.[side] ?? content,
                   accent
                 },
                 { signal: controller.signal }
@@ -309,25 +348,27 @@ export function useSelectedVoiceAudio({
           const failure = results.find(
             (result, index) =>
               result.status === "rejected" &&
-              (stored.dubbing ||
-                requiredLocales?.includes(
-                  accents[index] === "gb" ? "en-GB" : "en-US"
-                ) ||
-                (!resolved.length &&
-                  !stored.voices.some((setting) => setting.enabled)))
+              (accents[index]!.required ||
+                (!resolved.length && (hasExplicitScope || !selectedSides.size)))
           );
           if (failure?.status === "rejected") throw failure.reason;
         }
         if (!isCurrent()) return resumeCurrent();
+        if (latest.current.profile !== profileBeforeResolve)
+          stored = latest.current.profile ?? stored;
         const selected = retainResolvedAudio(resolved, stored.voices).filter(
           (setting) =>
             setting.enabled && inScope(setting, stored, locale, activeLocales)
         );
         const selectedKeys = new Set(selected.map(voiceSettingKey));
         for (const setting of stored.voices) {
+          const group = speechAccentGroup(setting.locale, setting.accent);
           if (
             setting.enabled &&
             inScope(setting, stored, locale, activeLocales) &&
+            (!hasExplicitScope ||
+              !adapter.resolveVoices ||
+              (group && (group !== "other" || !stored.dubbing))) &&
             !inheritedSetting(setting, stored, locale) &&
             !selectedKeys.has(voiceSettingKey(setting))
           ) {
@@ -426,9 +467,9 @@ export function useSelectedVoiceAudio({
           commit(stored);
         }
         return isCurrent() ? true : resumeCurrent();
-      } catch (failure) {
+      } catch (error) {
         if (isCurrent()) {
-          setError(failure);
+          setFailure({ signature: expectedSignature, error });
           return false;
         }
         return resumeCurrent();
@@ -458,12 +499,14 @@ export function useSelectedVoiceAudio({
   ]);
   useLayoutEffect(() => {
     ensureRef.current = ensure;
+    if (running.current && running.current.signature !== signature)
+      running.current.controller.abort();
     if (!enabled || !onChange || !waitForSave) return;
     audioTasks?.set(target, () => ensureRef.current());
     return () => {
       audioTasks?.delete(target);
     };
-  }, [audioTasks, enabled, onChange, target, ensure, waitForSave]);
+  }, [audioTasks, enabled, onChange, target, ensure, signature, waitForSave]);
   useEffect(() => {
     if (!enabled) {
       attempted.current = undefined;
@@ -493,5 +536,9 @@ export function useSelectedVoiceAudio({
     },
     []
   );
-  return { busy, error, retry: ensure };
+  return {
+    busy,
+    error: failure?.signature === signature ? failure.error : undefined,
+    retry: ensure
+  };
 }
