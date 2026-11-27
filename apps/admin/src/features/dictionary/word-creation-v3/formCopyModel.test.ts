@@ -353,54 +353,83 @@ describe("词形内容定向复制", () => {
     }
   });
 
-  it("同一口音已匹配的独立音素配置不占用共享拼写配置", () => {
-    const form = (id: number, name: string) =>
-      commonFormFixture({
-        id: uuidFromInt(id),
-        spelling: name,
-        pronunciations: [0, 1, 2].map((index) => {
-          const usesSpelling = index !== 2;
-          return pronunciationFixture({
-            id: uuidFromInt(id + index + 10),
-            synthesis: {
-              alphabet: "ipa",
-              ipa: "",
-              ups: "",
-              uk: usesSpelling
-                ? { source: "spelling", ipa: "", ups: "" }
-                : {
-                    source: "ipa",
-                    ipa: "test",
-                    ups: "",
-                    ipa_speech: speech(name, profile(`${name}-ipa`))
-                  },
-              us: { source: "none", ipa: "", ups: "" }
+  it.each(["match", "skip", "upload"] as const)(
+    "同一口音的独立配音和共享拼写各自处理（%s）",
+    (operation) => {
+      const form = (id: number, name: string, sharedReadings: number) =>
+        commonFormFixture({
+          id: uuidFromInt(id),
+          spelling: name,
+          pronunciations: Array.from(
+            { length: sharedReadings + 1 },
+            (_, index) => {
+              const usesSpelling = index < sharedReadings;
+              return pronunciationFixture({
+                id: uuidFromInt(id + index + 10),
+                style: usesSpelling ? "normal" : "citation",
+                synthesis: {
+                  alphabet: "ipa",
+                  ipa: "",
+                  ups: "",
+                  uk: usesSpelling
+                    ? { source: "spelling", ipa: "", ups: "" }
+                    : {
+                        source: "ipa",
+                        ipa: "test",
+                        ups: "",
+                        ipa_speech: speech(name, profile(`${name}-ipa`))
+                      },
+                  us: { source: "none", ipa: "", ups: "" }
+                }
+              });
             }
-          });
-        })
-      });
-    const { forms, sourceId, targetId } = setup(
-      form(500, "source"),
-      form(700, "target")
-    );
-    const source = variant(forms.contents[0]!);
-    source.spelling_speech = speech(
-      source.spelling,
-      profile("source-spelling")
-    );
-
-    const copied = variant(
-      applyFormCopy(forms, planFormCopy(forms, sourceId, targetId, "voices"))
-        .contents[1]!
-    );
-    expect(copied.spelling_speech?.voice_profile.voices[0]?.voice_id).toBe(
-      "source-spelling"
-    );
-    expect(
-      copied.pronunciations[2]!.synthesis?.uk?.ipa_speech?.voice_profile
-        .voices[0]?.voice_id
-    ).toBe("source-ipa");
-  });
+          )
+        });
+      const { forms, sourceId, targetId } = setup(
+        form(500, "source", 2),
+        form(700, "target", operation === "match" ? 2 : 3)
+      );
+      const source = variant(forms.contents[0]!);
+      const target = variant(forms.contents[1]!);
+      const fromReading = source.pronunciations.at(-1)!;
+      const targetReading = target.pronunciations.at(-1)!;
+      if (operation === "upload") {
+        fromReading.synthesis!.uk!.source = "upload";
+        fromReading.audio_assets = [recording("source-upload")];
+        targetReading.synthesis!.uk!.source = "upload";
+      }
+      source.spelling_speech = speech(
+        source.spelling,
+        profile("source-spelling")
+      );
+      const mapping =
+        operation === "match"
+          ? {}
+          : {
+              ...(operation === "skip"
+                ? { uk: { [targetReading.id]: null } }
+                : {}),
+              us: Object.fromEntries(
+                target.pronunciations.map(({ id }) => [id, null])
+              )
+            };
+      const plan = planFormCopy(forms, sourceId, targetId, "voices", mapping);
+      expect(plan.needsMapping).toBe(false);
+      const copied = variant(applyFormCopy(forms, plan).contents[1]!);
+      expect(copied.spelling_speech?.voice_profile.voices[0]?.voice_id).toBe(
+        "source-spelling"
+      );
+      const independent = copied.pronunciations.at(-1)!;
+      if (operation === "upload") {
+        expect(independent.audio_assets).toEqual(fromReading.audio_assets);
+      } else {
+        expect(
+          independent.synthesis?.uk?.ipa_speech?.voice_profile.voices[0]
+            ?.voice_id
+        ).toBe(operation === "skip" ? "target-ipa" : "source-ipa");
+      }
+    }
+  );
 
   it("同口音的多拼写各自采用对应拼写的配音配置", () => {
     const form = (id: number, prefix: string): WordConcreteFormV3 => {

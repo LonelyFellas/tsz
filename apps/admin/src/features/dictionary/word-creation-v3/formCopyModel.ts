@@ -63,6 +63,7 @@ type SharedSpellingCopy = {
     side: FormCopySide;
     sources: FormCopyPronunciationReference[];
     targets: FormCopyPronunciationReference[];
+    preferredSources: FormCopyPronunciationReference[];
   }[];
 };
 
@@ -155,7 +156,9 @@ function planSharedSpellingCopies(
   to: Record<FormCopySide, FormCopyPronunciationReference[]>,
   mapping: FormCopyMapping
 ): SharedSpellingCopy[] {
-  const recordedVariants = { uk: new Set<string>(), us: new Set<string>() };
+  const spellingRecordings = { uk: new Set<string>(), us: new Set<string>() };
+  const rowRecordings = new Set<FormCopyPronunciationReference>();
+  const configuredSpellings = new Set<FormCopyPronunciationReference>();
   const sourcesBySide = new Map<
     FormCopySide,
     FormCopyPronunciationReference[]
@@ -168,7 +171,7 @@ function planSharedSpellingCopies(
       const selected = voiceCopySynthesisForSide(row, side, ref.region);
       const hasRecording = audioAssetsForSide(row, side).length > 0;
       if (hasRecording && usesUploadForCopy(selected, hasRecording))
-        recordedVariants[side].add(variant.id);
+        rowRecordings.add(ref);
       if (
         selected.source === "none" ||
         selected.source === "upload" ||
@@ -176,10 +179,13 @@ function planSharedSpellingCopies(
       )
         return true;
       if (audioAssetsForSide(variant.spelling_speech, side).length)
-        recordedVariants[side].add(variant.id);
+        spellingRecordings[side].add(variant.id);
       // All spelling readings on this variant resolve the same profile.
       if (spellingVariants.has(variant.id)) return false;
       spellingVariants.add(variant.id);
+      const profile = variant.spelling_speech?.voice_profile;
+      if (profile?.voices.length || profile?.dubbing?.[side].mode === "inherit")
+        configuredSpellings.add(ref);
       return true;
     });
     sourcesBySide.set(side, sources);
@@ -187,19 +193,24 @@ function planSharedSpellingCopies(
   const copies: SharedSpellingCopy[] = [];
   for (const variant of regionalVariants(target.regional_variants)) {
     const sides = SIDES.flatMap((side) => {
-      const targets = to[side].filter((ref) => {
-        if (ref.variantId !== variant.id) return false;
-        const selected = voiceCopySynthesisForSide(
-          variant.pronunciations[ref.index]!,
-          side,
-          ref.region
-        );
-        return (
-          selected.use_spelling &&
-          selected.source !== "none" &&
-          selected.source !== "upload"
-        );
-      });
+      const readings = to[side]
+        .filter((ref) => ref.variantId === variant.id)
+        .map((ref) => ({
+          ref,
+          selected: voiceCopySynthesisForSide(
+            variant.pronunciations[ref.index]!,
+            side,
+            ref.region
+          )
+        }));
+      const targets = readings
+        .filter(
+          ({ selected }) =>
+            selected.use_spelling &&
+            selected.source !== "none" &&
+            selected.source !== "upload"
+        )
+        .map(({ ref }) => ref);
       if (!targets.length) return [];
       const sourceVariants = regionalVariants(source.regional_variants, side);
       const targetVariants = regionalVariants(target.regional_variants, side);
@@ -210,7 +221,15 @@ function planSharedSpellingCopies(
       const sources = sourcesBySide
         .get(side)!
         .filter((ref) => !corresponding || ref.variantId === corresponding.id);
-      return [{ side, sources, targets }];
+      const hasIndependentReading = readings.some(
+        ({ selected }) =>
+          selected.source === "upload" ||
+          (!selected.use_spelling && selected.source !== "none")
+      );
+      const preferredSources = hasIndependentReading
+        ? sources.filter((ref) => configuredSpellings.has(ref))
+        : [];
+      return [{ side, sources, targets, preferredSources }];
     });
     const readingIds = new Set(
       sides.flatMap(({ targets }) =>
@@ -219,8 +238,10 @@ function planSharedSpellingCopies(
     );
     if (readingIds.size < 2) continue;
     const automatic = sides.filter(
-      ({ side, sources, targets }) =>
-        !sources.some((ref) => recordedVariants[side].has(ref.variantId)) &&
+      ({ side, sources, targets, preferredSources }) =>
+        !sources.some((ref) => spellingRecordings[side].has(ref.variantId)) &&
+        (preferredSources.length > 0 ||
+          !sources.some((ref) => rowRecordings.has(ref))) &&
         !targets.some(
           (ref) => mapping[side]?.[ref.pronunciationId] !== undefined
         )
@@ -1109,7 +1130,11 @@ function activeProfileForSharedSpelling(
   const variant = variantForCopyReference(source, ref);
   const row = pronunciationAt(source, ref);
   const selected = voiceCopySynthesisForSide(row, side, ref.region);
-  if (selected.source === "none" || selected.source === "upload") return;
+  if (
+    selected.source === "none" ||
+    usesUploadForCopy(selected, audioAssetsForSide(row, side).length > 0)
+  )
+    return;
   const onSide = (
     profile: VoiceProfileV3 | undefined,
     channel: ResolvedFormCopyProfile["channel"]
@@ -1148,16 +1173,23 @@ function copySharedSpelling(
   versions: Map<string, string>
 ): boolean {
   const incoming: SideVoiceCopy[] = [];
-  for (const { side, sources } of sides) {
+  for (const { side, sources, preferredSources } of sides) {
+    const readProfiles = (refs: FormCopyPronunciationReference[]) =>
+      refs.flatMap((ref) => {
+        const profile = activeProfileForSharedSpelling(
+          source,
+          ref,
+          side,
+          resolved
+        );
+        return profile ? [profile] : [];
+      });
+    const spellingProfiles = readProfiles(preferredSources);
+    const profiles = spellingProfiles.length
+      ? spellingProfiles
+      : readProfiles(sources);
     let candidate: { profile: VoiceProfileV3; signature: string } | undefined;
-    for (const ref of sources) {
-      const profile = activeProfileForSharedSpelling(
-        source,
-        ref,
-        side,
-        resolved
-      );
-      if (!profile) continue;
+    for (const profile of profiles) {
       const signature = JSON.stringify(
         profile.voices.map((voice) => [
           voiceEffectKey(voice),
