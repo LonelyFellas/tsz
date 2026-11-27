@@ -129,6 +129,42 @@ export function VoiceParameterFields({
           <Form.Item
             layout="horizontal"
             colon={false}
+            name="rate_percent"
+            className="voice-parameter-number"
+            label={t("rate")}
+            rules={[
+              {
+                required: true,
+                type: "integer",
+                min: rateMin,
+                max: rateMax,
+                message: t("enter_a_rate_between_and", {
+                  p0: ((100 + rateMin) / 100).toFixed(2),
+                  p1: ((100 + rateMax) / 100).toFixed(2)
+                })
+              }
+            ]}
+            tooltip={
+              capabilities.min_rate_percent === capabilities.max_rate_percent
+                ? t("this_voice_uses_a_fixed_rate")
+                : t("1_00_is_the_standard_rate")
+            }
+          >
+            <SpeechRateInput
+              compact
+              aria-label={labels.rate ?? t("synthesis_rate")}
+              min={rateMin}
+              max={rateMax}
+              disabled={
+                disabled ||
+                capabilities.min_rate_percent === capabilities.max_rate_percent
+              }
+              style={{ width: "100%" }}
+            />
+          </Form.Item>
+          <Form.Item
+            layout="horizontal"
+            colon={false}
             name="volume_percent"
             label={t("volume")}
             tooltip={t("100_is_the_original_volume_0_is_mute")}
@@ -154,45 +190,6 @@ export function VoiceParameterFields({
               }
             />
           </Form.Item>
-          <div className="voice-parameter-grid">
-            <Form.Item
-              layout="horizontal"
-              colon={false}
-              name="rate_percent"
-              className="voice-parameter-number"
-              label={t("rate")}
-              rules={[
-                {
-                  required: true,
-                  type: "integer",
-                  min: rateMin,
-                  max: rateMax,
-                  message: t("enter_a_rate_between_and", {
-                    p0: ((100 + rateMin) / 100).toFixed(2),
-                    p1: ((100 + rateMax) / 100).toFixed(2)
-                  })
-                }
-              ]}
-              tooltip={
-                capabilities.min_rate_percent === capabilities.max_rate_percent
-                  ? t("this_voice_uses_a_fixed_rate")
-                  : t("1_00_is_the_standard_rate")
-              }
-            >
-              <SpeechRateInput
-                compact
-                aria-label={labels.rate ?? t("synthesis_rate")}
-                min={rateMin}
-                max={rateMax}
-                disabled={
-                  disabled ||
-                  capabilities.min_rate_percent ===
-                    capabilities.max_rate_percent
-                }
-                style={{ width: "100%" }}
-              />
-            </Form.Item>
-          </div>
         </div>
       </section>
       <section

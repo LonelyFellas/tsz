@@ -94,9 +94,9 @@ export function VoicePreviewResult({
                 </Tag>
               </Space>
               <Typography.Text type="secondary">
-                {t("volume")} <VoiceVolume parameters={preview.parameters} />
-                {t("preview_parameter_separator")}
                 <VoiceRate parameters={preview.parameters} />
+                {t("preview_parameter_separator")}
+                {t("volume")} <VoiceVolume parameters={preview.parameters} />
                 {t("preview_style_suffix", {
                   style: preview.parameters.style
                     ? voiceLabel(
