@@ -3703,6 +3703,53 @@ describe("VoiceEditor 发音区", () => {
     ]);
   });
 
+  it("声音更新请求未完成时，替换录音使用刚选的声音", async () => {
+    const existing = asset({ locale: "en-US", gender: "female" });
+    let finishUpdate!: (updated: AudioAsset) => void;
+    const updateGender = vi.fn(
+      () =>
+        new Promise<AudioAsset>((resolve) => {
+          finishUpdate = resolve;
+        })
+    );
+    const adapter = audioAdapter({ updateGender });
+    const onAudioAssetsChange = vi.fn();
+    render(
+      <VoiceEditor
+        {...props({
+          mode: "audio-upload",
+          locale: "en-US",
+          defaultAudioUploadGender: "male",
+          audioUploadAdapter: adapter,
+          audioAssets: [existing],
+          onAudioAssetsChange
+        })}
+      />
+    );
+    const male = screen.getByRole("radio", { name: "男声" });
+    fireEvent.click(male);
+    expect(updateGender).toHaveBeenCalledWith(
+      existing.id,
+      "male",
+      expect.any(Object)
+    );
+    const file = mp3("replacement.mp3");
+    chooseFiles([file]);
+    expect(adapter.upload).toHaveBeenCalledWith(
+      expect.objectContaining({ file, locale: "en-US", gender: "male" })
+    );
+    expect(male).toBeChecked();
+    await waitFor(() => {
+      expect(onAudioAssetsChange).toHaveBeenLastCalledWith([
+        expect.objectContaining({ original_name: file.name, gender: "male" })
+      ]);
+    });
+    await act(async () => finishUpdate({ ...existing, gender: "male" }));
+    expect(onAudioAssetsChange).toHaveBeenLastCalledWith([
+      expect.objectContaining({ original_name: file.name, gender: "male" })
+    ]);
+  });
+
   it("已上传录音可设为默认播放，同口音互斥并随草稿重新打开保留", async () => {
     const uk = asset({ original_name: "uk.mp3" });
     const another = asset({ original_name: "another.mp3" });

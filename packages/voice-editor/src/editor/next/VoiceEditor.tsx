@@ -232,6 +232,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   onVoiceProfileChange,
   audioUploadAdapter,
   audioUploadAllowed = true,
+  defaultAudioUploadGender = "female",
   showAudioUpload = true,
   audioAssets,
   onAudioAssetsChange,
@@ -415,7 +416,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   latestReadOnly.current = !!readOnly;
   const [upload, setUpload] = useState<UploadDraft>({
     locale: locale ?? "en-GB",
-    gender: "female"
+    gender: defaultAudioUploadGender
   });
   /** 已落成资产的音频（受控，与 voiceProfile 同款进出）。 */
   const [assets, setAssets] = useState<AudioAsset[]>(audioAssets ?? []);
@@ -2719,7 +2720,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       );
   };
 
-  const addAudioFiles = (files: FileList) => {
+  const addAudioFiles = (files: FileList, gender: UploadDraft["gender"]) => {
     if (!audioUploadAdapter || !audioUploadAllowed || readOnly) return;
     // 名额 = 上限 − 已落成 − 还在路上的；预检不过的那些不占名额。
     const inFlight = pendingUploads.filter((item) => !item.error).length;
@@ -2745,7 +2746,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
         file,
         name: file.name,
         locale: upload.locale,
-        gender: upload.gender,
+        gender,
         progress: 0,
         error: error ? uploadFailure(error) : undefined
       };
@@ -3849,7 +3850,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
             playingAssetId={playingAssetId}
             downloadingAssetId={downloadingAssetId}
             playbackMessage={playbackMessage}
-            genderUpdatePending={Boolean(genderUpdateAssetId)}
+            genderUpdateAssetId={genderUpdateAssetId}
             genderUpdateMessage={genderUpdateMessage}
           />
           {assetReview && (
@@ -4068,7 +4069,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                     playingAssetId={playingAssetId}
                     downloadingAssetId={downloadingAssetId}
                     playbackMessage={playbackMessage}
-                    genderUpdatePending={genderUpdateAssetId !== undefined}
+                    genderUpdateAssetId={genderUpdateAssetId}
                     genderUpdateMessage={genderUpdateMessage}
                   />
                   {assetReview && (

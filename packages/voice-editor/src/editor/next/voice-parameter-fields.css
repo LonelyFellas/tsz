@@ -12,9 +12,6 @@
   grid-template-columns: minmax(0, 1fr);
   gap: 8px 16px;
 }
-.voice-parameter-fields > .voice-parameter-grid {
-  display: contents;
-}
 .voice-parameter-panel .ui-form-item {
   margin-bottom: 0;
   min-width: 0;

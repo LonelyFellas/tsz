@@ -71,6 +71,7 @@ export function V3PronunciationAudioUpload({
                 env.VOICE_AUDIO_UPLOAD ? adminAudioUploadAdapter : undefined
               }
               audioUploadAllowed={allowed}
+              defaultAudioUploadGender={locale === "en-US" ? "male" : undefined}
               audioAssets={scopedAssets}
               onAudioAssetsChange={(next) => {
                 const explicitAccents = new Set(
