@@ -387,6 +387,8 @@ export interface VoiceEditorProps<TLink extends VoiceAssociation = TextLinkV3> {
   audioUploadAdapter?: AudioUploadAdapter;
   /** 仅限制新增上传；已有音频仍可试听。 */
   audioUploadAllowed?: boolean;
+  /** 没有当前口音的录音时，上传面板初次选中的声音。 */
+  defaultAudioUploadGender?: AudioAssetGender;
   /** 宿主已提供上传入口时，隐藏编辑器内的上传工具。 */
   showAudioUpload?: boolean;
   /** 挂在这段文本上的音频资产；与 voiceProfile 一样是受控通道，改动实时抛出。 */
