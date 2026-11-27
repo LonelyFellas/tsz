@@ -6,7 +6,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { Alert, Button } from "@tsz/ui/admin/display";
 import { App as FeedbackApp } from "@tsz/ui/admin/overlays";
-import { authRuntime, useAuthStore } from "@/lib/auth";
+import { useAuthStore } from "@/lib/auth";
 import {
   adminAccountIdentity,
   bindAdminAuthorizationCache
@@ -44,22 +44,9 @@ export function RootProviders({ children }: { children?: ReactNode }) {
           predicate: (query) => query.state.status === "error"
         });
     };
-    const refresh = () => {
-      if (authRuntime.tokens.getToken())
-        void authRuntime.refreshProfile().catch(() => undefined);
-    };
-    const visible = () => {
-      if (document.visibilityState === "visible") refresh();
-    };
-    window.addEventListener("focus", refresh);
-    window.addEventListener("online", refresh);
     window.addEventListener("tsz:session-recovered", recovered);
-    document.addEventListener("visibilitychange", visible);
     return () => {
-      window.removeEventListener("focus", refresh);
-      window.removeEventListener("online", refresh);
       window.removeEventListener("tsz:session-recovered", recovered);
-      document.removeEventListener("visibilitychange", visible);
     };
   }, []);
   const identity = useAuthStore((s) => adminAccountIdentity(s.profile));
