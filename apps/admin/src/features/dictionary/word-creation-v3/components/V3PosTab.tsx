@@ -140,7 +140,10 @@ export function V3PosTab({
     : partOfSpeechLabel(pos.pos, t);
   const { preference } = useDialectPreference();
   const referenceGuard = useV3ReferenceGuard();
-  const allowedDerivedTypes = posCatalog?.allowed_form_types ?? [];
+  const canAddGroup =
+    !posCatalog ||
+    posCatalog.kind === "phrase" ||
+    (posCatalog.allowed_form_types?.length ?? 0) > 0;
   const membershipCounts = new Map<string, number>();
   for (const group of pos.form_groups) {
     for (const member of group.members) {
@@ -150,13 +153,10 @@ export function V3PosTab({
       );
     }
   }
-  // 没配派生词形的词性（副词、代词）只有一个原形组，也要照常渲染：原形的拼写与
-  // 发音得有地方录，完成度本来就把原形发音算作未填项。只有空组才继续藏起来——
-  // 没有成员的组对这类词性没有意义，「增加一组词性变化」入口同样不给。
-  const visibleGroups = pos.form_groups.filter(
-    (group) =>
-      !posCatalog || allowedDerivedTypes.length > 0 || group.members.length > 0
-  );
+  // 短语可以建立仅含原形的变化组。没有派生词形的单词仍显示所有已有成员的组。
+  const visibleGroups = canAddGroup
+    ? pos.form_groups
+    : pos.form_groups.filter((group) => group.members.length > 0);
   const applyDialectRules = (groupId: string, rules: DialectRulesV3) => {
     const result = normalizeGroupDialectRules(
       content,
@@ -474,7 +474,7 @@ export function V3PosTab({
         />
       ) : null}
       {visibleGroups.length === 0 ? (
-        !posCatalog || allowedDerivedTypes.length > 0 ? (
+        canAddGroup ? (
           <Empty
             description={t(
               "creation_a_draft_can_temporarily_have_no_form_groups"
@@ -525,7 +525,7 @@ export function V3PosTab({
           ))}
         </Space>
       )}
-      {!posCatalog || allowedDerivedTypes.length > 0 ? (
+      {canAddGroup ? (
         <Button
           aria-label={t("add_pos_group", { pos: posLabel })}
           block

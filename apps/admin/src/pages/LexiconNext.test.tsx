@@ -42,6 +42,7 @@ import * as voiceEditorSource from "@/features/dictionary/voice-editor/dataSourc
 
 import { partOfSpeechCatalogFixture } from "@/features/dictionary/word-creation/partOfSpeech.test.helper";
 import {
+  commonFormFixture,
   formsFixture,
   UUIDS
 } from "@/features/dictionary/word-creation-v3/fixtures";
@@ -3627,6 +3628,78 @@ it("Step 2 复用 V1 词性、词形与发音编辑，沿用 Step 1 的语言，
   expect(
     screen.getAllByText("centre").some((element) => element.closest("td"))
   ).toBe(true);
+  expect(api.get).toHaveBeenCalledTimes(2);
+});
+
+it("只有原形的短语词性可以新增变化组，保存后可重新打开两组", async () => {
+  const api = requests();
+  api.capabilities.mockResolvedValue({ ...caps, form_editor: true });
+  vi.spyOn(partOfSpeechDataSource, "catalog").mockResolvedValue({
+    ...partOfSpeechCatalogFixture,
+    items: [
+      {
+        ...partOfSpeechCatalogFixture.items[0]!,
+        code: "phrase_noun",
+        kind: "phrase",
+        name_zh: "名词性成分",
+        name_en: "Nominal constituent",
+        allowed_form_types: [],
+        default_form_types: []
+      }
+    ]
+  });
+  const formEditor = applyFormsStructure(
+    emptyFormEditor(),
+    formsFixture({
+      pos: "phrase_noun",
+      forms: [commonFormFixture({ spelling: "city centre" })]
+    })
+  );
+  if (!isSharedForms(formEditor)) throw new Error("Expected shared fixture");
+  const phrase: NextEntry = {
+    ...entry,
+    kind: "phrase",
+    draft: {
+      ...entry.draft,
+      headword: "city centre",
+      form_editor: formEditor
+    }
+  };
+  let stored = phrase;
+  api.get.mockImplementation(async () => stored);
+  api.save.mockImplementation(async (_id, input) => {
+    stored = {
+      ...phrase,
+      revision: input.expected_revision + 1,
+      draft: structuredClone(input.draft)
+    };
+    return stored;
+  });
+  const path = `/lexicon-next/${id}?step=forms`;
+  const mounted = mount(api, path);
+  fireEvent.click(
+    await screen.findByRole("button", { name: "新增名词性成分变化组" })
+  );
+  fireEvent.click(button("为第 2 组增加词形"));
+  fireEvent.click(await screen.findByRole("menuitem", { name: "原形" }));
+  const editBase = screen.getAllByRole("button", { name: "编辑原形内容" });
+  expect(editBase).toHaveLength(2);
+  fireEvent.click(editBase[1]!);
+  fireEvent.change(
+    await screen.findByRole("textbox", { name: "词形英美通用拼写" }),
+    { target: { value: "city center" } }
+  );
+  fireEvent.click(textAction("确认，应用到草稿"));
+  await waitFor(() => expect(stored.revision).toBe(2));
+  await waitFor(() => expect(button("保存草稿")).toBeDisabled());
+  mounted.unmount();
+
+  mount(api, path);
+  expect(
+    await screen.findByRole("button", { name: "为第 2 组增加词形" })
+  ).toBeVisible();
+  expect(screen.getByRole("cell", { name: /city centre$/ })).toBeVisible();
+  expect(screen.getByRole("cell", { name: /city center$/ })).toBeVisible();
   expect(api.get).toHaveBeenCalledTimes(2);
 });
 
