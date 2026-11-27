@@ -100,6 +100,11 @@ export function createAdminAuthRuntime({
     getTestResourceRun,
     getInterfaceLocale,
     getToken: tokens.getToken,
+    // 刷新与当前设备登出依赖 Cookie，需要独立于 Bearer 刷新发送。
+    getTokenForRequest: (path) =>
+      path === "/auth/refresh" || path === "/auth/logout"
+        ? tokens.getToken()
+        : tokens.getTokenForRequest(),
     getSessionGeneration: tokens.getSessionGeneration,
     onRefresh: tokens.refreshTokens,
     onSessionExpired: () => {

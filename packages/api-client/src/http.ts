@@ -15,6 +15,8 @@ export interface HttpClientOptions {
   getInterfaceLocale?: () => InterfaceLocaleV1 | undefined;
   /** 每次请求动态获取 access token。 */
   getToken?: () => string | undefined | Promise<string | undefined>;
+  /** 发出鉴权请求前读取凭证；仅在需要共享刷新时返回 Promise，刷新后会重新读取。 */
+  getTokenForRequest?: (path: string) => string | undefined | Promise<string>;
   /** 仅测试批次使用；后端仍须验证账号白名单。不会附加到 OSS 直传请求。 */
   getTestResourceRun?: () => string | undefined;
   getSessionGeneration?: () => number;
@@ -165,6 +167,7 @@ async function parseError(res: Response): Promise<ParsedError> {
 export function createHttpClient({
   baseUrl,
   getToken,
+  getTokenForRequest,
   getTestResourceRun,
   getInterfaceLocale,
   getSessionGeneration,
@@ -174,13 +177,13 @@ export function createHttpClient({
 }: HttpClientOptions) {
   async function performRequest<T>(
     path: string,
-    init: RequestInit = {},
+    init: RequestInit,
+    deadline: ReturnType<typeof createRequestDeadline>,
     retrying = false,
     skipAuth = false,
     retryOnUnauthorized:
       boolean | ((code: string | undefined) => boolean) = true,
     responseType: "json" | "blob" = "json",
-    deadline?: ReturnType<typeof createRequestDeadline>,
     consumeStream?: (response: Response, checkSession: () => void) => Promise<T>
   ): Promise<T> {
     if (!retrying && !skipAuth && getTestResourceRun) {
@@ -193,11 +196,37 @@ export function createHttpClient({
     }
     const generation = getSessionGeneration?.();
     const isCurrent = () => generation === getSessionGeneration?.();
-    // 公开端点(登录/注册等)不带 access token，避免遗留的旧 token 污染请求。
-    const token = skipAuth ? undefined : await getToken?.();
-    if (!skipAuth && !isCurrent()) throw new Error("session changed");
-    init.signal?.throwIfAborted();
+    const checkSession = () => {
+      deadline.signal.throwIfAborted();
+      if (!skipAuth && !isCurrent()) throw new Error("session changed");
+    };
+    const rethrowRefreshError = (error: unknown): never => {
+      if (isCurrent() && error instanceof HttpError && error.status === 401) {
+        onSessionExpired?.();
+      }
+      throw error;
+    };
     const headers = new Headers(init.headers);
+    let token: string | undefined;
+    // 公开端点(登录/注册等)不读 access token，也不等待刷新。
+    if (!skipAuth) {
+      if (getTokenForRequest && !headers.has("Authorization")) {
+        // 与普通 token 读取一致，发送前允许本轮会话变更生效。
+        await Promise.resolve();
+        checkSession();
+        let credential = getTokenForRequest(path);
+        while (typeof credential === "object") {
+          // 外层 deadline 负责结束当前请求，共享刷新自行结算。
+          await credential.catch(rethrowRefreshError);
+          checkSession();
+          credential = getTokenForRequest(path);
+        }
+        token = credential;
+      } else {
+        token = await getToken?.();
+      }
+    }
+    checkSession();
     if (!headers.has("Content-Type")) {
       headers.set("Content-Type", "application/json");
     }
@@ -227,22 +256,19 @@ export function createHttpClient({
       try {
         const currentToken = await getToken?.();
         if (!isCurrent()) throw new Error("session changed");
-        if (currentToken === token) await deadline!.wait(onRefresh);
+        if (currentToken === token) await deadline.wait(onRefresh);
       } catch (error) {
-        if (isCurrent() && error instanceof HttpError && error.status === 401) {
-          onSessionExpired?.();
-        }
-        throw error;
+        rethrowRefreshError(error);
       }
       if (!isCurrent()) throw new Error("session changed");
       return performRequest<T>(
         path,
         init,
+        deadline,
         true,
         skipAuth,
         retryOnUnauthorized,
         responseType,
-        deadline,
         consumeStream
       );
     }
@@ -268,10 +294,6 @@ export function createHttpClient({
     }
 
     if (consumeStream) {
-      const checkSession = () => {
-        init.signal?.throwIfAborted();
-        if (!skipAuth && !isCurrent()) throw new Error("session changed");
-      };
       const result = await consumeStream(res, checkSession);
       checkSession();
       return result;
@@ -329,11 +351,11 @@ export function createHttpClient({
         performRequest<T>(
           path,
           { ...init, signal: deadline.signal },
+          deadline,
           retrying,
           skipAuth,
           retryOnUnauthorized,
           responseType,
-          deadline,
           consumeStream
         )
       );
