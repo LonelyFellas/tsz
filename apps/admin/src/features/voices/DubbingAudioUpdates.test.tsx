@@ -11,21 +11,27 @@ import {
 } from "@testing-library/react";
 
 import type { AdminDubbingAudioUpdate, AdminProfile } from "@tsz/types";
+import { HttpError } from "@tsz/api-client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { api, useAuthStore } from "@/lib/auth";
 import { DubbingAudioUpdates } from "./DubbingAudioUpdates";
+import { dubbingGroupsKey } from "./dubbing-model";
 
+const missingGroup = new HttpError(404, "Group not found", [], "not_found");
 const clients: QueryClient[] = [];
 function mount(node: React.ReactNode) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } }
   });
   clients.push(client);
-  return render(
-    <QueryClientProvider client={client}>
-      <>{node}</>
-    </QueryClientProvider>
-  );
+  return {
+    client,
+    ...render(node, {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      )
+    })
+  };
 }
 function update(state = "pending"): AdminDubbingAudioUpdate {
   return {
@@ -42,9 +48,9 @@ function update(state = "pending"): AdminDubbingAudioUpdate {
     error_codes: []
   };
 }
-beforeEach(() => {
+function setAccount(id = "update-admin") {
   useAuthStore.getState().setProfile({
-    id: "update-admin",
+    id,
     phone: "fixture",
     display_name: "测试",
     role: "admin",
@@ -52,14 +58,121 @@ beforeEach(() => {
     permission_version: 1,
     catalog_version: "test",
     permissions: ["speech.global_dubbing"]
-  } as AdminProfile);
-});
+  } satisfies AdminProfile);
+}
+beforeEach(() => setAccount());
 afterEach(() => {
   cleanup();
   clients.splice(0).forEach((client) => client.clear());
   useAuthStore.getState().setProfile(null);
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
+
+it.each(["pending", "running"])(
+  "任务 %s 时分组消失，停止请求音频更新状态",
+  async (state) => {
+    vi.useFakeTimers();
+    const read = vi
+      .spyOn(api.speech, "audioUpdates")
+      .mockResolvedValueOnce({ updates: [update(state)] })
+      .mockRejectedValue(missingGroup);
+    mount(<DubbingAudioUpdates groupId="group" revision={3} />);
+
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    expect(read).toHaveBeenCalledTimes(1);
+    await act(async () => vi.advanceTimersByTimeAsync(3000));
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("button", { name: "重试" })).toBeInTheDocument();
+
+    await act(async () => vi.advanceTimersByTimeAsync(12000));
+    expect(read).toHaveBeenCalledTimes(2);
+  }
+);
+
+it("初次查询返回 404 时停用自动请求，重新挂载后仍可手动重试", async () => {
+  vi.useFakeTimers();
+  const read = vi
+    .spyOn(api.speech, "audioUpdates")
+    .mockRejectedValueOnce(missingGroup)
+    .mockResolvedValue({ updates: [update("completed")] });
+  const status = <DubbingAudioUpdates groupId="group" revision={3} />;
+  const view = mount(status);
+
+  await act(async () => vi.advanceTimersByTimeAsync(12000));
+  expect(read).toHaveBeenCalledTimes(1);
+  view.rerender(<></>);
+  view.rerender(status);
+  await act(async () => vi.advanceTimersByTimeAsync(12000));
+  expect(read).toHaveBeenCalledTimes(1);
+
+  fireEvent.click(screen.getByRole("button", { name: "重试" }));
+  await act(async () => vi.advanceTimersByTimeAsync(1));
+  expect(read).toHaveBeenCalledTimes(2);
+  expect(screen.queryByRole("button", { name: "重试" })).toBeNull();
+});
+
+it.each([new TypeError("Network error"), new HttpError(503, "Unavailable")])(
+  "运行中遇到 $message 时保留轮询恢复，正常结束后停止",
+  async (error) => {
+    vi.useFakeTimers();
+    const read = vi
+      .spyOn(api.speech, "audioUpdates")
+      .mockResolvedValueOnce({ updates: [update("pending")] })
+      .mockResolvedValueOnce({ updates: [update("running")] })
+      .mockRejectedValueOnce(error)
+      .mockResolvedValue({ updates: [update("completed")] });
+    mount(<DubbingAudioUpdates groupId="group" revision={3} />);
+
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    expect(screen.getByText("等待更新")).toBeInTheDocument();
+    await act(async () => vi.advanceTimersByTimeAsync(3000));
+    expect(screen.getByText("生成中")).toBeInTheDocument();
+    await act(async () => vi.advanceTimersByTimeAsync(3000));
+    expect(screen.getByRole("button", { name: "重试" })).toBeInTheDocument();
+    await act(async () => vi.advanceTimersByTimeAsync(3000));
+    expect(screen.queryByRole("button", { name: "重试" })).toBeNull();
+    expect(screen.queryByText("生成中")).toBeNull();
+    await act(async () => vi.advanceTimersByTimeAsync(12000));
+    expect(read).toHaveBeenCalledTimes(4);
+  }
+);
+
+it.each([
+  { accountId: "update-admin", groupId: "other-group" },
+  { accountId: "other-admin", groupId: "group" }
+])(
+  "切到 $accountId/$groupId 后忽略旧请求迟到的 404",
+  async ({ accountId, groupId }) => {
+    let rejectOldRequest!: (error: HttpError) => void;
+    const oldRequest = new Promise<never>((_, reject) => {
+      rejectOldRequest = reject;
+    });
+    const read = vi
+      .spyOn(api.speech, "audioUpdates")
+      .mockReturnValueOnce(oldRequest)
+      .mockResolvedValue({
+        updates: [{ ...update("running"), group_id: groupId }]
+      });
+    const view = mount(<DubbingAudioUpdates groupId="group" revision={3} />);
+    const originalList = dubbingGroupsKey("update-admin");
+    const otherList = dubbingGroupsKey("other-admin");
+    view.client.setQueryData(originalList, { groups: [] });
+    view.client.setQueryData(otherList, { groups: [] });
+
+    await act(async () => {
+      setAccount(accountId);
+      view.rerender(<DubbingAudioUpdates groupId={groupId} revision={3} />);
+    });
+    expect(read).toHaveBeenNthCalledWith(2, groupId, expect.any(AbortSignal));
+    await screen.findByText("生成中");
+
+    await act(async () => rejectOldRequest(missingGroup));
+    expect(screen.getByText("生成中")).toBeInTheDocument();
+    expect(view.client.getQueryState(originalList)?.isInvalidated).toBe(false);
+    expect(view.client.getQueryState(otherList)?.isInvalidated).toBe(false);
+  }
+);
 
 it("按服务端任务倒计时，撤销只调用任务接口并重新读取", async () => {
   const job = update();

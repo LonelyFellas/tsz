@@ -1,9 +1,11 @@
 import { useVoiceTranslation, voiceLabel } from "./i18n";
 import { useQuery } from "@tanstack/react-query";
+import { HttpError } from "@tsz/api-client";
 import type { AdminDubbingAudioUpdate } from "@tsz/types";
 import { Button, Flex, Space, Tag, Typography } from "@tsz/ui/admin/display";
 import { useEffect, useState } from "react";
 import { api, useAuthStore } from "@/lib/auth";
+import { dubbingGroupsKey } from "./dubbing-model";
 
 const labels: Record<string, string> = {
   pending: "等待更新",
@@ -11,6 +13,14 @@ const labels: Record<string, string> = {
   failed: "失败",
   partial: "部分成功"
 };
+
+function isMissingGroup(error: unknown) {
+  return (
+    error instanceof HttpError &&
+    error.status === 404 &&
+    error.code === "not_found"
+  );
+}
 
 function Update({
   update,
@@ -139,7 +149,24 @@ export function DubbingAudioUpdates({
   const accountId = useAuthStore((state) => state.profile?.id);
   const updates = useQuery({
     queryKey: ["admin-dubbing-audio-updates", accountId, groupId, revision],
-    queryFn: ({ signal }) => api.speech.audioUpdates(groupId, signal),
+    queryFn: async ({ client, signal }) => {
+      try {
+        return await api.speech.audioUpdates(groupId, signal);
+      } catch (error) {
+        if (
+          isMissingGroup(error) &&
+          !signal.aborted &&
+          useAuthStore.getState().profile?.id === accountId
+        ) {
+          void client.invalidateQueries({
+            queryKey: dubbingGroupsKey(accountId),
+            exact: true
+          });
+        }
+        throw error;
+      }
+    },
+    enabled: (query) => !!accountId && !isMissingGroup(query.state.error),
     retry: false,
     refetchInterval: (query) =>
       ["pending", "running"].includes(query.state.data?.updates[0]?.state ?? "")
