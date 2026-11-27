@@ -758,6 +758,21 @@ export const voiceMessages = {
     "新增{{side}}推薦",
     "Add {{side}} recommendation"
   ],
+  recommendation_selection_count: [
+    "已选 {{selected}} 条，可添加 {{limit}} 条",
+    "已選 {{selected}} 條，可新增 {{limit}} 條",
+    "{{selected}} selected · {{limit}} available slots"
+  ],
+  recommendation_selection_exceeds_capacity: [
+    "已选音色超过剩余名额，请取消部分勾选。",
+    "已選音色超過剩餘名額，請取消部分勾選。",
+    "Deselect voices to fit the remaining slots."
+  ],
+  recommendation_catalog_changed: [
+    "部分音色已从目录移除，请关闭后重新选择。",
+    "部分音色已從目錄移除，請關閉後重新選擇。",
+    "Some selected voices were removed. Reopen the drawer to select again."
+  ],
   use_recommendation: ["选用", "選用", "Use"],
   order: ["顺序", "順序", "Order"],
   new_group: ["新分组", "新分組", "New group"],

@@ -46,6 +46,7 @@ import { useDubbingDrafts } from "./DubbingDrafts";
 import { DubbingAudioUpdates } from "./DubbingAudioUpdates";
 import {
   dubbingGroupsKey,
+  MAX_RECOMMENDATIONS_PER_SIDE,
   recommendationError,
   sideName,
   sides,
@@ -68,7 +69,7 @@ const areas = [
 ];
 type Editing = {
   groupId: string;
-  initial: RecommendationSeed;
+  initial?: RecommendationSeed;
   side: DubbingSide;
 };
 
@@ -410,6 +411,22 @@ export function DubbingGroups({
   }
   const editingGroup =
     editing && current.find((group) => group.id === editing.groupId);
+  function saveRecommendations(recommendations: AdminDubbingRecommendation[]) {
+    if (!editing || !editingGroup || !canEdit || saving) return;
+    const { groupId, side, initial } = editing;
+    if (initial) {
+      const [item] = recommendations;
+      if (!item) return;
+      updateSide(groupId, side, (items) =>
+        items.some((value) => value.id === item.id)
+          ? items.map((value) => (value.id === item.id ? item : value))
+          : [...items, item]
+      );
+    } else {
+      updateSide(groupId, side, (items) => [...items, ...recommendations]);
+    }
+    setEditing(undefined);
+  }
   const matching =
     groups.data?.groups.filter(
       (group) => !group.is_global && group.areas.includes(previewArea ?? "")
@@ -454,10 +471,10 @@ export function DubbingGroups({
                     <Button
                       size="small"
                       icon={<PlusIcon aria-hidden />}
-                      disabled={group[side].length >= 20}
-                      onClick={() =>
-                        setEditing({ groupId: group.id, side, initial: {} })
+                      disabled={
+                        group[side].length >= MAX_RECOMMENDATIONS_PER_SIDE
                       }
+                      onClick={() => setEditing({ groupId: group.id, side })}
                     >
                       {t("add_recommendation")}
                     </Button>
@@ -737,7 +754,10 @@ export function DubbingGroups({
                                     name: item.name
                                   })}
                                   icon={<CopyIcon aria-hidden />}
-                                  disabled={group[side].length >= 20}
+                                  disabled={
+                                    group[side].length >=
+                                    MAX_RECOMMENDATIONS_PER_SIDE
+                                  }
                                   onClick={() =>
                                     setEditing({
                                       groupId: group.id,
@@ -1108,21 +1128,25 @@ export function DubbingGroups({
       </Modal>
       {editing && editingGroup && (
         <RecommendationEditor
-          key={`${editing.groupId}-${editing.initial.id ?? "new"}-${editing.side}`}
+          key={`${editing.groupId}-${editing.initial?.id ?? "new"}-${editing.side}`}
           voices={voices}
-          initial={editing.initial}
+          initial={editing.initial ?? {}}
           side={editing.side}
           disabled={!canEdit || saving}
           onBeforeAudition={onInvalidatePreview}
           onCancel={() => setEditing(undefined)}
-          onSave={(item) => {
-            updateSide(editing.groupId, editing.side, (items) =>
-              items.some((value) => value.id === item.id)
-                ? items.map((value) => (value.id === item.id ? item : value))
-                : [...items, item]
-            );
-            setEditing(undefined);
-          }}
+          {...(editing.initial
+            ? { onSave: (item) => saveRecommendations([item]) }
+            : {
+                bulkAdd: {
+                  remainingSlots: Math.max(
+                    0,
+                    MAX_RECOMMENDATIONS_PER_SIDE -
+                      editingGroup[editing.side].length
+                  ),
+                  onSave: saveRecommendations
+                }
+              })}
         />
       )}
       <Modal
