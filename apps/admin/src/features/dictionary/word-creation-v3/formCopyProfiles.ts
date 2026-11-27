@@ -1,8 +1,10 @@
 import { api } from "@/lib/auth";
-import { speechAccentGroup, spellingSpeechContent } from "@tsz/shared";
-import { toRichTextV2 } from "@tsz/voice-editor/core";
+import { HttpError } from "@tsz/api-client";
+import { speechAccentGroup } from "@tsz/shared";
+import { normalizeSpeechLiaisons, toRichTextV2 } from "@tsz/voice-editor/core";
 import type { GeneratedSpeechSource, VoiceProfileV3 } from "@tsz/types";
 import {
+  spellingCopyInput,
   variantForCopyReference,
   voiceCopySynthesisForSide,
   type FormCopyPlan,
@@ -44,7 +46,13 @@ export async function resolveFormCopyProfiles(
     );
     if (selected.source === "none" || selected.source === "upload")
       return false;
-    if (selected.use_spelling) return variant.spelling_speech?.voice_profile;
+    if (selected.use_spelling)
+      return spellingCopyInput(
+        variant,
+        row,
+        match.side,
+        selected.source === "spelling"
+      ).profile;
     return (
       row.voice_profile ||
       selected[`${selected.alphabet}_speech`] ||
@@ -77,7 +85,8 @@ export async function resolveFormCopyProfiles(
     const add = (
       channel: ResolvedFormCopyProfile["channel"],
       profile: VoiceProfileV3 | undefined,
-      source: GeneratedSpeechSource
+      source: GeneratedSpeechSource,
+      usesDefault = false
     ) => {
       if (!profile) return;
       const key = `${match.side}:${pronunciation.id}:${channel}`;
@@ -88,10 +97,22 @@ export async function resolveFormCopyProfiles(
       }
       const request = (
         profile.dubbing
-          ? api.speech.resolve(
-              { profile, source, accent: match.side === "uk" ? "gb" : "us" },
-              signal
-            )
+          ? api.speech
+              .resolve(
+                { profile, source, accent: match.side === "uk" ? "gb" : "us" },
+                signal
+              )
+              .catch((error: unknown) => {
+                // 隐式推荐可能只覆盖一侧，仍可复制另一侧有音色的配置。
+                if (
+                  usesDefault &&
+                  error instanceof HttpError &&
+                  error.status === 400 &&
+                  error.code === "invalid_speech_preview"
+                )
+                  return { voices: [] };
+                throw error;
+              })
           : Promise.resolve({
               voices: profile.voices.filter((setting) => {
                 const voice = catalogue.get(setting.voice_id);
@@ -142,30 +163,33 @@ export async function resolveFormCopyProfiles(
       profiles.set(key, request);
       pending.push(request);
     };
-    const spellingSpeech = synthesis.use_spelling
-      ? variant.spelling_speech
+    const spelling = synthesis.use_spelling
+      ? spellingCopyInput(
+          variant,
+          pronunciation,
+          match.side,
+          synthesis.source === "spelling"
+        )
       : undefined;
+    const spellingContent = spelling?.usesDefault
+      ? normalizeSpeechLiaisons(spelling.content)
+      : spelling?.content;
     add(
       "fallback",
-      synthesis.use_spelling
-        ? spellingSpeech?.voice_profile
-        : pronunciation.voice_profile,
+      spelling ? spelling.profile : pronunciation.voice_profile,
       {
         kind: "text",
-        content: synthesis.use_spelling
-          ? (spellingSpeechContent(spellingSpeech, match.side) ?? {
+        content:
+          spellingContent ??
+          toRichTextV2(
+            pronunciation.dict_phonetic_rich ?? {
               version: 2,
-              text: variant.spelling,
+              text: pronunciation.dict_phonetic || variant.spelling,
               annotations: []
-            })
-          : toRichTextV2(
-              pronunciation.dict_phonetic_rich ?? {
-                version: 2,
-                text: pronunciation.dict_phonetic || variant.spelling,
-                annotations: []
-              }
-            )
-      }
+            }
+          )
+      },
+      spelling?.usesDefault
     );
     if (!synthesis.use_spelling) {
       for (const alphabet of ["ipa", "ups"] as const) {

@@ -24,6 +24,7 @@ import {
   EMPTY_SYNTHESIS,
   pronunciationLocale,
   speechAccentGroup,
+  spellingSpeechContent,
   synthesisForLocale
 } from "@tsz/shared";
 import {
@@ -184,7 +185,12 @@ function planSharedSpellingCopies(
       // All spelling readings on this variant resolve the same profile.
       if (spellingVariants.has(variant.id)) return false;
       spellingVariants.add(variant.id);
-      const profile = variant.spelling_speech?.voice_profile;
+      const { profile } = spellingCopyInput(
+        variant,
+        row,
+        side,
+        selected.source === "spelling"
+      );
       if (profile?.voices.length || profile?.dubbing?.[side].mode === "inherit")
         configuredSpellings.add(ref);
       return true;
@@ -587,6 +593,32 @@ export function voiceCopySynthesisForSide(
       !selected.ups_locale || selected.ups_locale === locale
         ? selected.ups_speech
         : undefined
+  };
+}
+
+export function spellingCopyInput(
+  variant: FormContentVariantV3,
+  row: WordPronunciationV3,
+  side: FormCopySide,
+  explicitSpelling: boolean
+) {
+  const speech = variant.spelling_speech;
+  const content = spellingSpeechContent(speech, side) ?? {
+    version: 2 as const,
+    text: variant.spelling,
+    annotations: []
+  };
+  const stored = speech?.voice_profile;
+  // 沿用总览的推荐分组：未设置 synthesis 时使用 azure，拼写来源已设置时使用 word。
+  const profile =
+    content.text.trim() && (stored || explicitSpelling || !row.voice_profile)
+      ? withDefaultVoiceProfile(stored, row.synthesis ? "word" : "azure")
+      : stored;
+  const usesDefault = profile !== stored;
+  return {
+    content,
+    profile,
+    usesDefault
   };
 }
 
