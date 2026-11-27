@@ -767,48 +767,53 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
     </Button>
   );
   const auditionPanel = (
-    <section className="voice-library-audition" aria-label={t("voice_preview")}>
-      <div className="voice-library-audition-row">
-        <Form
-          layout="vertical"
-          className="voice-library-audition-text"
-          colon={false}
-        >
-          <Form.Item
-            label={
-              <span className="voice-library-audition-label">
-                <Typography.Text strong>{t("preview_text")}</Typography.Text>
-                <Typography.Text
-                  type="secondary"
-                  className="voice-library-audition-count"
-                >
-                  {textLength} / 500
-                </Typography.Text>
-              </span>
-            }
-            validateStatus={!validText ? "error" : undefined}
-            help={
-              !validText
-                ? t("enter_1_500_characters_of_preview_text_4dc82c")
-                : undefined
-            }
+    <Card size="small" className="voice-library-controls">
+      <section
+        className="voice-library-audition"
+        aria-label={t("voice_preview")}
+      >
+        <div className="voice-library-audition-row">
+          <Form
+            layout="vertical"
+            className="voice-library-audition-text"
+            colon={false}
           >
-            <div className="voice-library-audition-input">
-              <Input.TextArea
-                aria-label={t("shared_preview_text")}
-                value={text}
-                autoSize={{ minRows: 1, maxRows: 4 }}
-                onChange={(event) => {
-                  cancelPreview();
-                  setText(event.target.value);
-                }}
-              />
-            </div>
-          </Form.Item>
-        </Form>
-      </div>
-      {!selected && (pendingVoice || error || preview) && previewView()}
-    </section>
+            <Form.Item
+              label={
+                <span className="voice-library-audition-label">
+                  <Typography.Text strong>{t("preview_text")}</Typography.Text>
+                  <Typography.Text
+                    type="secondary"
+                    className="voice-library-audition-count"
+                  >
+                    {textLength} / 500
+                  </Typography.Text>
+                </span>
+              }
+              validateStatus={!validText ? "error" : undefined}
+              help={
+                !validText
+                  ? t("enter_1_500_characters_of_preview_text_4dc82c")
+                  : undefined
+              }
+            >
+              <div className="voice-library-audition-input">
+                <Input.TextArea
+                  aria-label={t("shared_preview_text")}
+                  value={text}
+                  autoSize={{ minRows: 1, maxRows: 4 }}
+                  onChange={(event) => {
+                    cancelPreview();
+                    setText(event.target.value);
+                  }}
+                />
+              </div>
+            </Form.Item>
+          </Form>
+        </div>
+        {!selected && (pendingVoice || error || preview) && previewView()}
+      </section>
+    </Card>
   );
   return (
     <div
@@ -853,21 +858,14 @@ function VoiceLibraryContent({ view: tab }: { view: VoiceView }) {
           }
         />
       )}
-      {tab === "library" && (
-        <Card size="small" className="voice-library-controls">
-          {auditionPanel}
-        </Card>
-      )}
+      {tab === "library" && auditionPanel}
       <Card
         size="small"
         className={`voice-library-content${tab === "groups" ? " voice-library-group-content" : ""}`}
       >
-        {tab === "groups" &&
-          !selected &&
-          (pendingVoice || error || preview) &&
-          previewView()}
         {tab === "groups" && (
           <DubbingGroups
+            auditionPanel={auditionPanel}
             onDirtyChange={setGroupsDirty}
             onInvalidatePreview={cancelPreview}
             voices={voices.data?.items ?? []}
