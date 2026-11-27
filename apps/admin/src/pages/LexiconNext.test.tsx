@@ -2705,7 +2705,7 @@ it("新版列表按任务布局显示高级筛选并提交最后更新人", asyn
   );
 });
 
-it("新版列表在同一行显示保存的英美原形，旧响应仍可显示词条名", async () => {
+it("新版列表逐行显示原形，仅单侧拼写加点，旧响应仍有词条名", async () => {
   grantListPermissions();
   const api = requests();
   api.workspaceList.mockResolvedValue({
@@ -2717,9 +2717,17 @@ it("新版列表在同一行显示保存的英美原形，旧响应仍可显示�
           { text: "center", dialects: ["us"] }
         ]
       }),
+      listRow({
+        id: "case-variants",
+        headword: "Braille",
+        name_variants: [
+          { text: "Braille", dialects: ["uk", "us"] },
+          { text: "braille", dialects: ["uk", "us"] }
+        ]
+      }),
       listRow({ id: "older-entry", headword: "panel" })
     ],
-    pagination: { total: 2, page: 1, page_size: 20, total_pages: 1 }
+    pagination: { total: 3, page: 1, page_size: 20, total_pages: 1 }
   });
 
   mount(api, "/lexicon-next");
@@ -2729,6 +2737,13 @@ it("新版列表在同一行显示保存的英美原形，旧响应仍可显示�
   expect(names.getByText("centre")).toBeVisible();
   expect(names.getByRole("img", { name: "英式拼写" })).toBeVisible();
   expect(names.getByRole("img", { name: "美式拼写" })).toBeVisible();
+  const caseVariantCell = screen.getByText("Braille").closest("td")!;
+  expect(
+    [...caseVariantCell.querySelectorAll(".word-list-name")].map(
+      (name) => name.textContent
+    )
+  ).toEqual(["Braille", "braille"]);
+  expect(within(caseVariantCell).queryAllByRole("img")).toHaveLength(0);
   expect(screen.getByText("panel")).toBeVisible();
   expect(
     screen.getByRole("checkbox", { name: "选择「centre / center」" })

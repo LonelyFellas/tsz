@@ -19,16 +19,17 @@ export function WordListNames({
   return (
     <div className="word-list-names">
       <div className="word-list-name-variants">
-        {names.map((name) => (
-          <div className="word-list-name" key={name.text}>
-            <span className="tsz-words word-list-name-text">{name.text}</span>
-            {annotation ? (
-              <sup className="word-list-name-annotation">{annotation}</sup>
-            ) : null}
-            {!name.dialects.includes("common") &&
-              name.dialects.map((dialect) => (
+        {names.map((name) => {
+          const [dialect] = name.dialects;
+          return (
+            <div className="word-list-name" key={name.text}>
+              <span className="tsz-words word-list-name-text">{name.text}</span>
+              {annotation ? (
+                <sup className="word-list-name-annotation">{annotation}</sup>
+              ) : null}
+              {name.dialects.length === 1 &&
+              (dialect === "uk" || dialect === "us") ? (
                 <span
-                  key={dialect}
                   className={`word-list-dialect-dot word-list-dialect-dot-${dialect}`}
                   role="img"
                   aria-label={
@@ -36,9 +37,10 @@ export function WordListNames({
                   }
                   data-spelling-dialect={dialect}
                 />
-              ))}
-          </div>
-        ))}
+              ) : null}
+            </div>
+          );
+        })}
       </div>
       <span className="word-list-type-compact">{kindLabel}</span>
     </div>
