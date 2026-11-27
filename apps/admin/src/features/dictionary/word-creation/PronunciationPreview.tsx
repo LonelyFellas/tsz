@@ -736,15 +736,29 @@ export function PronunciationPreviewVoiceList({
     recommendationArea,
     shouldLoadSettings && voiceResolutionRequested
   );
-  const displayProfile = !shouldLoadSettings
-    ? voiceProfile
-    : resolved.error && !voicePreviewIsMock
-      ? {
-          voices:
-            voiceProfile?.voices.filter((setting) => setting.audio_asset_id) ??
-            []
-        }
-      : resolved.profile;
+  // 空文本无法解析试听音色，但本侧独立配置的参数已经可以展示。
+  const storedProfile =
+    shouldLoadSettings &&
+    voiceProfile?.dubbing &&
+    !content?.text.trim() &&
+    !profileHasInheritance(
+      voiceProfile,
+      localeForDialect(dialect, context.dialectPreference)
+    )
+      ? { voices: voiceProfile.voices }
+      : undefined;
+  const displayProfile =
+    storedProfile ??
+    (!shouldLoadSettings
+      ? voiceProfile
+      : resolved.error && !voicePreviewIsMock
+        ? {
+            voices:
+              voiceProfile?.voices.filter(
+                (setting) => setting.audio_asset_id
+              ) ?? []
+          }
+        : resolved.profile);
   const rows = pronunciationVoiceRows(
     displayProfile,
     context.voices,
@@ -859,7 +873,7 @@ export function PronunciationPreviewVoiceList({
                       dialect={dialect}
                       content={content}
                       voiceSetting={setting}
-                      disabled={!!source && !content}
+                      disabled={!!storedProfile || (!!source && !content)}
                       disabledReason={t("synthesis_source_required")}
                       ariaLabelPrefix={`${playback.label} · ${setting.version_name ?? displayName}`}
                       size="small"
