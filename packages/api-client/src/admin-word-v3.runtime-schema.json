@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/liaison-arc-adjustment/docs/openapi.json",
-  "_source_sha256": "909def3559dc2713800994909ee8efc7a67ece04b81bb5d0e9829e5358a083d9",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/fix-lexicon-save-conflicts/docs/openapi.json",
+  "_source_sha256": "82e7bd45af6a8386e3aa2cd0ac1a8a988d3a5b8feb01ffd9343666097d38a894",
   "roots": [
     "LexiconTaxonomy",
     "LexiconTaxonomyKind",

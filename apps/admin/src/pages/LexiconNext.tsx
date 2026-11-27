@@ -973,6 +973,21 @@ function EntryEditor({
         setError(
           "对方词义已变化。可重新选择，或只重载方言配对；其他草稿编辑会保留。"
         );
+      } else if (
+        options.preserveDraft &&
+        error instanceof HttpError &&
+        error.status === 409 &&
+        error.code === "revision_conflict" &&
+        (error.meta?.code === "speech_recommendation_changed" ||
+          (error.problem && error.problem.field == null && !error.meta))
+      ) {
+        // Older servers share a fieldless conflict between audio and other save checks.
+        const recovery =
+          error.meta?.code === "speech_recommendation_changed"
+            ? "配音推荐已变化，请重新解析并生成音频后再保存。"
+            : error.message;
+        setPeerConflict(false);
+        setError(`本地草稿已保留。${recovery}`);
       } else if (error instanceof HttpError && error.status === 409) {
         setConflict(true);
         setError("服务器版本已更新。本地草稿已保留，请先比较版本。");
