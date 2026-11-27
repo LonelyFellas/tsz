@@ -1537,6 +1537,64 @@ it("词形总览推荐解析失败时显示错误，不提供目录默认音色�
   expect(preview.synthesize).not.toHaveBeenCalled();
 });
 
+it("词形总览在拼写为空时显示复制来的两侧音色与参数", async () => {
+  const profile: VoiceProfileV3 = {
+    dubbing: {
+      area: "word",
+      uk: { mode: "local" },
+      us: { mode: "local" }
+    },
+    voices: [
+      {
+        voice_id: "british-voice",
+        locale: "en-GB",
+        enabled: true,
+        rate_percent: -10,
+        volume_percent: 85
+      },
+      {
+        voice_id: "american-voice",
+        locale: "en-US",
+        enabled: true,
+        rate_percent: -35,
+        volume_percent: 96
+      }
+    ]
+  };
+  render(
+    <PronunciationPreviewProvider>
+      {(["uk", "us"] as const).map((dialect) => (
+        <section key={dialect} aria-label={dialect}>
+          {(["voice", "rate", "volume"] as const).map((column) => (
+            <PronunciationPreviewVoiceList
+              key={column}
+              dialect={dialect}
+              source="spelling"
+              recommendationArea="word"
+              voiceProfile={profile}
+              content={{ version: 2, text: "", annotations: [] }}
+              column={column}
+              playback={{ pronunciationId: "plural", label: dialect }}
+            />
+          ))}
+        </section>
+      ))}
+    </PronunciationPreviewProvider>
+  );
+
+  for (const [dialect, name, rate, volume] of [
+    ["uk", "British", "0.90×", "85%"],
+    ["us", "American", "0.65×", "96%"]
+  ] as const) {
+    const row = within(screen.getByRole("region", { name: dialect }));
+    expect(await row.findByText(name)).toBeVisible();
+    expect(row.getByText(rate)).toBeVisible();
+    expect(row.getByText(volume)).toBeVisible();
+    expect(row.getByRole("button", { name: /播放语音/ })).toBeDisabled();
+  }
+  expect(preview.resolveVoices).not.toHaveBeenCalled();
+});
+
 it("词形总览按目录标注的口音归类未保存 locale 的音色", async () => {
   preview.listVoices.mockResolvedValue([
     {
