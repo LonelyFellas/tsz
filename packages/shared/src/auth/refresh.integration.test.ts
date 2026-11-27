@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { RequestTimeoutError } from "@tsz/api-client";
 import { createAuthRuntime } from "./runtime";
 import { createAdminAuthRuntime } from "./adminRuntime";
 
@@ -482,23 +483,289 @@ describe("web 账号安全真实请求层", () => {
   );
 });
 
-describe("admin 改密真实请求层", () => {
-  it("invalid_credentials 仅改密一次、refresh 零次", async () => {
+describe("Admin 请求等待会话刷新", () => {
+  function setup(expiresIn = 30) {
     vi.useFakeTimers();
-    const rt = createAdminAuthRuntime({ baseUrl: "/api/v1/admin" });
-    rt.persistSession({ access_token: "token", expires_in: 900 });
-    const fetch = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValue(
-        response(401, { code: "invalid_credentials", message: "当前密码错误" })
+    const rt = createAdminAuthRuntime({
+      baseUrl: "/api/v1/admin",
+      getTestResourceRun: () => "synthetic-run"
+    });
+    rt.persistSession({ access_token: "old", expires_in: expiresIn });
+    return { rt, fetch: vi.spyOn(globalThis, "fetch") };
+  }
+
+  function holdRefresh() {
+    let release!: (value: Response) => void;
+    const refresh = new Promise<Response>((resolve) => {
+      release = resolve;
+    });
+    return { refresh, release };
+  }
+
+  it.each(["主动刷新", "401 触发的刷新", "已知到期但尚未刷新"])(
+    "%s时，22 个语音解析请求共享一次刷新并首次成功",
+    async (scenario) => {
+      const expired = scenario === "已知到期但尚未刷新";
+      const { rt, fetch } = setup(expired ? 30 : 60);
+      const input = {
+        profile: { voices: [] },
+        source: {
+          kind: "text" as const,
+          content: { version: 2 as const, text: "hello", annotations: [] }
+        },
+        accent: "gb" as const
+      };
+      const resolved = { voices: [], source: { kind: "local" } };
+      const { refresh, release } = holdRefresh();
+      fetch.mockImplementation(async (url, init) => {
+        if (String(url).endsWith("/auth/refresh")) return refresh;
+        if (new Headers(init?.headers).get("Authorization") === "Bearer old")
+          return response(401, { code: "invalid_token" });
+        return response(200, resolved);
+      });
+      const refreshCalls = () =>
+        fetch.mock.calls.filter(
+          ([url]) => url === "/api/v1/admin/auth/refresh"
+        );
+      const resolveCalls = () =>
+        fetch.mock.calls.filter(
+          ([url]) => url === "/api/v1/admin/speech/resolve"
+        );
+
+      const trigger =
+        scenario === "401 触发的刷新" ? rt.api.speech.voices() : undefined;
+      await vi.advanceTimersByTimeAsync(trigger ? 0 : 30_000);
+      expect(refreshCalls()).toHaveLength(expired ? 0 : 1);
+      const pending = Promise.all(
+        Array.from({ length: 22 }, () => rt.api.speech.resolve(input))
       );
-    await expect(
-      rt.api.auth.changePassword("wrong", "new-password")
-    ).rejects.toMatchObject({ status: 401, code: "invalid_credentials" });
-    expect(fetch).toHaveBeenCalledTimes(1);
-    expect(String(fetch.mock.calls[0]?.[0])).toMatch(/change-password$/);
-    rt.tokens.setAccessToken(null);
+      await vi.advanceTimersByTimeAsync(0);
+      const callsWhileRefreshing = resolveCalls().length;
+      release(response(200, { access_token: "new", expires_in: 900 }));
+      await expect(pending).resolves.toEqual(
+        Array.from({ length: 22 }, () => resolved)
+      );
+      await trigger;
+      rt.tokens.setAccessToken(null);
+
+      expect(refreshCalls()).toHaveLength(1);
+      expect.soft(callsWhileRefreshing).toBe(0);
+      expect.soft(resolveCalls()).toHaveLength(22);
+      expect(
+        resolveCalls().every(([, init]) => {
+          const headers = new Headers(init?.headers);
+          return (
+            init?.method === "POST" &&
+            init.body === JSON.stringify(input) &&
+            headers.get("Authorization") === "Bearer new" &&
+            headers.get("X-TSZ-Test-Run") === "synthetic-run" &&
+            headers.get("X-TSZ-Voice-Versions") === "v6"
+          );
+        })
+      ).toBe(true);
+    }
+  );
+
+  it("单个等待者取消后，公开端点立即发送且其他等待者继续共享刷新", async () => {
+    const { rt, fetch } = setup();
+    const { refresh, release } = holdRefresh();
+    fetch.mockResolvedValueOnce(response(200, {}));
+    await rt.api.speech.voices();
+    expect(
+      new Headers(fetch.mock.calls[0]?.[1]?.headers).get("Authorization")
+    ).toBe("Bearer old");
+    fetch.mockClear();
+    fetch
+      .mockImplementationOnce(() => refresh)
+      .mockResolvedValueOnce(response(202))
+      .mockResolvedValueOnce(response(200, { voices: [] }));
+
+    await vi.advanceTimersByTimeAsync(30_000);
+    const controller = new AbortController();
+    const cancelled = expect(
+      rt.api.speech.voices(controller.signal)
+    ).rejects.toMatchObject({ name: "AbortError" });
+    const waiting = rt.api.speech.voices();
+    await vi.advanceTimersByTimeAsync(0);
+    controller.abort();
+    await cancelled;
+    await rt.api.auth.requestLoginCode("13800138000");
+
+    expect(fetch.mock.calls.map(([url]) => url)).toEqual([
+      "/api/v1/admin/auth/refresh",
+      "/api/v1/admin/auth/login-code"
+    ]);
+    expect(fetch.mock.calls[0]?.[1]?.signal?.aborted).toBe(false);
+    const publicHeaders = new Headers(fetch.mock.calls[1]?.[1]?.headers);
+    expect(publicHeaders.has("Authorization")).toBe(false);
+    expect(publicHeaders.has("X-TSZ-Test-Run")).toBe(false);
+
+    release(response(200, { access_token: "new", expires_in: 900 }));
+    await expect(waiting).resolves.toEqual({ voices: [] });
+    expect(fetch).toHaveBeenCalledTimes(3);
+    expect(
+      new Headers(fetch.mock.calls[2]?.[1]?.headers).get("Authorization")
+    ).toBe("Bearer new");
+    rt.clearSession();
   });
+
+  it.each([401, 503])(
+    "请求前刷新失败 (%s) 时，等待者共担失败且不发送业务请求",
+    async (status) => {
+      const { rt, fetch } = setup();
+      const location = { href: "" };
+      vi.stubGlobal("window", { location });
+      fetch.mockResolvedValue(response(status));
+      await vi.advanceTimersByTimeAsync(30_000);
+
+      const results = await Promise.allSettled([
+        rt.api.profile(),
+        rt.api.profile()
+      ]);
+      expect(results).toEqual(
+        Array.from({ length: 2 }, () => ({
+          status: "rejected",
+          reason: expect.objectContaining({ status })
+        }))
+      );
+      expect(fetch.mock.calls.map(([url]) => url)).toEqual([
+        "/api/v1/admin/auth/refresh"
+      ]);
+      expect(rt.tokens.getToken()).toBe(status === 401 ? undefined : "old");
+      expect(location.href).toBe(status === 401 ? "/login" : "");
+      rt.clearSession();
+    }
+  );
+
+  it.each(["登出", "切换会话"])(
+    "等待刷新时%s，原业务请求不发送",
+    async (action) => {
+      const { rt, fetch } = setup();
+      const { refresh, release } = holdRefresh();
+      fetch.mockImplementationOnce(() => refresh);
+      await vi.advanceTimersByTimeAsync(30_000);
+      const oldRequest = expect(
+        rt.api.updateProfilePreferences({ dialect: "us" })
+      ).rejects.toThrow("session changed");
+      await vi.advanceTimersByTimeAsync(0);
+
+      if (action === "登出") rt.clearSession();
+      else rt.persistSession({ access_token: "new-login", expires_in: 900 });
+      release(
+        response(200, { access_token: "late-rotation", expires_in: 900 })
+      );
+      await oldRequest;
+      expect(fetch.mock.calls.map(([url]) => url)).toEqual([
+        "/api/v1/admin/auth/refresh"
+      ]);
+
+      if (action === "登出") {
+        fetch.mockResolvedValueOnce(response(401));
+        await expect(rt.api.speech.voices()).rejects.toMatchObject({
+          status: 401
+        });
+      } else {
+        fetch.mockResolvedValueOnce(response(200, { voices: [] }));
+        await expect(rt.api.speech.voices()).resolves.toEqual({ voices: [] });
+      }
+      expect(fetch.mock.calls.map(([url]) => url)).toEqual([
+        "/api/v1/admin/auth/refresh",
+        "/api/v1/admin/speech/voices"
+      ]);
+      expect(
+        new Headers(fetch.mock.calls[1]?.[1]?.headers).get("Authorization")
+      ).toBe(action === "登出" ? null : "Bearer new-login");
+      rt.clearSession();
+    }
+  );
+
+  it("请求前刷新、401 刷新和重试共用原始超时预算及写入参数", async () => {
+    const { rt, fetch } = setup();
+    const after = (ms: number, result: Response) =>
+      new Promise<Response>((resolve) => setTimeout(() => resolve(result), ms));
+    fetch
+      .mockImplementationOnce(() =>
+        after(
+          8_000,
+          response(200, { access_token: "preflight", expires_in: 900 })
+        )
+      )
+      .mockImplementationOnce(() =>
+        after(20_000, response(401, { code: "invalid_token" }))
+      )
+      .mockImplementationOnce(() =>
+        after(
+          1_000,
+          response(200, { access_token: "replayed", expires_in: 900 })
+        )
+      )
+      .mockImplementationOnce(() => new Promise<Response>(() => {}));
+    await vi.advanceTimersByTimeAsync(30_000);
+    const body = { schema_version: 3 as const, base_revision: 7 };
+    const write = rt.api.words.publishV3("synthetic-entry", "same-key", body);
+    const timedOut = expect(write).rejects.toBeInstanceOf(RequestTimeoutError);
+    await vi.advanceTimersByTimeAsync(30_000);
+    await timedOut;
+
+    expect(fetch.mock.calls.map(([url]) => url)).toEqual([
+      "/api/v1/admin/auth/refresh",
+      "/api/v1/admin/lexicon/entries/synthetic-entry/publications",
+      "/api/v1/admin/auth/refresh",
+      "/api/v1/admin/lexicon/entries/synthetic-entry/publications"
+    ]);
+    const first = fetch.mock.calls[1]?.[1];
+    const replay = fetch.mock.calls[3]?.[1];
+    expect(first?.signal).toBe(replay?.signal);
+    expect(replay?.signal?.aborted).toBe(true);
+    expect(first?.body).toBe(JSON.stringify(body));
+    expect(replay?.body).toBe(first?.body);
+    for (const [init, token] of [
+      [first, "preflight"],
+      [replay, "replayed"]
+    ] as const) {
+      const headers = new Headers(init?.headers);
+      expect(headers.get("Authorization")).toBe(`Bearer ${token}`);
+      expect(headers.get("Idempotency-Key")).toBe("same-key");
+      expect(headers.get("X-TSZ-Test-Run")).toBe("synthetic-run");
+    }
+    rt.clearSession();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe("admin 改密真实请求层", () => {
+  it.each([false, true])(
+    "invalid_credentials 不重试改密（已知到期：%s）",
+    async (expired) => {
+      vi.useFakeTimers();
+      const rt = createAdminAuthRuntime({ baseUrl: "/api/v1/admin" });
+      rt.persistSession({
+        access_token: "token",
+        expires_in: expired ? 30 : 900
+      });
+      const wrongPassword = response(401, {
+        code: "invalid_credentials",
+        message: "当前密码错误"
+      });
+      const fetch = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(wrongPassword);
+      if (expired) {
+        fetch.mockResolvedValueOnce(
+          response(200, { access_token: "new", expires_in: 900 })
+        );
+        await vi.advanceTimersByTimeAsync(30_000);
+      }
+      await expect(
+        rt.api.auth.changePassword("wrong", "new-password")
+      ).rejects.toMatchObject({ status: 401, code: "invalid_credentials" });
+      expect(fetch.mock.calls.map(([url]) => url)).toEqual([
+        ...(expired ? ["/api/v1/admin/auth/refresh"] : []),
+        "/api/v1/admin/auth/change-password"
+      ]);
+      rt.tokens.setAccessToken(null);
+    }
+  );
 
   it("invalid_token 刷新成功后只重试一次", async () => {
     vi.useFakeTimers();
