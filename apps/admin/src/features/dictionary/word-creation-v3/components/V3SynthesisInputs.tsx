@@ -694,6 +694,17 @@ export function V3SynthesisInputs({
                             (isPhoneme
                               ? pronunciation.voice_profile
                               : undefined);
+                          const savedAssetId = savedVoiceAudioAsset(
+                            savedProfile,
+                            sideLocale
+                          );
+                          const savedVoice = savedAssetId
+                            ? savedProfile?.voices.find(
+                                (voice) =>
+                                  voice.enabled &&
+                                  voice.audio_asset_id === savedAssetId
+                              )
+                            : undefined;
                           const active = currentSource === option.value;
                           const sourceRecording =
                             option.value === "upload"
@@ -748,8 +759,14 @@ export function V3SynthesisInputs({
                                 dialect={side}
                                 source={option.value}
                                 content={previewContent}
-                                voiceProfile={voiceProfile}
-                                recommendationArea={recommendationArea}
+                                voiceProfile={
+                                  savedVoice
+                                    ? { voices: [savedVoice] }
+                                    : voiceProfile
+                                }
+                                recommendationArea={
+                                  savedVoice ? undefined : recommendationArea
+                                }
                                 requestSharedResolution={false}
                               />
                             );
@@ -779,11 +796,7 @@ export function V3SynthesisInputs({
                                   playbackOnly
                                   assetOnly={option.value === "upload"}
                                   audioAssetId={
-                                    sourceRecording?.id ??
-                                    savedVoiceAudioAsset(
-                                      savedProfile,
-                                      sideLocale
-                                    )
+                                    sourceRecording?.id ?? savedAssetId
                                   }
                                   pronunciationId={pronunciation.id}
                                   dialect={side}

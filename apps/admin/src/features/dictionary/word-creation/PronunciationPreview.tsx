@@ -1032,6 +1032,12 @@ export function PronunciationPreviewControls({
     assetOnly ? undefined : recommendationArea,
     resolveRequested || context.voiceResolutionRequested
   );
+  const canResolveVoiceOnDemand =
+    !assetOnly &&
+    resolved.profile?.dubbing &&
+    (previewAdapter ?? context.adapter).resolveVoices &&
+    !resolveRequested &&
+    !context.voiceResolutionRequested;
   const enabledSettings =
     resolved.profile?.voices.filter((setting) => setting.enabled) ?? [];
   const voice = voiceSetting
@@ -1203,13 +1209,7 @@ export function PronunciationPreviewControls({
     )
       return;
     claimPlayback(stopPlayback);
-    if (
-      !assetOnly &&
-      resolved.profile?.dubbing &&
-      adapter.resolveVoices &&
-      !resolveRequested &&
-      !context.voiceResolutionRequested
-    ) {
+    if (canResolveVoiceOnDemand) {
       pendingGenerateRef.current = {
         key: requestKey,
         waitingFor: "resolution"
@@ -1406,7 +1406,7 @@ export function PronunciationPreviewControls({
     ? t("panel_voice_auditions_are_disabled")
     : context.voicesLoading || resolved.pending
       ? t("panel_loading_speakers")
-      : !context.voicesRequested
+      : !context.voicesRequested || canResolveVoiceOnDemand
         ? context.voicesError || t("panel_get_audio_2")
         : resolved.error
           ? resolved.error
@@ -1462,7 +1462,9 @@ export function PronunciationPreviewControls({
                   : (!playbackOnly && !canReadSavedAudio) ||
                     (context.voicesRequested && context.voicesLoading) ||
                     resolved.pending ||
-                    (context.voicesRequested && !voice) ||
+                    (context.voicesRequested &&
+                      !voice &&
+                      !canResolveVoiceOnDemand) ||
                     !text)) ||
               (!assetOnly && !context.enabled)
             }
@@ -1505,7 +1507,7 @@ export function PronunciationPreviewControls({
               disabled ||
               !context.enabled ||
               context.voicesLoading ||
-              (context.voicesRequested && !voice) ||
+              (context.voicesRequested && !voice && !canResolveVoiceOnDemand) ||
               !text ||
               busy
             }

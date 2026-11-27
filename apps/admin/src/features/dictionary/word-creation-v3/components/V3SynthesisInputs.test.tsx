@@ -161,6 +161,7 @@ function Harness({
   recording = false,
   recordingLocale = "en-GB",
   extraRecording = false,
+  eagerPreview = true,
   issues = [],
   audioTasks = null,
   onLatestChange
@@ -178,6 +179,7 @@ function Harness({
   recording?: boolean;
   recordingLocale?: "en-GB" | "en-US";
   extraRecording?: boolean;
+  eagerPreview?: boolean;
   issues?: readonly V3DraftValidationIssue[];
   audioTasks?: Map<string, () => Promise<boolean>> | null;
   onLatestChange?: (next: WordPronunciationV3) => void;
@@ -321,7 +323,10 @@ function Harness({
   return (
     <App>
       <VoiceAudioTasksContext.Provider value={audioTasks}>
-        <PronunciationPreviewProvider loadVoicesOnMount resolveVoicesOnMount>
+        <PronunciationPreviewProvider
+          loadVoicesOnMount={eagerPreview}
+          resolveVoicesOnMount={eagerPreview}
+        >
           <V3SynthesisInputs
             pronunciation={pronunciation}
             synthesisEditable
@@ -362,6 +367,51 @@ it("音色解析失败时仍可读取编辑窗中已保存的正式音频", asyn
     })
   );
   expect(speech.synthesize).not.toHaveBeenCalled();
+});
+
+it("发音行显示正式音频的音色，推荐更新后仍指向同一个录音", async () => {
+  speech.resolve.mockResolvedValue({
+    voices: [
+      {
+        voice_id: "en-gb-ryan",
+        locale: "en-GB",
+        enabled: true,
+        rate_percent: 0
+      }
+    ]
+  });
+  render(<Harness dialect="uk" generated generatedLocale="en-GB" />);
+  fireEvent.click(sourceRadio("Azure IPA", "英式"));
+  const row = within(screen.getByRole("region", { name: "英式配音来源" }));
+  expect(await row.findByText("Sonia")).toBeVisible();
+  expect(row.queryByText("en-gb-ryan")).not.toBeInTheDocument();
+  fireEvent.click(
+    row.getByRole("button", {
+      name: "第 1 条发音 英式 Azure IPA 最终读音 播放语音"
+    })
+  );
+  await waitFor(() =>
+    expect(speech.resolveAudio).toHaveBeenCalledWith("stored-audio", {
+      signal: expect.any(AbortSignal)
+    })
+  );
+});
+
+it("显示继承音色后仍可按需解析并试听未选中的来源", async () => {
+  render(<Harness dialect="uk" eagerPreview={false} />);
+  const row = within(screen.getByRole("region", { name: "英式配音来源" }));
+  expect(await row.findByText("Sonia")).toBeVisible();
+  const play = row.getByRole("button", {
+    name: "第 1 条发音 英式 Azure IPA 最终读音 播放语音"
+  });
+  expect(play).toBeEnabled();
+  fireEvent.click(play);
+  await waitFor(() =>
+    expect(speech.synthesize).toHaveBeenCalledWith(
+      expect.objectContaining({ voiceId: "en-gb-sonia" }),
+      expect.anything()
+    )
+  );
 });
 
 it("词形拼写同时有录音和合成资产时，播放同口音默认录音", async () => {
