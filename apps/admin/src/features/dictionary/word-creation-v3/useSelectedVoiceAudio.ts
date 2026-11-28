@@ -8,7 +8,7 @@ import {
   useState
 } from "react";
 import { flushSync } from "react-dom";
-import { speechAccentGroup } from "@tsz/shared";
+import { speechAccentGroup, type SpeechAccentGroup } from "@tsz/shared";
 import type {
   PhonemeLocaleV3,
   RichTextV2,
@@ -79,7 +79,8 @@ function selectionSignature(
   locale: string | undefined,
   profile?: VoiceProfileV3 | null,
   activeLocales?: readonly PhonemeLocaleV3[],
-  requiredLocales?: readonly PhonemeLocaleV3[]
+  requiredLocales?: readonly PhonemeLocaleV3[],
+  recordedAccents?: readonly SpeechAccentGroup[]
 ) {
   const sides = resolveAccents.filter(
     (scope) =>
@@ -91,6 +92,7 @@ function selectionSignature(
     locale,
     activeLocales,
     requiredLocales,
+    recordedAccents,
     profile?.dubbing && [
       profile.dubbing.area,
       sides.map(({ side }) => profile.dubbing![side].mode)
@@ -127,6 +129,7 @@ export function useSelectedVoiceAudio({
   locale,
   activeLocales,
   requiredLocales,
+  recordedAccents,
   enabled,
   defer,
   waitForSave = true,
@@ -140,6 +143,8 @@ export function useSelectedVoiceAudio({
   locale?: `en-${string}`;
   activeLocales?: readonly PhonemeLocaleV3[];
   requiredLocales?: readonly PhonemeLocaleV3[];
+  /** 已选默认录音覆盖的口音跳过合成，正文变化仍清理过期引用。 */
+  recordedAccents?: readonly SpeechAccentGroup[];
   enabled: boolean;
   defer: boolean;
   waitForSave?: boolean;
@@ -191,7 +196,8 @@ export function useSelectedVoiceAudio({
     locale,
     profile,
     activeLocales,
-    requiredLocales
+    requiredLocales,
+    recordedAccents
   );
   const latest = useRef({
     target,
@@ -243,7 +249,8 @@ export function useSelectedVoiceAudio({
         locale,
         next,
         activeLocales,
-        requiredLocales
+        requiredLocales,
+        recordedAccents
       );
       attempted.current = expectedSignature;
       if (running.current?.controller === controller)
@@ -313,7 +320,8 @@ export function useSelectedVoiceAudio({
               (scope) =>
                 (!locale ||
                   scope.locale === (locale === "en-GB" ? "en-GB" : "en-US")) &&
-                (!activeLocales || activeLocales.includes(scope.locale))
+                (!activeLocales || activeLocales.includes(scope.locale)) &&
+                !recordedAccents?.includes(scope.side)
             )
             .map((scope) => ({
               ...scope,
@@ -356,16 +364,22 @@ export function useSelectedVoiceAudio({
         if (!isCurrent()) return resumeCurrent();
         if (latest.current.profile !== profileBeforeResolve)
           stored = latest.current.profile ?? stored;
+        const inGenerationScope = (setting: VoiceSettingV3) =>
+          inScope(setting, stored, locale, activeLocales) &&
+          !recordedAccents?.some(
+            (side) =>
+              side ===
+              speechAccentGroup(setting.locale ?? locale, setting.accent)
+          );
         const selected = retainResolvedAudio(resolved, stored.voices).filter(
-          (setting) =>
-            setting.enabled && inScope(setting, stored, locale, activeLocales)
+          (setting) => setting.enabled && inGenerationScope(setting)
         );
         const selectedKeys = new Set(selected.map(voiceSettingKey));
         for (const setting of stored.voices) {
           const group = speechAccentGroup(setting.locale, setting.accent);
           if (
             setting.enabled &&
-            inScope(setting, stored, locale, activeLocales) &&
+            inGenerationScope(setting) &&
             (!hasExplicitScope ||
               !adapter.resolveVoices ||
               (group && (group !== "other" || !stored.dubbing))) &&
@@ -385,8 +399,7 @@ export function useSelectedVoiceAudio({
           ...stored,
           voices: stored.voices.map((setting) => {
             const resolved =
-              !setting.enabled &&
-              inScope(setting, stored, locale, activeLocales)
+              !setting.enabled && inGenerationScope(setting)
                 ? reused.get(voiceSettingKey(setting))
                 : undefined;
             return resolved
@@ -396,7 +409,7 @@ export function useSelectedVoiceAudio({
                     ? { version_name: setting.version_name }
                     : {})
                 }
-              : inScope(setting, stored, locale, activeLocales) &&
+              : inGenerationScope(setting) &&
                   inheritedSetting(setting, stored, locale) &&
                   !selectedKeys.has(voiceSettingKey(setting))
                 ? { ...setting, enabled: false }
@@ -445,7 +458,7 @@ export function useSelectedVoiceAudio({
           if (!isCurrent()) return resumeCurrent();
           const voices = (latest.current.profile?.voices ?? stored.voices).map(
             (item) =>
-              inScope(item, stored, locale, activeLocales) &&
+              inGenerationScope(item) &&
               inheritedSetting(item, stored, locale) &&
               !selectedKeys.has(voiceSettingKey(item))
                 ? { ...item, enabled: false }
@@ -491,6 +504,7 @@ export function useSelectedVoiceAudio({
     enabled,
     locale,
     profile,
+    recordedAccents,
     requiredLocales,
     signature,
     sourceKey,

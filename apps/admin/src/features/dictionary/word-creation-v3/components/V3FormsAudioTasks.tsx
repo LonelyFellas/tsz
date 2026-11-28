@@ -2,7 +2,8 @@ import { useLayoutEffect, useRef, useState } from "react";
 import {
   pronunciationLocale,
   speechAccentGroup,
-  synthesisForLocale
+  synthesisForLocale,
+  type SpeechAccentGroup
 } from "@tsz/shared";
 import type {
   Dialect,
@@ -11,7 +12,8 @@ import type {
   SharedFormsStepContentV3,
   VoiceProfileV3,
   VoiceSettingV3,
-  RichTextV2
+  RichTextV2,
+  WordPronunciationV3
 } from "@tsz/types";
 import { Alert, Button } from "@tsz/ui/admin/display";
 import { env } from "@/lib/env";
@@ -58,15 +60,27 @@ function variants(forms: SharedFormsStepContentV3) {
 function needsVoiceCatalog(
   setting: VoiceSettingV3,
   dialect: Dialect,
-  profile: VoiceProfileV3
+  profile: VoiceProfileV3,
+  recordedAccents?: readonly SpeechAccentGroup[]
 ) {
   return (
     !(profile.dubbing && setting.accent === "none") &&
     (!setting.locale || !setting.accent) &&
+    !recordedAccents?.some(
+      (side) => side === speechAccentGroup(undefined, setting.accent)
+    ) &&
     (dialect === "common" ||
       !setting.accent ||
       speechAccentGroup(undefined, setting.accent) === dialect)
   );
+}
+
+function legacyRecordedAccents(row: WordPronunciationV3) {
+  if (row.synthesis) return undefined;
+  return row.audio_assets
+    ?.filter((asset) => asset.is_default)
+    .map((asset) => speechAccentGroup(asset.locale))
+    .filter((side) => side === "uk" || side === "us");
 }
 
 /** 汇总表没有挂载字段编辑器；在这里承接词典带入、复制和载入的已选配音。 */
@@ -107,9 +121,11 @@ export function V3FormsAudioTasks({
       const profile = row.voice_profile;
       if (!profile || row.synthesis?.uk?.source || row.synthesis?.us?.source)
         return [];
+      const recordedAccents = legacyRecordedAccents(row);
       return profile.voices.filter(
         (setting) =>
-          setting.enabled && needsVoiceCatalog(setting, dialect, profile)
+          setting.enabled &&
+          needsVoiceCatalog(setting, dialect, profile, recordedAccents)
       );
     })
   );
@@ -285,13 +301,21 @@ export function V3FormsAudioTasks({
               dialect === "common"
                 ? undefined
                 : pronunciationLocale(dialect, dialect);
+            const recordedAccents = legacyRecordedAccents(pronunciation);
             const storedProfile = pronunciation.voice_profile;
             const profile =
               storedProfile && catalog
                 ? {
                     ...storedProfile,
                     voices: storedProfile.voices.map((setting) => {
-                      if (!needsVoiceCatalog(setting, dialect, storedProfile))
+                      if (
+                        !needsVoiceCatalog(
+                          setting,
+                          dialect,
+                          storedProfile,
+                          recordedAccents
+                        )
+                      )
                         return setting;
                       const voice = catalog.find(
                         (voice) => voice.id === setting.voice_id
@@ -335,6 +359,7 @@ export function V3FormsAudioTasks({
                   locale={locale}
                   activeLocales={locale ? [locale] : undefined}
                   requiredLocales={requiredLocales}
+                  recordedAccents={recordedAccents}
                   content={toRichTextV2(
                     pronunciation.dict_phonetic_rich ?? {
                       version: 2,
@@ -447,6 +472,7 @@ function TextAudioTask({
   locale,
   activeLocales,
   requiredLocales,
+  recordedAccents,
   background = false,
   onRetry,
   refreshCatalog
@@ -459,6 +485,7 @@ function TextAudioTask({
   locale?: `en-${string}`;
   activeLocales?: readonly PhonemeLocaleV3[];
   requiredLocales?: readonly PhonemeLocaleV3[];
+  recordedAccents?: readonly SpeechAccentGroup[];
   background?: boolean;
   onRetry?: () => void;
   refreshCatalog?: () => Promise<boolean>;
@@ -478,6 +505,7 @@ function TextAudioTask({
     locale,
     activeLocales,
     requiredLocales,
+    recordedAccents,
     enabled,
     defer: !background,
     waitForSave: !background,
