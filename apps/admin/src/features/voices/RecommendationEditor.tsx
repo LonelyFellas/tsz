@@ -12,6 +12,7 @@ import { Drawer } from "@tsz/ui/admin/overlays";
 import {
   newRecommendationVoice,
   recommendationError,
+  recommendationVoiceIdentity,
   sideName,
   type DubbingSide
 } from "./dubbing-model";
@@ -48,6 +49,8 @@ export function RecommendationEditor({
   initial,
   side,
   disabled,
+  occupiedVoices,
+  submissionError,
   bulkAdd,
   onBeforeAudition,
   onSave,
@@ -57,6 +60,8 @@ export function RecommendationEditor({
   initial: RecommendationSeed;
   side: DubbingSide;
   disabled: boolean;
+  occupiedVoices?: ReadonlyMap<string, number>;
+  submissionError?: string;
   onBeforeAudition?: () => void;
   onCancel: () => void;
 } & RecommendationSubmission) {
@@ -71,10 +76,25 @@ export function RecommendationEditor({
   const [ssmlDrafts, setSsmlDrafts] = useState<Record<string, SsmlDraft>>({});
   const voiceDrafts = useRef(new Map<string, RecommendationSeed>());
   const [selectedAliases, setSelectedAliases] = useState<string[]>([]);
+  const identityForAlias = (alias: string) =>
+    recommendationVoiceIdentity(
+      alias,
+      voices.find((voice) => voice.alias === alias)
+    );
+  const selectedIdentities = new Set<string>();
+  const availableSelection = selectedAliases.filter((alias) => {
+    const identity = identityForAlias(alias);
+    if (occupiedVoices?.has(identity) || selectedIdentities.has(identity))
+      return false;
+    selectedIdentities.add(identity);
+    return true;
+  });
+  if (availableSelection.length !== selectedAliases.length)
+    setSelectedAliases(availableSelection);
   const atCapacity =
-    !!bulkAdd && selectedAliases.length >= bulkAdd.remainingSlots;
+    !!bulkAdd && availableSelection.length >= bulkAdd.remainingSlots;
   const selectionExceedsCapacity =
-    !!bulkAdd && selectedAliases.length > bulkAdd.remainingSlots;
+    !!bulkAdd && availableSelection.length > bulkAdd.remainingSlots;
   const [searches, setSearches] = useState({ female: "", male: "" });
   const lists = useRef(new Map<string, HTMLDivElement>());
   const positions = useRef(new Map<string, number>());
@@ -101,11 +121,17 @@ export function RecommendationEditor({
     setError(undefined);
   }
   function toggleVoice(alias: string) {
-    const checked = selectedAliases.includes(alias);
-    if (disabled || (!checked && atCapacity)) return;
+    const checked = availableSelection.includes(alias);
+    const identity = identityForAlias(alias);
+    if (
+      disabled ||
+      occupiedVoices?.has(identity) ||
+      (!checked && (atCapacity || selectedIdentities.has(identity)))
+    )
+      return;
     const next = checked
-      ? selectedAliases.filter((selected) => selected !== alias)
-      : [...selectedAliases, alias];
+      ? availableSelection.filter((selected) => selected !== alias)
+      : [...availableSelection, alias];
     setSelectedAliases(next);
     setError(undefined);
   }
@@ -127,6 +153,18 @@ export function RecommendationEditor({
     recommendation: AdminDubbingRecommendation,
     candidate: AdminSpeechVoice | undefined
   ) {
+    if (
+      occupiedVoices?.has(
+        recommendationVoiceIdentity(recommendation.voice_alias, candidate)
+      )
+    ) {
+      setError(
+        voiceMessage("recommendation_voice_conflict", {
+          voice: candidate?.display_name ?? recommendation.voice_alias
+        })
+      );
+      return false;
+    }
     if (
       !recommendationError(
         t("recommendation"),
@@ -152,12 +190,13 @@ export function RecommendationEditor({
 
   const saveDisabled =
     disabled ||
-    (!!bulkAdd && (!selectedAliases.length || selectionExceedsCapacity));
+    !!submissionError ||
+    (!!bulkAdd && (!availableSelection.length || selectionExceedsCapacity));
   function save() {
     if (saveDisabled) return;
     if (bulkAdd) {
       const recommendations: AdminDubbingRecommendation[] = [];
-      for (const alias of selectedAliases) {
+      for (const alias of availableSelection) {
         const candidate = voices.find((voice) => voice.alias === alias);
         if (!candidate) {
           setError(voiceMessage("recommendation_catalog_changed"));
@@ -352,6 +391,10 @@ export function RecommendationEditor({
           const candidates = voices.filter(
             (voice) =>
               speechAccentGroup(voice.locale, voice.accent) === side &&
+              (voice.alias === item?.voice_alias ||
+                !occupiedVoices?.has(
+                  recommendationVoiceIdentity(voice.alias, voice)
+                )) &&
               (gender === "female"
                 ? voice.gender.toLowerCase() === "female"
                 : voice.gender.toLowerCase() !== "female") &&
@@ -364,7 +407,10 @@ export function RecommendationEditor({
             gender: label
           });
           const options = candidates.map((candidate) => {
-            const checked = selectedAliases.includes(candidate.alias);
+            const checked = availableSelection.includes(candidate.alias);
+            const alreadySelected = selectedIdentities.has(
+              recommendationVoiceIdentity(candidate.alias, candidate)
+            );
             const unavailable = candidate.synthesis_available === false;
             const name = <VoiceName voice={candidate} />;
             return (
@@ -373,7 +419,9 @@ export function RecommendationEditor({
                   <Checkbox
                     checked={checked}
                     disabled={
-                      disabled || (!checked && (atCapacity || unavailable))
+                      disabled ||
+                      (!checked &&
+                        (atCapacity || unavailable || alreadySelected))
                     }
                     onChange={() => toggleVoice(candidate.alias)}
                   >
@@ -462,13 +510,18 @@ export function RecommendationEditor({
     </Form>
   );
 
+  const footerError =
+    submissionError ??
+    (selectionExceedsCapacity
+      ? t("recommendation_selection_exceeds_capacity")
+      : error);
   const footer = (
     <div className="dubbing-editor-footer">
       <div className="dubbing-editor-footer-status">
         {bulkAdd && (
           <Typography.Text type="secondary" aria-live="polite">
             {t("recommendation_selection_count", {
-              selected: selectedAliases.length,
+              selected: availableSelection.length,
               limit: bulkAdd.remainingSlots
             })}
           </Typography.Text>
@@ -476,11 +529,9 @@ export function RecommendationEditor({
         <Typography.Text type="secondary">
           {t("editor_status_side")}
         </Typography.Text>
-        {(selectionExceedsCapacity || error) && (
+        {footerError && (
           <Typography.Text type="danger" role="alert">
-            {selectionExceedsCapacity
-              ? t("recommendation_selection_exceeds_capacity")
-              : error}
+            {footerError}
           </Typography.Text>
         )}
       </div>
