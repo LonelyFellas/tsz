@@ -18,6 +18,32 @@ export const sideName = (
   t: VoiceTranslation = defaultVoiceTranslation
 ) => t(side === "uk" ? "british" : "american");
 
+export function recommendationVoiceIdentity(
+  alias: string,
+  voice?: AdminSpeechVoice
+): string {
+  // The recommendation catalog currently contains only Azure voices.
+  const officialId =
+    voice?.capability_evidence?.provider_voice_id ??
+    voice?.metadata?.provider_voice_id;
+  return officialId ? `azure:${officialId}` : `alias:${alias}`;
+}
+
+export function recommendationVoiceCounts(
+  items: AdminDubbingRecommendation[],
+  voices: AdminSpeechVoice[],
+  exceptId?: string
+): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const item of items) {
+    if (item.id === exceptId) continue;
+    const voice = voices.find((voice) => voice.alias === item.voice_alias);
+    const identity = recommendationVoiceIdentity(item.voice_alias, voice);
+    counts.set(identity, (counts.get(identity) ?? 0) + 1);
+  }
+  return counts;
+}
+
 export function newRecommendationVoice(
   voice: AdminSpeechVoice
 ): Omit<AdminDubbingRecommendation, "name" | "selected"> {

@@ -571,6 +571,11 @@ export function V3SynthesisInputs({
                     side === "uk" ? "dialect_uk" : "dialect_us"
                   );
                   const candidate = candidateForSide(synthesis, side, dialect);
+                  const ipa = candidate.ipa.trim();
+                  const ipaText =
+                    !ipa || (ipa.startsWith("/") && ipa.endsWith("/"))
+                      ? ipa
+                      : `/${ipa}/`;
                   const current = synthesisForLocale(
                     synthesis,
                     side === "uk" ? "en-GB" : "en-US",
@@ -582,11 +587,21 @@ export function V3SynthesisInputs({
                   const recording = recordings.find(
                     (asset) => asset.is_default
                   );
+                  const uploadRecording = recording ?? recordings[0];
                   const spellingRecording = spellingSpeech?.audio_assets?.find(
                     (asset) =>
                       asset.is_default &&
                       speechAccentGroup(asset.locale) === side
                   );
+                  const spellingPreviewContent = spellingSpeechContent(
+                    spellingSpeech,
+                    side
+                  ) ??
+                    spellingContent ?? {
+                      version: 2 as const,
+                      text: spelling,
+                      annotations: []
+                    };
                   const currentSource =
                     current.source ??
                     (recording
@@ -625,7 +640,6 @@ export function V3SynthesisInputs({
                         value={currentSource}
                         onChange={(event) => {
                           const value = event.target.value;
-                          const selected = recording ?? recordings[0];
                           writeCandidate(
                             side,
                             { ...candidate, source: value },
@@ -635,7 +649,7 @@ export function V3SynthesisInputs({
                                     ...asset,
                                     is_default:
                                       value === "upload" &&
-                                      asset.id === selected?.id
+                                      asset.id === uploadRecording?.id
                                   }
                                 : asset
                             )
@@ -646,19 +660,27 @@ export function V3SynthesisInputs({
                           [
                             {
                               value: "spelling",
-                              name: t("spelling")
+                              name: t("spelling"),
+                              text: spellingPreviewContent.text.trim(),
+                              fontClass: "tsz-words"
                             },
                             {
                               value: "ipa",
-                              name: "Azure IPA"
+                              name: "Azure IPA",
+                              text: ipaText,
+                              fontClass: "tsz-phonetics"
                             },
                             {
                               value: "ups",
-                              name: "Azure UPS"
+                              name: "Azure UPS",
+                              text: candidate.ups.trim(),
+                              fontClass: "tsz-phonetics"
                             },
                             {
                               value: "upload",
                               name: t("creation_upload_audio"),
+                              text: uploadRecording?.original_name,
+                              fontClass: "",
                               disabled: recordings.length === 0
                             }
                           ] as const
@@ -708,7 +730,7 @@ export function V3SynthesisInputs({
                           const active = currentSource === option.value;
                           const sourceRecording =
                             option.value === "upload"
-                              ? (recording ?? recordings[0])
+                              ? uploadRecording
                               : option.value === "spelling"
                                 ? spellingRecording
                                 : undefined;
@@ -717,12 +739,7 @@ export function V3SynthesisInputs({
                           const hidden = option.value === "ups" && !upsExpanded;
                           const previewContent =
                             option.value === "spelling"
-                              ? (spellingSpeechContent(spellingSpeech, side) ??
-                                spellingContent ?? {
-                                  version: 2 as const,
-                                  text: spelling,
-                                  annotations: []
-                                })
+                              ? spellingPreviewContent
                               : phonemeContent;
                           const previewDisabled =
                             option.value === "upload"
@@ -770,6 +787,23 @@ export function V3SynthesisInputs({
                                 requestSharedResolution={false}
                               />
                             );
+                          const optionId = `${inputPrefix}-${side}-source-${option.value}`;
+                          const sourceValue = option.text && (
+                            <span
+                              className={`word-synthesis-choice-value ${option.fontClass}`}
+                              title={option.text}
+                            >
+                              {option.text}
+                            </span>
+                          );
+                          const spellingFileName =
+                            option.value === "spelling"
+                              ? spellingRecording?.original_name
+                              : undefined;
+                          const descriptionId =
+                            !hidden && (option.text || spellingFileName)
+                              ? `${optionId}-value`
+                              : undefined;
                           return (
                             <Fragment key={option.value}>
                               <div
@@ -779,13 +813,14 @@ export function V3SynthesisInputs({
                                 inert={hidden}
                               >
                                 <Radio
-                                  id={`${inputPrefix}-${side}-source-${option.value}`}
+                                  id={optionId}
                                   value={option.value}
                                   aria-label={
                                     dialect === "common"
                                       ? `${sideLabel} ${option.name}`
                                       : option.name
                                   }
+                                  aria-describedby={descriptionId}
                                   disabled={
                                     "disabled" in option && option.disabled
                                   }
@@ -874,18 +909,27 @@ export function V3SynthesisInputs({
                                 )}
                                 <div className="word-synthesis-choice-details">
                                   <label
-                                    htmlFor={`${inputPrefix}-${side}-source-${option.value}`}
+                                    htmlFor={optionId}
                                     className="word-synthesis-choice-content"
                                   >
                                     <span className="word-synthesis-choice-tag">
                                       {option.name}
                                     </span>
-                                    {active && sourceRecording && (
+                                    {descriptionId && (
                                       <span
-                                        className="word-synthesis-choice-recording"
-                                        title={sourceRecording.original_name}
+                                        id={descriptionId}
+                                        className="word-synthesis-choice-values"
                                       >
-                                        {sourceRecording.original_name}
+                                        {sourceValue}
+                                        {option.text && spellingFileName && " "}
+                                        {spellingFileName && (
+                                          <span
+                                            className="word-synthesis-choice-value"
+                                            title={spellingFileName}
+                                          >
+                                            {spellingFileName}
+                                          </span>
+                                        )}
                                       </span>
                                     )}
                                   </label>
@@ -894,11 +938,14 @@ export function V3SynthesisInputs({
                               </div>
                               {hidden && active && (
                                 <div className="word-synthesis-choice-details word-synthesis-collapsed-source">
-                                  <Typography.Text type="secondary">
-                                    {t("creation_current_source", {
-                                      source: option.name
-                                    })}
-                                  </Typography.Text>
+                                  <div className="word-synthesis-collapsed-values">
+                                    <Typography.Text type="secondary">
+                                      {t("creation_current_source", {
+                                        source: option.name
+                                      })}
+                                    </Typography.Text>
+                                    {sourceValue}
+                                  </div>
                                   {voiceSummary}
                                 </div>
                               )}

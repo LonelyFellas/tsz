@@ -66,7 +66,15 @@ const sonia: AdminSpeechVoice = {
     checked_at: "2026-11-02"
   }
 };
-const libby = { ...sonia, alias: "libby", display_name: "Libby" };
+const libby = {
+  ...sonia,
+  alias: "libby",
+  display_name: "Libby",
+  capability_evidence: {
+    ...sonia.capability_evidence!,
+    provider_voice_id: "en-GB-LibbyNeural"
+  }
+};
 const aria: AdminSpeechVoice = {
   ...sonia,
   alias: "aria",
