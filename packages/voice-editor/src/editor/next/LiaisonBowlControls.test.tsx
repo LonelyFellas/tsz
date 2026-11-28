@@ -5,13 +5,21 @@ import type { LiaisonBowl } from "@tsz/types";
 import { prepareBowl } from "../../marks/liaisonBowl";
 import { LiaisonBowlControls } from "./LiaisonBowlControls";
 
-function renderControls(initialBowl: LiaisonBowl = {}) {
+function renderControls(initialBowl: LiaisonBowl = {}, em = 18, gap = 3) {
   const commit = vi.fn();
   const arc = {
     index: 0,
     key: "0",
     d: "",
-    pose: prepareBowl({ x: 5, tipY: 16 }, { x: 60, tipY: 16 }, 18, 15, [], 3, 1)
+    pose: prepareBowl(
+      { x: 5, tipY: 16 },
+      { x: 60, tipY: 16 },
+      em,
+      15,
+      [],
+      gap,
+      1
+    )
   };
   function Example() {
     const [bowl, setBowl] = useState(initialBowl);
@@ -114,7 +122,7 @@ it("整弧输入在确认时只提交一次，且保留两端设置", () => {
   expect(thumb).toHaveAttribute("aria-valuenow", "42");
 });
 
-it("无效值和取消的修改不回写，端点仍通过滑杆调整", () => {
+it("整弧的无效值和取消的修改不回写", () => {
   const { commit } = renderControls({ curve_pct: -68 });
   const input = screen.getByRole("textbox", { name: "整弧调整百分比" });
 
@@ -129,8 +137,73 @@ it("无效值和取消的修改不回写，端点仍通过滑杆调整", () => {
   fireEvent.blur(input);
   expect(input).toHaveValue("-68");
   expect(commit).not.toHaveBeenCalled();
+});
+
+it("端点输入像素位移，提交后与对应滑杆同步并保留其他调整", () => {
+  const { commit } = renderControls({ curve_pct: 20, left_tip_pct: 10 });
+  fireEvent.click(screen.getByRole("radio", { name: "右端点" }));
+  const right = screen.getByRole("textbox", { name: "右端点位移（像素）" });
+  const slider = screen.getByRole("slider", { name: "右端点" });
+  expect(right).toHaveValue("0");
+
+  for (const value of ["-2.6", "7.3", "1e0"]) {
+    fireEvent.change(right, { target: { value } });
+    fireEvent.keyDown(right, { key: "Enter" });
+    expect(right).toHaveAttribute("aria-invalid", "true");
+    fireEvent.blur(right);
+    expect(right).toHaveValue("0");
+  }
+  fireEvent.change(right, { target: { value: "-1.5" } });
+  fireEvent.keyDown(right, { key: "Escape" });
+  expect(right).toHaveValue("0");
+  expect(commit).not.toHaveBeenCalled();
+
+  fireEvent.change(right, { target: { value: "-1.49" } });
+  expect(slider).toHaveAttribute("aria-valuenow", "0");
+  fireEvent.keyDown(right, { key: "Enter" });
+  fireEvent.blur(right);
+  expect(commit).toHaveBeenCalledExactlyOnceWith({
+    curve_pct: 20,
+    left_tip_pct: 10,
+    right_tip_pct: -60
+  });
+  expect(slider).toHaveAttribute("aria-valuenow", "-60");
+  expect(right).toHaveValue("-1.5");
+  fireEvent.keyDown(slider, { key: "End" });
+  expect(right).toHaveValue("7.2");
 
   fireEvent.click(screen.getByRole("radio", { name: "左端点" }));
-  expect(input).not.toBeInTheDocument();
-  expect(screen.getByRole("slider", { name: "左端点" })).toBeInTheDocument();
+  const left = screen.getByRole("textbox", { name: "左端点位移（像素）" });
+  fireEvent.change(left, { target: { value: "+3.6" } });
+  fireEvent.blur(left);
+  expect(commit).toHaveBeenCalledTimes(3);
+  expect(commit).toHaveBeenLastCalledWith({
+    curve_pct: 20,
+    left_tip_pct: 50,
+    right_tip_pct: 100
+  });
+  expect(screen.getByRole("slider", { name: "左端点" })).toHaveAttribute(
+    "aria-valuenow",
+    "50"
+  );
+});
+
+it("端点按实测边界校验，最大位移的读数也在可输入范围内", () => {
+  const { commit } = renderControls({}, 18.1, 3.06);
+  fireEvent.click(screen.getByRole("radio", { name: "右端点" }));
+  const input = screen.getByRole("textbox", { name: "右端点位移（像素）" });
+
+  fireEvent.change(input, { target: { value: "7.24" } });
+  fireEvent.keyDown(input, { key: "Enter" });
+  expect(commit).toHaveBeenCalledExactlyOnceWith({ right_tip_pct: 100 });
+
+  fireEvent.change(input, { target: { value: "-2.6" } });
+  fireEvent.blur(input);
+  expect(commit).toHaveBeenCalledTimes(1);
+
+  fireEvent.change(input, { target: { value: "-2.56" } });
+  fireEvent.keyDown(input, { key: "Enter" });
+  expect(commit).toHaveBeenCalledTimes(2);
+  expect(commit).toHaveBeenLastCalledWith({ right_tip_pct: -100 });
+  expect(input).toHaveValue("-2.56");
 });

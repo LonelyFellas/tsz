@@ -354,7 +354,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   const [selectedLiaisonIndex, setSelectedLiaisonIndex] = useState<number>();
   const [bowlTarget, setBowlTarget] = useState<BowlTarget>("curve_pct");
   // 切换动作可能拦截 mousedown 的默认焦点转移，卸载前主动让输入失焦。
-  const liaisonCurveInputRef = useRef<ComponentRef<typeof Input>>(null);
+  const liaisonAdjustmentInputRef = useRef<ComponentRef<typeof Input>>(null);
   const [bowlPreview, setBowlPreview] = useState<{
     link: LiaisonLink;
     bowl: LiaisonBowl;
@@ -1462,7 +1462,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   ]);
 
   const changeBrush = (next: Brush) => {
-    liaisonCurveInputRef.current?.blur();
+    liaisonAdjustmentInputRef.current?.blur();
     if (next.kind === "role") lastRoleRef.current = next.level;
     if (next.kind === "pause") lastPauseRef.current = next.durationMs;
     setBrush(next);
@@ -2491,7 +2491,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   ) => {
     if (readOnly) return;
     if (brush.kind === "liaison-adjust") {
-      liaisonCurveInputRef.current?.blur();
+      liaisonAdjustmentInputRef.current?.blur();
       setSelectedLiaisonIndex(index);
       setBowlTarget(target);
       setBowlPreview(undefined);
@@ -3519,9 +3519,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
                 }
                 target={bowlTarget}
                 disabled={readOnly}
-                curveInputRef={liaisonCurveInputRef}
+                inputRef={liaisonAdjustmentInputRef}
                 onTarget={(v) => {
-                  liaisonCurveInputRef.current?.blur();
+                  liaisonAdjustmentInputRef.current?.blur();
                   setBowlPreview(undefined);
                   setBowlTarget(v);
                 }}

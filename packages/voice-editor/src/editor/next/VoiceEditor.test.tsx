@@ -1493,7 +1493,7 @@ describe("VoiceEditor 文本与落盘", () => {
     ]);
   });
 
-  it("画布切换连读弧或端点前提交聚焦的整弧输入", () => {
+  it("画布切换连读弧或端点前提交输入，且能够撤销单个端点的调整", () => {
     const pose = prepareBowl(
       { x: 5, tipY: 16 },
       { x: 60, tipY: 16 },
@@ -1514,11 +1514,20 @@ describe("VoiceEditor 文本与落盘", () => {
       })),
       strokeWidth: 1
     });
-    const first = { type: "liaison", start: 3, end: 6, bowl: {} };
+    const first = {
+      type: "liaison",
+      start: 3,
+      end: 6,
+      start_len: 1,
+      end_len: 1,
+      bowl: {}
+    };
     const second = {
       type: "liaison",
       start: 6,
       end: 9,
+      start_len: 1,
+      end_len: 1,
       bowl: { curve_pct: 16 }
     };
     const view = props({
@@ -1550,13 +1559,36 @@ describe("VoiceEditor 文本与落盘", () => {
       { ...second, bowl: { curve_pct: 24 } }
     ]);
 
-    fireEvent.click(button("上一步"));
-    expect(applied(view).annotations).toMatchObject([
+    const left = screen.getByRole("textbox", { name: "左端点位移（像素）" });
+    act(() => left.focus());
+    fireEvent.change(left, { target: { value: "-1.5" } });
+    fireEvent.mouseDown(container.querySelector('[data-arc-end="right"]')!);
+    const right = screen.getByRole("textbox", { name: "右端点位移（像素）" });
+    expect(right).toHaveValue("0");
+    expect(applied(view).annotations).toEqual([
       { ...first, bowl: { curve_pct: -68 } },
-      second
+      { ...second, bowl: { curve_pct: 24, left_tip_pct: -60 } }
     ]);
 
-    fireEvent.click(screen.getByRole("radio", { name: "整弧" }));
+    act(() => right.focus());
+    fireEvent.change(right, { target: { value: "3.6" } });
+    fireEvent.mouseDown(container.querySelectorAll(".tsz-ve-arc-hit")[0]!);
+    expect(input()).toHaveValue("-68");
+    expect(view.onChange).toHaveBeenCalledTimes(4);
+    expect(applied(view).annotations).toEqual([
+      { ...first, bowl: { curve_pct: -68 } },
+      {
+        ...second,
+        bowl: { curve_pct: 24, left_tip_pct: -60, right_tip_pct: 50 }
+      }
+    ]);
+
+    fireEvent.click(button("上一步"));
+    expect(applied(view).annotations).toEqual([
+      { ...first, bowl: { curve_pct: -68 } },
+      { ...second, bowl: { curve_pct: 24, left_tip_pct: -60 } }
+    ]);
+
     act(() => input().focus());
     fireEvent.change(input(), { target: { value: "35" } });
     expect(input()).toHaveFocus();
@@ -1564,10 +1596,10 @@ describe("VoiceEditor 文本与落盘", () => {
     expect(
       screen.queryByRole("textbox", { name: "整弧调整百分比" })
     ).not.toBeInTheDocument();
-    expect(view.onChange).toHaveBeenCalledTimes(4);
-    expect(applied(view).annotations).toMatchObject([
-      { ...first, bowl: { curve_pct: -68 } },
-      { ...second, bowl: { curve_pct: 35 } }
+    expect(view.onChange).toHaveBeenCalledTimes(6);
+    expect(applied(view).annotations).toEqual([
+      { ...first, bowl: { curve_pct: 35 } },
+      { ...second, bowl: { curve_pct: 24, left_tip_pct: -60 } }
     ]);
   });
 
