@@ -2009,7 +2009,8 @@ function EntryEditor({
         sectionCandidatesAvailable={sectionCandidatesAvailable}
         refreshReference={refreshReference}
         onFill={(result, binding, exampleIds, sourceRunId) => {
-          if (!grammarCatalog.data) return false;
+          if (!grammarCatalog.data)
+            throw new Error("词性目录尚未加载，请稍后重试。");
           const next = fillGeneratedDraft(
             draft,
             result,
@@ -2031,7 +2032,7 @@ function EntryEditor({
             !next.resources.length &&
             JSON.stringify(next.draft) === JSON.stringify(draft)
           )
-            return false;
+            return { changed: false, skippedForms: next.skippedForms };
           for (const resource of next.resources)
             sentenceWorkspace.update(
               sentenceWorkspace.resources[resource.id] ?? resource,
@@ -2051,7 +2052,7 @@ function EntryEditor({
                 )
               : next.draft
           );
-          return true;
+          return { changed: true, skippedForms: next.skippedForms };
         }}
       >
         {editor}

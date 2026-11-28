@@ -3,7 +3,11 @@ import type {
   AssistantCandidatePos,
   SharedFormsStepContentV3
 } from "@tsz/types";
-import { expandFormContents, regionalVariants } from "@tsz/shared";
+import {
+  expandFormContents,
+  primaryRegionalVariant,
+  regionalVariants
+} from "@tsz/shared";
 import {
   applyFormsStructure,
   assignSharedFormContent
@@ -378,4 +382,95 @@ describe("AI 候选本地导入", () => {
     expect(plan.forms).toEqual(shared);
     expect(plan.rows[0]!.message).toBe("candidate_shared_kept");
   });
+
+  it.each([
+    ["record", "record", "ˈrekɔːd", "ˈrekərd", "rɪˈkɔːd", "rɪˈkɔːrd"],
+    ["colour", "color", "ˈkʌlə", "ˈkʌlər", "ˈkʌlə", "ˈkʌlər"],
+    ["book", "book", "bʊk", "bʊk", "bʊk", "bʊk"]
+  ])(
+    "回填共用空原形时分别保存 %s 的词性和英美读音",
+    (ukWord, usWord, nounUk, nounUs, verbUk, verbUs) => {
+      const noun = catalog.items.find((item) => item.code === "noun")!;
+      const verb = catalog.items.find((item) => item.code === "verb")!;
+      const afterNoun = addPartOfSpeech({ pos: [] }, noun);
+      if (!afterNoun.ok) throw new Error(afterNoun.reason);
+      const afterVerb = addPartOfSpeech(afterNoun.value, verb);
+      if (!afterVerb.ok) throw new Error(afterVerb.reason);
+      const original = applyFormsStructure(
+        empty(),
+        afterVerb.value
+      ) as SharedFormsStepContentV3;
+      const shared = assignSharedFormContent(
+        original,
+        original.pos[0]!.forms[0]!.content_id,
+        original.pos[1]!.forms[0]!.id,
+        createStableVariantIdFactory(expandFormContents(original), [])
+      );
+      const proposals: AssistantCandidatePos[] = [
+        {
+          pos: "noun",
+          forms: [
+            {
+              form_type: "base",
+              is_regular: true,
+              uk: { spelling: ukWord, dict_phonetic: nounUk },
+              us: { spelling: usWord, dict_phonetic: nounUs }
+            }
+          ]
+        },
+        {
+          pos: "verb",
+          forms: [
+            {
+              form_type: "base",
+              is_regular: true,
+              uk: { spelling: ukWord, dict_phonetic: verbUk },
+              us: { spelling: usWord, dict_phonetic: verbUs }
+            }
+          ]
+        }
+      ];
+      const planned = planFormCandidates(shared, proposals, catalog.items);
+      expect(planned.changed).toBe(2);
+      const filled = planned.forms as SharedFormsStepContentV3;
+      expect(filled.pos.map((pos) => pos.forms[0]!.id)).toEqual(
+        original.pos.map((pos) => pos.forms[0]!.id)
+      );
+      expect(
+        new Set(filled.pos.map((pos) => pos.forms[0]!.content_id)).size
+      ).toBe(2);
+      for (const [index, pos] of filled.pos.entries()) {
+        const before = shared.pos[index]!.forms[0]!.regional_bindings;
+        const after = pos.forms[0]!.regional_bindings;
+        if (before.mode === "common" && after.mode === "common") {
+          expect(after.common.id).toBe(before.common.id);
+          expect(after.common.pronunciations.map(({ id }) => id)).toEqual(
+            before.common.pronunciations.map(({ id }) => id)
+          );
+        }
+      }
+      const contents = expandFormContents(filled).pos.map((pos) =>
+        (["uk", "us"] as const).map((side) => {
+          const variant = primaryRegionalVariant(
+            pos.forms[0]!.regional_variants,
+            side
+          );
+          return [variant.spelling, variant.pronunciations[0]!.dict_phonetic];
+        })
+      );
+      expect(contents).toEqual([
+        [
+          [ukWord, nounUk],
+          [usWord, nounUs]
+        ],
+        [
+          [ukWord, verbUk],
+          [usWord, verbUs]
+        ]
+      ]);
+      expect(planFormCandidates(filled, proposals, catalog.items).changed).toBe(
+        0
+      );
+    }
+  );
 });

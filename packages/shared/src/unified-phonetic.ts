@@ -207,8 +207,14 @@ function convertDictionary(
 ): Conversion {
   if (/\p{Cc}/u.test(input))
     return { ok: false, message: "字典音标不能包含控制字符" };
+  const dictionaryReading = input.replaceAll(
+    "(r)",
+    dialect === "us" ? "r" : ""
+  );
   const source = stripPhoneticDelimiters(
-    target === "azure-ipa" ? input.replace(/[()[\]{}]/gu, "") : input
+    target === "azure-ipa"
+      ? dictionaryReading.replace(/[()[\]{}]/gu, "")
+      : dictionaryReading
   );
   if (!source) return { ok: false, message: "请先填写字典音标" };
   if (Array.from(source).length > 200)
