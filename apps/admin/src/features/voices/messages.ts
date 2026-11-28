@@ -4,6 +4,16 @@ const fixedVoiceMessages = {
     "請選擇推薦分組。",
     "Select a recommendation group."
   ],
+  recommendation_group_removed: [
+    "该分组已被移除。",
+    "此組已被移除。",
+    "This group has been removed."
+  ],
+  recommendation_removed: [
+    "这条推荐已被移除。",
+    "這條推薦已被移除。",
+    "This recommendation has been removed."
+  ],
   this_group_already_has_20_recommendations_organise_them_in_group_: [
     "该组已有 20 个推荐，请先在分组配音中整理。",
     "此組已有 20 個推薦，請先在分組配音中整理。",
@@ -802,17 +812,21 @@ export const voiceMessages = {
     "拖曳排序，或使用上下方向鍵",
     "Drag to reorder, or use the Up and Down arrow keys"
   ],
-  copy_side_recommendation: [
-    "复制{{side}} {{name}}",
-    "複製{{side}} {{name}}",
-    "Copy {{side}} {{name}}"
+  recommendation_duplicate_voice: [
+    "同侧音色重复",
+    "同側音色重複",
+    "Duplicate voice on this side"
+  ],
+  recommendation_voice_conflict: [
+    "本组同侧已使用「{{voice}}」，请换用其他音色或移除重复推荐。",
+    "此組同側已使用「{{voice}}」，請改用其他音色或移除重複推薦。",
+    "This side already uses {{voice}}. Choose another voice or remove the duplicate recommendation."
   ],
   delete_side_recommendation: [
     "删除{{side}} {{name}}",
     "刪除{{side}} {{name}}",
     "Delete {{side}} {{name}}"
   ],
-  recommendation_copy_name: ["{{name}} 副本", "{{name}} 副本", "{{name}} copy"],
   search_side_gender: [
     "搜索{{side}}{{gender}}",
     "搜尋{{side}}{{gender}}",

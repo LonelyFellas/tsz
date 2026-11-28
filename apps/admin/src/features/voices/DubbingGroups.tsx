@@ -11,7 +11,6 @@ import { speechAccentGroup } from "@tsz/shared";
 import {
   ArrowDownIcon,
   ArrowUpIcon,
-  CopyIcon,
   Trash2Icon,
   PencilIcon,
   GripVerticalIcon,
@@ -52,15 +51,14 @@ import {
   dubbingGroupsKey,
   MAX_RECOMMENDATIONS_PER_SIDE,
   recommendationError,
+  recommendationVoiceCounts,
+  recommendationVoiceIdentity,
   sideName,
   sides,
   type DubbingDraft,
   type DubbingSide
 } from "./dubbing-model";
-import {
-  RecommendationEditor,
-  type RecommendationSeed
-} from "./RecommendationEditor";
+import { RecommendationEditor } from "./RecommendationEditor";
 import { VoiceName, VoiceRate, VoiceVolume } from "./VoiceDisplay";
 import "./dubbing-groups.css";
 
@@ -73,7 +71,7 @@ const areas = [
 ];
 type Editing = {
   group: DubbingDraft;
-  initial?: RecommendationSeed;
+  initial?: AdminDubbingRecommendation;
   side: DubbingSide;
 };
 
@@ -170,6 +168,7 @@ export function DubbingGroups({
         ? { ...value, [id]: update(draft ?? structuredClone(base)) }
         : value;
     });
+    setGroupSaveError(id);
     setSaved(undefined);
   }
   function setGroupSaveError(id: string, message?: VoiceMessageValue) {
@@ -219,15 +218,24 @@ export function DubbingGroups({
       return;
     }
     const original = groups.data?.groups.find((g) => g.id === id);
-    for (const side of sides)
+    for (const side of sides) {
+      const counts = recommendationVoiceCounts(draft[side], voices);
       for (const item of draft[side]) {
         const stored = original?.[side].find((value) => value.id === item.id);
-        const issue = recommendationError(
-          draft.name,
-          side,
-          item,
-          voices.find((voice) => voice.alias === item.voice_alias)
-        );
+        const voice = voices.find((voice) => voice.alias === item.voice_alias);
+        if (
+          (counts.get(recommendationVoiceIdentity(item.voice_alias, voice)) ??
+            0) > 1
+        ) {
+          setGroupSaveError(
+            id,
+            voiceMessage("recommendation_voice_conflict", {
+              voice: voice?.display_name ?? item.voice_alias
+            })
+          );
+          return;
+        }
+        const issue = recommendationError(draft.name, side, item, voice);
         const retained =
           stored && item.selected === false
             ? { ...stored, selected: false }
@@ -235,17 +243,12 @@ export function DubbingGroups({
         if (issue && JSON.stringify(retained) !== JSON.stringify(item)) {
           setGroupSaveError(id, {
             format: (t) =>
-              recommendationError(
-                draft.name,
-                side,
-                item,
-                voices.find((voice) => voice.alias === item.voice_alias),
-                t
-              ) ?? ""
+              recommendationError(draft.name, side, item, voice, t) ?? ""
           });
           return;
         }
       }
+    }
     setSavingId(id);
     setError(undefined);
     setGroupSaveError(id);
@@ -273,13 +276,16 @@ export function DubbingGroups({
     } catch (cause) {
       setGroupSaveError(
         id,
-        cause instanceof HttpError && cause.status === 409
-          ? voiceMessage(
-              "this_group_changed_or_its_name_is_in_use_all_drafts_have_been_kep"
-            )
-          : voiceMessage(
-              "could_not_save_all_drafts_in_this_group_have_been_kept_try_again"
-            )
+        cause instanceof HttpError &&
+          cause.meta?.code === "duplicate_dubbing_voice"
+          ? cause.message
+          : cause instanceof HttpError && cause.status === 409
+            ? voiceMessage(
+                "this_group_changed_or_its_name_is_in_use_all_drafts_have_been_kep"
+              )
+            : voiceMessage(
+                "could_not_save_all_drafts_in_this_group_have_been_kept_try_again"
+              )
       );
     } finally {
       setSavingId(undefined);
@@ -425,8 +431,14 @@ export function DubbingGroups({
   const editingGroup =
     editing &&
     (current.find((group) => group.id === editing.group.id) ?? editing.group);
+  const editingItems = editing && editingGroup?.[editing.side];
+  const editingItemId = editing?.initial?.id;
+  const editingSubmissionError =
+    editingItemId && !editingItems?.some((item) => item.id === editingItemId)
+      ? t("recommendation_removed")
+      : undefined;
   function saveRecommendations(recommendations: AdminDubbingRecommendation[]) {
-    if (!editing || !canEdit || saving) return;
+    if (!editing || !canEdit || saving || editingSubmissionError) return;
     const { group, side, initial } = editing;
     const item = initial ? recommendations[0] : undefined;
     if (initial && !item) return;
@@ -434,10 +446,9 @@ export function DubbingGroups({
       group.id,
       (base) => {
         const items = base[side];
-        const next =
-          item && items.some((value) => value.id === item.id)
-            ? items.map((value) => (value.id === item.id ? item : value))
-            : [...items, ...recommendations];
+        const next = item
+          ? items.map((value) => (value.id === item.id ? item : value))
+          : [...items, ...recommendations];
         return { ...base, [side]: next };
       },
       group
@@ -468,6 +479,10 @@ export function DubbingGroups({
     editable: boolean,
     auditionAllowed = true
   ) {
+    const voiceCounts = {
+      uk: recommendationVoiceCounts(group.uk, voices),
+      us: recommendationVoiceCounts(group.us, voices)
+    };
     return (
       <div className="dubbing-lists">
         <Typography.Text type="secondary" className="dubbing-table-scroll-hint">
@@ -527,6 +542,10 @@ export function DubbingGroups({
                         voice,
                         t
                       );
+                      const duplicate =
+                        (voiceCounts[side].get(
+                          recommendationVoiceIdentity(item.voice_alias, voice)
+                        ) ?? 0) > 1;
                       const accent = voice
                         ? speechAccentGroup(voice.locale, voice.accent)
                         : "other";
@@ -753,6 +772,14 @@ export function DubbingGroups({
                                 {issue}
                               </Typography.Text>
                             )}
+                            {duplicate && (
+                              <Typography.Text
+                                type="danger"
+                                className="dubbing-item-issue"
+                              >
+                                {t("recommendation_duplicate_voice")}
+                              </Typography.Text>
+                            )}
                           </td>
                           <td>
                             <VoiceRate parameters={item.parameters} />
@@ -763,34 +790,6 @@ export function DubbingGroups({
                           {editable && (
                             <td>
                               <Space size={0}>
-                                <Button
-                                  type="text"
-                                  size="small"
-                                  aria-label={t("copy_side_recommendation", {
-                                    side: sideName(side, t),
-                                    name: item.name
-                                  })}
-                                  icon={<CopyIcon aria-hidden />}
-                                  disabled={
-                                    group[side].length >=
-                                    MAX_RECOMMENDATIONS_PER_SIDE
-                                  }
-                                  onClick={() =>
-                                    setEditing({
-                                      group,
-                                      side,
-                                      initial: {
-                                        ...structuredClone(item),
-                                        id: newWordNodeId(),
-                                        name: t("recommendation_copy_name", {
-                                          name: Array.from(item.name)
-                                            .slice(0, 32)
-                                            .join("")
-                                        })
-                                      }
-                                    })
-                                  }
-                                />
                                 <Popconfirm
                                   title={t("delete_side_recommendation", {
                                     side: sideName(side, t),
@@ -1169,7 +1168,13 @@ export function DubbingGroups({
           voices={voices}
           initial={editing.initial ?? {}}
           side={editing.side}
+          occupiedVoices={recommendationVoiceCounts(
+            editingGroup[editing.side],
+            voices,
+            editing.initial?.id
+          )}
           disabled={!canEdit || saving}
+          submissionError={editingSubmissionError}
           onBeforeAudition={onInvalidatePreview}
           onCancel={() => setEditing(undefined)}
           {...(editing.initial

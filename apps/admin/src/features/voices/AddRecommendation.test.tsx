@@ -4,7 +4,8 @@ import {
   cleanup,
   fireEvent,
   render,
-  screen
+  screen,
+  waitFor
 } from "@testing-library/react";
 import type {
   AdminDubbingGroupsV3Response,
@@ -91,6 +92,27 @@ function Harness() {
         }
       >
         编辑B
+      </button>
+      <button
+        onClick={() =>
+          setDrafts((current) => ({
+            ...current,
+            a: {
+              ...initial.groups[0]!,
+              uk: [
+                {
+                  id: "draft-voice",
+                  name: "草稿推荐",
+                  voice_alias: voice.alias,
+                  selected: false,
+                  parameters
+                }
+              ]
+            }
+          }))
+        }
+      >
+        在 A 草稿中加入音色
       </button>
     </>
   );
@@ -207,5 +229,50 @@ describe("当前口音推荐只应用到分组草稿", () => {
     await screen.findByText("该组已有 20 个推荐，请先在分组配音中整理。");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByTestId("drafts")).toHaveTextContent("{}");
+  });
+  it("编辑期间目标侧变为满额时保留抽屉输入", async () => {
+    const client = mount();
+    await chooseGroup();
+    await screen.findByLabelText("合成语速");
+    fireEvent.change(screen.getByLabelText("推荐名称"), {
+      target: { value: "尚未应用的名称" }
+    });
+    const full = structuredClone(initial);
+    full.groups[0]!.uk = Array.from({ length: 20 }, (_, index) => ({
+      id: `uk-${index}`,
+      name: String(index),
+      voice_alias: `catalog-${index}`,
+      parameters
+    }));
+    await act(async () =>
+      client.setQueryData(["admin-dubbing-groups-v3", "groups-admin"], full)
+    );
+    expect(await screen.findByText(/已有 20 个推荐/)).toHaveAttribute(
+      "role",
+      "alert"
+    );
+    expect(screen.getByRole("button", { name: "保存到本组" })).toBeDisabled();
+    expect(screen.getByLabelText("推荐名称")).toHaveValue("尚未应用的名称");
+    expect(screen.getByTestId("drafts")).toHaveTextContent("{}");
+    await act(async () =>
+      client.setQueryData(["admin-dubbing-groups-v3", "groups-admin"], initial)
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "保存到本组" })).toBeEnabled()
+    );
+    expect(screen.getByLabelText("推荐名称")).toHaveValue("尚未应用的名称");
+  });
+  it("同组草稿已使用该音色时，音色库无法再次加入", async () => {
+    mount();
+    fireEvent.click(
+      screen.getByRole("button", { name: "在 A 草稿中加入音色" })
+    );
+    await chooseGroup();
+    expect(await screen.findByText(/本组同侧已使用「Sonia」/)).toBeVisible();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    const drafts = JSON.parse(screen.getByTestId("drafts").textContent!);
+    expect(drafts.a.uk.map((item: { id: string }) => item.id)).toEqual([
+      "draft-voice"
+    ]);
   });
 });
