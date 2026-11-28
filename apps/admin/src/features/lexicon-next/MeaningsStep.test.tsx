@@ -8,7 +8,11 @@ import {
   waitFor
 } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
-import type { NextDraft } from "@tsz/types";
+import type {
+  NextDraft,
+  NextEntry,
+  NextPhraseComponentUsage
+} from "@tsz/types";
 import { App } from "@tsz/ui/admin/overlays";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { partOfSpeechDataSource } from "@/features/dictionary/dataSource";
@@ -578,7 +582,25 @@ it("未指定词性的旧词义保留内容并锁定下方录入，指定词性�
   }
 });
 
-it("在新版短语的词义里提供成分用词入口", () => {
+it("新版短语可以改选新版成分，并清除已有成分关联", async () => {
+  const previous: NextPhraseComponentUsage = {
+    target_source: "v3",
+    usage: {
+      id: "usage",
+      literal: "give",
+      state: "resolved",
+      target_word_id: "v1-word",
+      target_pos_id: "v1-pos",
+      target_base_form_id: "v1-form",
+      target_form_id: "v1-form",
+      target_variant_id: "v1-variant",
+      target_sense_id: "v1-sense",
+      target_dialect: "common",
+      target_form_type: "base",
+      target_headword: "give",
+      target_gloss: "给予"
+    }
+  };
   const draft: NextDraft = {
     schema_version: 1,
     headword: "give up",
@@ -588,24 +610,139 @@ it("在新版短语的词义里提供成分用词入口", () => {
         id: "phrase-sense",
         part_of_speech: "verb",
         definitions: [],
-        equivalents: []
+        equivalents: [],
+        component_usages: [previous]
       }
     ]
   };
+  const entry: NextEntry = {
+    id: "next-word",
+    kind: "word",
+    target_language: "en",
+    owner_id: "owner",
+    revision: 1,
+    updated_at: "2026-11-28T00:00:00Z",
+    draft: {
+      schema_version: 1,
+      headword: "give",
+      forms: [],
+      senses: [
+        {
+          id: "next-sense",
+          part_of_speech: "verb",
+          definitions: [
+            {
+              id: "gloss",
+              locale: "zh-Hans",
+              style: "definition",
+              text: "给出"
+            }
+          ],
+          equivalents: []
+        }
+      ],
+      form_editor: {
+        forms_format: "shared_v1",
+        contents: [
+          {
+            id: "content",
+            dialect_rules: {
+              spelling_mode: "unified",
+              phonetic_mode: "unified"
+            },
+            regional_variants: {
+              mode: "common",
+              common: {
+                id: "slot",
+                spelling: "give",
+                origin: "manual",
+                pronunciations: []
+              }
+            }
+          }
+        ],
+        pos: [
+          {
+            pos_id: "next-pos",
+            pos: "verb",
+            form_groups: [],
+            forms: [
+              {
+                id: "next-form",
+                form_type: "base",
+                content_id: "content",
+                regional_bindings: {
+                  mode: "common",
+                  common: {
+                    id: "next-variant",
+                    content_slot_id: "slot",
+                    is_regular: true,
+                    pronunciations: []
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  };
+  const requests = {
+    ...api.lexiconNext,
+    matchEntries: vi.fn().mockResolvedValue({
+      items: [{ id: entry.id }],
+      pagination: { page: 1, page_size: 20, total: 1, total_pages: 1 }
+    }),
+    get: vi.fn().mockResolvedValue(entry)
+  };
+  function Harness() {
+    const [value, onChange] = useState(draft);
+    return (
+      <>
+        <MeaningsStep
+          value={value}
+          kind="phrase"
+          requests={requests}
+          componentUsagesAvailable
+          formEditorAvailable={false}
+          target="en-GB"
+          medium="zh-Hans"
+          partOfSpeechCodes={["verb"]}
+          disabled={false}
+          onChange={onChange}
+        />
+        <output aria-label="当前草稿">{JSON.stringify(value)}</output>
+      </>
+    );
+  }
   render(
     <QueryClientProvider client={new QueryClient()}>
-      <MeaningsStep
-        value={draft}
-        kind="phrase"
-        componentUsagesAvailable
-        formEditorAvailable={false}
-        target="en-GB"
-        medium="zh-Hans"
-        partOfSpeechCodes={["verb"]}
-        disabled={false}
-        onChange={vi.fn()}
-      />
+      <Harness />
     </QueryClientProvider>
   );
-  expect(screen.getByRole("region", { name: "成分用词" })).toBeVisible();
+  const token = () =>
+    within(screen.getByRole("region", { name: "成分用词" })).getByRole(
+      "button",
+      { name: "关联第 1 个词 give" }
+    );
+  const usages = () =>
+    (JSON.parse(screen.getByLabelText("当前草稿").textContent!) as NextDraft)
+      .senses[0]!.component_usages;
+  fireEvent.click(token());
+  expect(screen.getByText(/发布前请清除 V1 关联/)).toBeVisible();
+  fireEvent.click(await screen.findByRole("button", { name: /给出/ }));
+  expect(usages()).toEqual([
+    {
+      target_source: "lexicon_next",
+      usage: expect.objectContaining({
+        id: "usage",
+        literal: "give",
+        target_word_id: "next-word",
+        target_sense_id: "next-sense"
+      })
+    }
+  ]);
+  fireEvent.click(token());
+  fireEvent.click(screen.getByRole("button", { name: "清除关联" }));
+  expect(usages()).toEqual([]);
 });

@@ -12,8 +12,11 @@ export const lexiconEditorMessages = {
   next_component_searching: ["正在读取词条", "正在讀取詞條", "Loading entries"],
   next_component_previous_page: ["上一页", "上一頁", "Previous page"],
   next_component_next_page: ["下一页", "下一頁", "Next page"],
-  next_component_from_new: ["新版词库", "新版詞庫", "New lexicon"],
-  next_component_from_v1: ["V1 词库", "V1 詞庫", "V1 lexicon"],
+  next_component_legacy_link: [
+    "发布前请清除 V1 关联或改选新版词条",
+    "發布前請清除 V1 關聯或改選新版詞條",
+    "Before publishing, clear the V1 link or choose an entry from the new lexicon"
+  ],
   next_component_count_unit: ["项", "項", "links"],
   next_component_missing_literal: [
     "当前拼写中没有该用词",

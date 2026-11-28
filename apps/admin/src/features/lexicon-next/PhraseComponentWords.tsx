@@ -5,16 +5,10 @@ import type { NextPhraseComponentUsage } from "@tsz/types";
 import type { LexiconNextRequests } from "@/pages/LexiconNext";
 import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
 import { SenseSection } from "@/features/dictionary/word-creation-v3/components/V3SenseSection";
-import {
-  V3TargetCascader,
-  type ResolvedTarget
-} from "@/features/dictionary/word-creation-v3/components/V3TargetCascader";
+import type { ResolvedTarget } from "@/features/dictionary/word-creation-v3/components/V3TargetCascader";
 import { sentenceTokens } from "@/features/dictionary/word-creation-v3/tokens";
 import { NextTargetPicker } from "./NextTargetPicker";
 import "./phrase-components.css";
-
-type Source = NextPhraseComponentUsage["target_source"];
-type ComponentChoice = { source: Source; target: ResolvedTarget };
 
 export function PhraseComponentWords({
   spelling,
@@ -33,12 +27,11 @@ export function PhraseComponentWords({
   target: string;
   medium: string;
   disabled: boolean;
-  onSelect: (literal: string, choice?: ComponentChoice) => void;
+  onSelect: (literal: string, choice?: ResolvedTarget) => void;
 }) {
   const { t } = useLexiconEditorTranslation();
   const [collapsed, setCollapsed] = useState(false);
   const [open, setOpen] = useState<number>();
-  const [source, setSource] = useState<Source>("lexicon_next");
   const tokens = sentenceTokens(spelling).map(({ text }) => text);
   const literals = [
     ...tokens,
@@ -65,7 +58,7 @@ export function PhraseComponentWords({
             const row = rows.find(({ usage }) => usage.literal === literal);
             const selected =
               row?.usage.state === "resolved" ? row.usage : undefined;
-            function choose(choice?: ComponentChoice) {
+            function choose(choice?: ResolvedTarget) {
               onSelect(literal, choice);
               setOpen(undefined);
             }
@@ -78,7 +71,6 @@ export function PhraseComponentWords({
                 open={!disabled && open === index}
                 onOpenChange={(visible) => {
                   if (visible) {
-                    setSource(row?.target_source ?? "lexicon_next");
                     setOpen(index);
                   } else {
                     setOpen((current) =>
@@ -103,82 +95,40 @@ export function PhraseComponentWords({
                           </Button>
                         </Flex>
                       )}
+                      {row?.target_source === "v3" && (
+                        <Typography.Text type="secondary">
+                          {t("next_component_legacy_link")}
+                        </Typography.Text>
+                      )}
                       {index >= tokens.length && (
                         <Typography.Text type="secondary">
                           {t("next_component_missing_literal")}
                         </Typography.Text>
                       )}
                       {index < tokens.length && requests && (
-                        <>
-                          <Flex gap="small" wrap>
-                            {(["lexicon_next", "v3"] as const).map((option) => (
-                              <Button
-                                key={option}
-                                size="small"
-                                aria-pressed={source === option}
-                                type={source === option ? "default" : "text"}
-                                onClick={() => setSource(option)}
-                              >
-                                {t(
-                                  option === "v3"
-                                    ? "next_component_from_v1"
-                                    : "next_component_from_new"
-                                )}
-                              </Button>
-                            ))}
-                          </Flex>
-                          {source === "lexicon_next" ? (
-                            <NextTargetPicker
-                              literal={literal}
-                              targetLocale={target}
-                              mediumLocale={medium}
-                              requests={requests}
-                              componentWords
-                              selfEntryId={entryId}
-                              onSelect={(choice) =>
-                                choose({
-                                  source,
-                                  target: {
-                                    state: "resolved",
-                                    target_word_id: choice.target_word_id,
-                                    target_pos_id: choice.target_pos_id,
-                                    target_base_form_id:
-                                      choice.target_base_form_id,
-                                    target_form_id: choice.target_form_id,
-                                    target_variant_id: choice.target_variant_id,
-                                    target_sense_id: choice.target_sense_id,
-                                    target_dialect: choice.target_dialect,
-                                    target_form_type:
-                                      choice.form_type ?? "base",
-                                    target_headword: choice.headword,
-                                    target_gloss: choice.gloss
-                                  }
-                                })
-                              }
-                            />
-                          ) : (
-                            <V3TargetCascader
-                              literal={literal}
-                              phraseSelection="entry"
-                              sourceDialect={
-                                target === "en-US"
-                                  ? "us"
-                                  : target === "en-GB"
-                                    ? "uk"
-                                    : undefined
-                              }
-                              selfEntryId={entryId}
-                              targets={
-                                row?.target_source === "v3" && selected
-                                  ? [selected]
-                                  : []
-                              }
-                              onReplace={([target]) =>
-                                choose(target ? { source, target } : undefined)
-                              }
-                            />
-                          )}
-                        </>
+                        <NextTargetPicker
+                          literal={literal}
+                          targetLocale={target}
+                          mediumLocale={medium}
+                          requests={requests}
+                          componentWords
+                          selfEntryId={entryId}
+                          onSelect={(choice) =>
+                            choose({
+                              state: "resolved",
+                              target_word_id: choice.target_word_id,
+                              target_pos_id: choice.target_pos_id,
+                              target_base_form_id: choice.target_base_form_id,
+                              target_form_id: choice.target_form_id,
+                              target_variant_id: choice.target_variant_id,
+                              target_sense_id: choice.target_sense_id,
+                              target_dialect: choice.target_dialect,
+                              target_form_type: choice.form_type ?? "base",
+                              target_headword: choice.headword,
+                              target_gloss: choice.gloss
+                            })
+                          }
+                        />
                       )}
                     </Flex>
                   ) : null

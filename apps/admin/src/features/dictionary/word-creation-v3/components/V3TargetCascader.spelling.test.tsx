@@ -395,7 +395,7 @@ it("分页追加同词形另一侧不增加显示行或丢失选中态", async (
   expect(onReplace).toHaveBeenLastCalledWith([target("us")], undefined);
 });
 
-it("新版美式短语选择同拼写的 V1 成分时提交美式坐标", async () => {
+it("新版短语找不到新版成分时，不提供同拼写的 V1 候选入口", async () => {
   const onSelect = vi.fn();
   const requests = {
     matchEntries: vi.fn().mockResolvedValue({
@@ -418,12 +418,8 @@ it("新版美式短语选择同拼写的 V1 成分时提交美式坐标", async 
     </QueryClientProvider>
   );
   fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 job" }));
-  fireEvent.click(await screen.findByRole("button", { name: "V1 词库" }));
-  await expandJob();
-  fireEvent.click(screen.getByText("原形 job"));
-  fireEvent.click(await screen.findByText("工作"));
-  expect(onSelect).toHaveBeenCalledExactlyOnceWith("job", {
-    source: "v3",
-    target: target("us")
-  });
+  expect(await screen.findByText("没有匹配的新版词条")).toBeVisible();
+  expect(screen.queryByRole("button", { name: "V1 词库" })).toBeNull();
+  expect(search).not.toHaveBeenCalled();
+  expect(onSelect).not.toHaveBeenCalled();
 });
