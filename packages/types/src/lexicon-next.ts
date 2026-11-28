@@ -56,6 +56,7 @@ export interface NextSenseGroup {
   name_en: string;
 }
 export interface NextPhraseComponentUsage {
+  /** 新建关联使用 lexicon_next，草稿可保留已有 v3 关联。 */
   target_source: "v3" | "lexicon_next";
   usage: PhraseComponentUsageV3;
 }

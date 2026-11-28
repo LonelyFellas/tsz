@@ -861,9 +861,9 @@ export function MeaningsStep({
                                                 ? [
                                                     {
                                                       target_source:
-                                                        choice.source,
+                                                        "lexicon_next",
                                                       usage: {
-                                                        ...choice.target,
+                                                        ...choice,
                                                         id:
                                                           component_usages[
                                                             index
