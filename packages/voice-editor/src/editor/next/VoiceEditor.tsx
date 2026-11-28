@@ -216,6 +216,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   previewAdapter,
   deferAudioGeneration = false,
   deferContentVoiceResolution = false,
+  waitForInitialVoiceProfileOnSave = false,
   previewEnabled = true,
   loadRecommendations,
   recommendationArea,
@@ -266,8 +267,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   const voiceSettingsRef = useRef<VoiceSetting[]>([]);
   const latestReadOnly = useRef(false);
   useEffect(() => () => recommendationRequest.current?.abort(), []);
+  const shouldAutoRecommend = autoRecommend ?? !value.text.trim();
   const initialRecommendationPending = useRef(
-    (autoRecommend ?? !value.text.trim()) && voiceProfile == null
+    shouldAutoRecommend && voiceProfile == null
   );
   useEffect(() => {
     recommendationRequest.current?.abort();
@@ -1686,14 +1688,26 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     setSpellingNotice("");
   };
 
+  const initialVoiceProfilePending =
+    waitForInitialVoiceProfileOnSave &&
+    !readOnly &&
+    Boolean(
+      recommendationArea && loadRecommendations && onVoiceProfileChange
+    ) &&
+    shouldAutoRecommend &&
+    voiceProfile == null &&
+    Boolean(text.trim()) &&
+    !recommendationError &&
+    (!recommendationsLoaded || voicesLoading || voices.length > 0);
   const voiceSavePending =
-    !deferContentVoiceResolution &&
-    !contentReadOnly &&
-    mode !== "actual-pron" &&
-    Boolean(voiceProfile?.dubbing) &&
-    (voicesLoading ||
-      (Boolean(previewAdapter?.resolveVoices) &&
-        resolvedVoices?.key !== resolutionKey));
+    initialVoiceProfilePending ||
+    (!deferContentVoiceResolution &&
+      !contentReadOnly &&
+      mode !== "actual-pron" &&
+      Boolean(voiceProfile?.dubbing) &&
+      (voicesLoading ||
+        (Boolean(previewAdapter?.resolveVoices) &&
+          resolvedVoices?.key !== resolutionKey)));
 
   const automaticAudio = effectiveSettings.filter(
     (setting) =>
@@ -1764,7 +1778,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       !contentReadOnly &&
       mode !== "actual-pron" &&
       recommendationArea &&
-      (autoRecommend ?? !value.text.trim()) &&
+      shouldAutoRecommend &&
       profile == null
     )
       throw new Error(

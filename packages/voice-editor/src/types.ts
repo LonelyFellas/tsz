@@ -347,6 +347,8 @@ export interface VoiceEditorProps<TLink extends VoiceAssociation = TextLinkV3> {
   deferAudioGeneration?: boolean;
   /** 录入时沿用已解析的音色，宿主完成动作按最新正文校验配音。 */
   deferContentVoiceResolution?: boolean;
+  /** 宿主保存需要校验配音时，等待默认配置初始化。 */
+  waitForInitialVoiceProfileOnSave?: boolean;
   /** Catalogue reads remain available when synthesis is disabled by the host. */
   previewEnabled?: boolean;
   loadRecommendations?: LoadVoiceRecommendations;
