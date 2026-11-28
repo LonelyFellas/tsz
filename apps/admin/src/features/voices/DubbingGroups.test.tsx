@@ -910,7 +910,7 @@ describe("按口音独立推荐与逐组草稿", () => {
     updated.groups[0]!.uk = [];
     await act(async () => client.setQueryData(queryKey, updated));
 
-    expect(dialog.getByRole("alert")).toHaveTextContent("已被移除");
+    expect(await dialog.findByRole("alert")).toHaveTextContent("已被移除");
     expect(button("保存到本组", screen.getByRole("dialog"))).toBeDisabled();
     expect(dialog.getByLabelText("推荐名称")).toHaveValue("尚未应用的名称");
     closeDialog();
