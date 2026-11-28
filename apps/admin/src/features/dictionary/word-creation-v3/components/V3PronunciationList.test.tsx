@@ -725,7 +725,9 @@ it("r 规范化后仍有不支持音素时保持严格拒绝，不改写 IPA 或
 it("字典转换失败保留目标，转换后继续编辑不被旧快照覆盖", async () => {
   const view = renderWithUps(<Harness phonetic="kæt😀" />);
   fireEvent.click(screen.getByLabelText("从字典音标填入实际发音"));
-  expect(screen.getByText(/第 1 段音标包含未支持的符号/)).toBeInTheDocument();
+  expect(
+    screen.getByText("请输入正确的音标文字；其他字符无法识别。")
+  ).toBeInTheDocument();
   expect(field("实际发音")).toHaveValue("kæt");
   view.unmount();
   renderWithUps(<Harness word="school" phonetic="skuːl" />);
