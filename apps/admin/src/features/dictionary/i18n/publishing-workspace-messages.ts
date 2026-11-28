@@ -406,6 +406,11 @@ export const publishingWorkspaceMessages = {
     "已有多條拼寫，保留原內容",
     "Multiple spellings exist. Existing content is kept."
   ],
+  candidate_invalid_phonetic: [
+    "字典音标无法转换，请核对英美读音",
+    "字典音標無法轉換，請核對英美讀音",
+    "Dictionary IPA could not be converted. Check both pronunciations."
+  ],
   candidate_fill: [
     "补充空缺，保留已有内容",
     "補充空缺，保留已有內容",

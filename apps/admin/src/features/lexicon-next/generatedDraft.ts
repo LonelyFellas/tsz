@@ -460,5 +460,8 @@ export function fillGeneratedDraft(
       dialect[id] = { ...generalSense(id), usage: row.usage };
     }
   }
-  return { draft, resources, dialect };
+  const skippedForms = forms.rows.filter(
+    (row) => !row.changed && row.message && row.message !== "candidate_filled"
+  );
+  return { draft, resources, dialect, skippedForms };
 }

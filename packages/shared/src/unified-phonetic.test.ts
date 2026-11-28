@@ -7,6 +7,15 @@ import {
 } from "./pronunciation-synthesis";
 
 describe("语雀统一音标规则", () => {
+  it("将字典词尾的可选 r 转换为明确的英美读音", () => {
+    const ipa = "lʊk ˈɑːftə(r)";
+    expect(
+      convertDictionaryToUnified(ipa, "look after", "uk", "citation")
+    ).toMatchObject({ ok: true, value: "lʊk ˈɑːftə" });
+    expect(
+      convertDictionaryToUnified(ipa, "look after", "us", "citation")
+    ).toMatchObject({ ok: true, value: "lʊk ˈɑːftər" });
+  });
   it("逐字正音不套用语流连读或强弱读例词替换", () => {
     expect(
       convertDictionaryToUnified("ˈfæmɪlɪ", "family", "uk", "citation")

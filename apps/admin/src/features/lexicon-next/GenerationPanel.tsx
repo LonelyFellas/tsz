@@ -30,6 +30,8 @@ import { generatedRelationCandidates } from "./generatedRelations";
 import { GenerationResult } from "./GenerationResult";
 import { FormTypeLabelsProvider } from "@/features/dictionary/part-of-speech/FormTypeLabels";
 import { PartOfSpeechLabelsProvider } from "@/features/dictionary/part-of-speech/PartOfSpeechLabels";
+import { localizedCatalogName } from "@/features/dictionary/part-of-speech/catalog";
+import type { CandidateImportRow } from "@/features/dictionary/assistant/formCandidatesModel";
 
 const entryTarget: GenerationTarget = { section: "all" };
 const statuses: Record<string, string> = {
@@ -154,9 +156,9 @@ export function GenerationPanel({
     binding: GenerationTarget,
     exampleIds: string[],
     sourceRunId: string
-  ) => boolean;
+  ) => boolean | { changed: boolean; skippedForms: CandidateImportRow[] };
 }) {
-  const { t } = useLexiconEditorTranslation();
+  const { t, i18n } = useLexiconEditorTranslation();
   const [open, setOpen] = useState(false);
   const [selection, setSelection] = useState<GenerationTarget>(entryTarget);
   const [generated, setGeneration] = useState<Generation>();
@@ -165,7 +167,9 @@ export function GenerationPanel({
   const [lookupError, setLookupError] = useState(false);
   const [lookupAttempt, setLookupAttempt] = useState(0);
   const [pending, setPending] = useState(false);
-  const [feedback, setFeedback] = useState("");
+  const [feedback, setFeedback] = useState<
+    string | { summary: string; skippedForms: CandidateImportRow[] }
+  >("");
   const [error, setError] = useState("");
   const [resume, setResume] = useState<Run>();
   const active = useRef<AbortController | undefined>(undefined);
@@ -385,16 +389,20 @@ export function GenerationPanel({
       return;
     }
     try {
-      const changed = latest.current.onFill(
+      const outcome = latest.current.onFill(
         result,
         run.binding,
         run.exampleIds,
         sourceRunId
       );
+      const changed = typeof outcome === "boolean" ? outcome : outcome.changed;
+      const summary = changed
+        ? "已回填到草稿，请核对后保存。"
+        : "已有内容已保留，本次没有可补全的字段。";
       setFeedback(
-        changed
-          ? "已回填到草稿，请核对后保存。"
-          : "已有内容已保留，本次没有可补全的字段。"
+        typeof outcome !== "boolean" && outcome.skippedForms.length
+          ? { summary, skippedForms: outcome.skippedForms }
+          : summary
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : t("entry_ai_fill_failed"));
@@ -652,7 +660,37 @@ export function GenerationPanel({
               />
             )}
             {error && <Alert type="error" title={error} />}
-            {feedback && <p role="status">{feedback}</p>}
+            {feedback &&
+              (typeof feedback === "string" ? (
+                <p role="status">{feedback}</p>
+              ) : (
+                <div role="status">
+                  <p>{feedback.summary}</p>
+                  <ul>
+                    {feedback.skippedForms.map((row) => {
+                      const pos = catalog?.items.find(
+                        (item) => item.code === row.pos
+                      );
+                      const type = catalog?.form_types?.find(
+                        (item) => item.code === row.form_type
+                      );
+                      return (
+                        <li key={row.key}>
+                          {pos
+                            ? localizedCatalogName(pos, i18n.language)
+                            : row.pos}
+                          {" · "}
+                          {type
+                            ? localizedCatalogName(type, i18n.language)
+                            : row.form_type}
+                          {" · "}
+                          {row.message && t(row.message)}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ))}
             {previewSection && generation && (
               <PartOfSpeechLabelsProvider items={catalog?.items}>
                 <FormTypeLabelsProvider items={catalog?.form_types}>

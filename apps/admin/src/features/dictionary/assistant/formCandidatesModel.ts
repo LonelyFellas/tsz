@@ -1,5 +1,5 @@
 import type { LexiconEditorKey } from "../i18n/editor";
-import { primaryRegionalVariant } from "@tsz/shared";
+import { primaryRegionalVariant, regionalVariants } from "@tsz/shared";
 import type {
   AssistantCandidateForm,
   AssistantCandidatePos,
@@ -31,6 +31,7 @@ import {
   contentEditorForms,
   contentFromEditor,
   createSharedContentDialectNormalizer,
+  detachSharedFormContent,
   replaceSharedContent,
   createPronunciationReferenceIds
 } from "../word-creation-v3/sharedFormsModel";
@@ -238,6 +239,13 @@ export function planFormCandidates(
         us_actual: candidatePronunciation(proposal.us, "us").actual_pron
       };
       rows.push(row);
+      if (
+        (proposal.uk.dict_phonetic.trim() && !row.uk_actual) ||
+        (proposal.us.dict_phonetic.trim() && !row.us_actual)
+      ) {
+        row.message = "candidate_invalid_phonetic";
+        continue;
+      }
       if (pos.form_groups.length !== 1) {
         row.message = "candidate_multiple_groups";
         continue;
@@ -277,11 +285,9 @@ export function planFormCandidates(
         row.message = "candidate_base_kept";
         continue;
       }
+      let layout = inline;
+      const addedForm = !target;
       if (!target) {
-        if (!compatible(proposal, group.dialect_rules)) {
-          row.message = "candidate_dialect_mismatch";
-          continue;
-        }
         const added = addConcreteForm(
           inline,
           pos.pos_id,
@@ -289,49 +295,77 @@ export function planFormCandidates(
           proposal.form_type
         );
         if (!added.ok) throw new Error("无法添加候选词形");
-        inline = added.value;
-        pos = inline.pos.find((value) => value.pos_id === pos.pos_id)!;
+        layout = added.value;
+        pos = layout.pos.find((value) => value.pos_id === pos.pos_id)!;
         target = pos.forms.at(-1)!;
       }
-      if (isNew || !sameType.some((form) => form.id === target!.id)) {
+      if (isNew || (addedForm && compatible(proposal, group.dialect_rules))) {
         target.regional_variants = newVariants(proposal, group.dialect_rules);
-        result = applyFormsStructure(result, inline);
+        result = applyFormsStructure(result, layout);
         row.changed = true;
         row.message = isNew ? "candidate_add_pos" : "candidate_add_form";
       } else {
-        result = applyFormsStructure(result, inline);
-        if (!isSharedForms(result)) throw new Error("共享词形不可用");
-        const binding = result.pos
+        if (addedForm)
+          for (const variant of regionalVariants(target.regional_variants))
+            variant.is_regular = proposal.is_regular;
+        let prepared = applyFormsStructure(result, layout);
+        if (!isSharedForms(prepared)) throw new Error("共享词形不可用");
+        let binding = prepared.pos
           .flatMap((value) => value.forms)
           .find((form) => form.id === target!.id)!;
+        let content = structuredClone(
+          prepared.contents.find((value) => value.id === binding.content_id)!
+        );
+        const canAdaptEmptyContent =
+          !content.pronunciation_slots?.length &&
+          !regionalVariants(binding.regional_bindings).some(
+            (variant) => variant.component_usages?.length
+          ) &&
+          isEmptyTemplate(content) &&
+          regionalVariants(content.regional_variants).every(
+            (variant) => !variant.spelling.trim()
+          );
         if (
-          result.pos
+          prepared.pos
             .flatMap((value) => value.forms)
             .filter((form) => form.content_id === binding.content_id).length > 1
         ) {
-          row.message = "candidate_shared_kept";
-          continue;
+          if (!canAdaptEmptyContent) {
+            row.message = "candidate_shared_kept";
+            continue;
+          }
+          prepared = detachSharedFormContent(prepared, target.id, {
+            preserveBindingIds: true
+          });
+          binding = prepared.pos
+            .flatMap((value) => value.forms)
+            .find((form) => form.id === target!.id)!;
+          content = prepared.contents.find(
+            (value) => value.id === binding.content_id
+          )!;
         }
-        let content = structuredClone(
-          result.contents.find((value) => value.id === binding.content_id)!
-        );
         const before = JSON.stringify(content);
         if (!compatible(proposal, content.dialect_rules)) {
           if (
-            proposal.uk.spelling !== proposal.us.spelling ||
-            content.regional_variants.mode !== "common" ||
-            content.regional_variants.common.spelling.trim() ||
-            content.pronunciation_slots?.length ||
-            binding.regional_bindings.mode !== "common" ||
-            binding.regional_bindings.common.component_usages?.length ||
-            !isEmptyTemplate(content)
+            !canAdaptEmptyContent ||
+            content.regional_variants.mode === "uk_us_many"
           ) {
             row.message = "candidate_dialect_mismatch";
             continue;
           }
+          const rules = rulesFor([proposal]);
           const regional = createSharedContentDialectNormalizer(content, [])(
             contentEditorForms(content),
-            rulesFor([proposal]),
+            {
+              spelling_mode:
+                content.dialect_rules.spelling_mode === "distinguish"
+                  ? "distinguish"
+                  : rules.spelling_mode,
+              phonetic_mode:
+                content.dialect_rules.phonetic_mode === "distinguish"
+                  ? "distinguish"
+                  : rules.phonetic_mode
+            },
             "uk"
           );
           if (!regional.ok) {
@@ -351,13 +385,17 @@ export function planFormCandidates(
           fillVariant(content.regional_variants.us, proposal.us, "us");
         }
         row.changed = before !== JSON.stringify(content);
-        row.message = row.changed ? "candidate_fill" : "candidate_filled";
+        row.message = row.changed
+          ? addedForm
+            ? "candidate_add_form"
+            : "candidate_fill"
+          : "candidate_filled";
         if (row.changed)
           result = replaceSharedContent(
-            result,
+            prepared,
             content,
-            createStableVariantIdFactory(expandFormContents(result), []),
-            createPronunciationReferenceIds(result)
+            createStableVariantIdFactory(expandFormContents(prepared), []),
+            createPronunciationReferenceIds(prepared)
           );
         const regions = content.regional_variants;
         const uk = primaryRegionalVariant(regions, "uk");

@@ -120,12 +120,17 @@ function initialBinding(
   };
 }
 
-function emptyForm(form: WordConcreteFormV3): WordConcreteFormV3 {
+function emptyForm(
+  form: WordConcreteFormV3,
+  preserveBindingIds: boolean
+): WordConcreteFormV3 {
   const blank = <TDialect extends "common" | "uk" | "us">(variant: {
+    id: string;
     dialect: TDialect;
     is_regular?: boolean;
+    pronunciations: readonly { id: string }[];
   }) => ({
-    id: newWordNodeId(),
+    id: preserveBindingIds ? variant.id : newWordNodeId(),
     dialect: variant.dialect,
     spelling: "",
     origin: "manual" as const,
@@ -134,7 +139,9 @@ function emptyForm(form: WordConcreteFormV3): WordConcreteFormV3 {
       : { is_regular: variant.is_regular }),
     pronunciations: [
       {
-        id: newWordNodeId(),
+        id:
+          (preserveBindingIds ? variant.pronunciations[0]?.id : undefined) ??
+          newWordNodeId(),
         dict_phonetic: "",
         actual_pron: "",
         style: "citation" as const
@@ -244,7 +251,8 @@ export function applyFormsStructure(
 /** Keep a concrete form and its group membership while giving it an empty content slot. */
 export function detachSharedFormContent(
   forms: SharedFormsStepContentV3,
-  formId: string
+  formId: string,
+  { preserveBindingIds = false }: { preserveBindingIds?: boolean } = {}
 ): SharedFormsStepContentV3 {
   const next = structuredClone(forms);
   const pos = next.pos.find((row) =>
@@ -265,7 +273,7 @@ export function detachSharedFormContent(
   const form = expanded.pos
     .find((row) => row.pos_id === pos.pos_id)!
     .forms.find((row) => row.id === formId)!;
-  const blankForm = emptyForm(form);
+  const blankForm = emptyForm(form, preserveBindingIds);
   const groupDefaults = {
     ...group,
     dialect_rules: sourceContent.dialect_rules
