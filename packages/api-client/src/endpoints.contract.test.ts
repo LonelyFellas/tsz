@@ -856,7 +856,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "ba0148d5380e5404ff03c9e05e37308aec52f48456d2fdfd57da273eae9df27d"
+      "d7983d39d0b4357159026605a478d131e61b655035b555d9d79faf435c571845"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -1170,6 +1170,14 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       required: false,
       schema: { type: ["string", "null"] }
     };
+    const componentUsagesHeader = {
+      ...creationSnapshotHeader,
+      name: "x-tsz-next-component-usages"
+    };
+    const componentMatchHeader = {
+      ...creationSnapshotHeader,
+      name: "x-tsz-next-component-match"
+    };
     const annotationRuleHeader = {
       name: "x-tsz-next-annotation-rule",
       in: "header",
@@ -1224,10 +1232,12 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
         }
       ],
       "get /admin/lexicon-next/entries/{id}/publication": [
+        componentUsagesHeader,
         dialectPairsHeader,
         formQuestionsHeader
       ],
       "post /admin/lexicon-next/entries/{id}/publications": [
+        componentUsagesHeader,
         formQuestionsHeader
       ],
       ...Object.fromEntries(
@@ -1239,7 +1249,11 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
           operation,
           [
             ...(operation === "post /admin/lexicon-next/entry-matches"
-              ? [annotationKindHeader, annotationRuleHeader]
+              ? [
+                  annotationKindHeader,
+                  annotationRuleHeader,
+                  componentMatchHeader
+                ]
               : []),
             {
               name: "x-tsz-next-levels",
@@ -1332,6 +1346,9 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
         ].map((operation) => [
           operation,
           [
+            ...(operation === "post /admin/lexicon-next/entries"
+              ? []
+              : [componentUsagesHeader]),
             creationSnapshotHeader,
             {
               name: "x-tsz-next-definitions",
@@ -1367,6 +1384,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
         ])
       ),
       "get /admin/lexicon-next/entries/{id}/view": [
+        componentUsagesHeader,
         {
           name: "x-tsz-next-definitions",
           in: "header",
@@ -1388,6 +1406,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
         }
       ],
       "get /admin/lexicon-next/capabilities": [
+        componentUsagesHeader,
         creationSnapshotHeader,
         {
           name: "x-tsz-next-definitions",

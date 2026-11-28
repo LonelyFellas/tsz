@@ -1,12 +1,12 @@
 import type {
   Dialect,
-  FormContentRegionalVariantsV3,
-  FormRegionalBindingsV3,
   NextEntry,
+  WordFormTypeV3,
   PublishedSentenceTargetCandidateV3,
   SentenceTargetCandidateFormV3,
   SentenceTargetSenseV3
 } from "@tsz/types";
+import { expandFormContents, regionalVariants } from "@tsz/shared";
 import { normalizeSentenceSurface } from "@/features/sentences/associationModel";
 
 export interface NextTargetChoice {
@@ -19,34 +19,45 @@ export interface NextTargetChoice {
   target_dialect: Dialect;
   headword: string;
   gloss: string;
+  form_type?: WordFormTypeV3;
+  part_of_speech?: string;
 }
 
 export function nextTargetChoices(
   entry: NextEntry,
   literal: string,
   targetLocale: string,
-  mediumLocale: string
+  mediumLocale: string,
+  componentWords = false
 ): NextTargetChoice[] {
   const editor = entry.draft.form_editor;
-  if (!editor) return [];
+  if (!editor || (componentWords && entry.kind !== "word")) return [];
   const wanted = normalizeSentenceSurface(literal);
   const result: NextTargetChoice[] = [];
-  for (const pos of editor.pos) {
+  for (const pos of expandFormContents(editor).pos) {
     const senses = entry.draft.senses.filter(
       (sense) => sense.part_of_speech === pos.pos
     );
-    const base = pos.forms.find((form) => form.form_type === "base");
-    if (!base) continue;
+    const firstBase = pos.forms.find((form) => form.form_type === "base");
+    if (!firstBase) continue;
     for (const form of pos.forms) {
-      const content = editor.contents.find(
-        (item) => item.id === form.content_id
-      );
-      if (!content) continue;
-      const variants = contentVariants(
-        content.regional_variants,
-        form.regional_bindings
-      );
-      const matched = variants.filter(
+      const base = componentWords
+        ? pos.forms.find(
+            (candidate) =>
+              candidate.form_type === "base" &&
+              (candidate.id === form.id ||
+                (form.form_type !== "base" &&
+                  pos.form_groups.some(
+                    (group) =>
+                      group.members.some(
+                        (member) => member.form_id === candidate.id
+                      ) &&
+                      group.members.some((member) => member.form_id === form.id)
+                  )))
+          )
+        : firstBase;
+      if (!base) continue;
+      const matched = regionalVariants(form.regional_variants).filter(
         (variant) =>
           (targetLocale === "en-GB" || targetLocale === "en-US"
             ? variant.dialect === "common" ||
@@ -56,8 +67,19 @@ export function nextTargetChoices(
       for (const variant of matched) {
         for (const sense of senses) {
           const definition = sense.definitions.find(
-            (row) => row.locale === mediumLocale
+            (row) =>
+              row.locale === mediumLocale &&
+              (!componentWords || row.text.trim())
           );
+          const gloss =
+            definition?.text ??
+            (componentWords
+              ? sense.equivalents.find(
+                  (row) => row.locale === mediumLocale && row.text.trim()
+                )?.text
+              : undefined) ??
+            "";
+          if (componentWords && !gloss.trim()) continue;
           result.push({
             target_word_id: entry.id,
             target_pos_id: pos.pos_id,
@@ -67,43 +89,16 @@ export function nextTargetChoices(
             target_sense_id: sense.id,
             target_dialect: variant.dialect,
             headword: variant.spelling,
-            gloss: definition?.text ?? ""
+            gloss,
+            ...(componentWords
+              ? { form_type: form.form_type, part_of_speech: pos.pos }
+              : {})
           });
         }
       }
     }
   }
   return result;
-}
-
-function contentVariants(
-  content: FormContentRegionalVariantsV3,
-  bindings: FormRegionalBindingsV3
-): Array<{ id: string; spelling: string; dialect: Dialect }> {
-  if (content.mode === "common" && bindings.mode === "common") {
-    return [{ ...content.common, id: bindings.common.id, dialect: "common" }];
-  }
-  if (content.mode === "uk_us" && bindings.mode === "uk_us") {
-    return [
-      { ...content.uk, id: bindings.uk.id, dialect: "uk" },
-      { ...content.us, id: bindings.us.id, dialect: "us" }
-    ];
-  }
-  if (content.mode === "uk_us_many" && bindings.mode === "uk_us_many") {
-    return [
-      ...content.uk.map((variant, index) => ({
-        ...variant,
-        id: bindings.uk[index]?.id ?? variant.id,
-        dialect: "uk" as const
-      })),
-      ...content.us.map((variant, index) => ({
-        ...variant,
-        id: bindings.us[index]?.id ?? variant.id,
-        dialect: "us" as const
-      }))
-    ];
-  }
-  return [];
 }
 
 /** Converts a Next entry into the legacy candidate shape used by read-only summaries. */

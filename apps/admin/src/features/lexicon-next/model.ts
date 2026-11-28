@@ -331,6 +331,9 @@ export function previewDraft(
         (row) => row.locale === medium
       );
       return {
+        ...(sense.component_usages !== undefined
+          ? { component_usages: sense.component_usages }
+          : {}),
         ...(sense.relations !== undefined
           ? { relations: sense.relations }
           : {}),
@@ -375,7 +378,8 @@ export function draftNodeCount(draft: NextDraft) {
         count +
         sense.definitions.length +
         sense.equivalents.length +
-        (sense.relations?.length ?? 0),
+        (sense.relations?.length ?? 0) +
+        (sense.component_usages?.length ?? 0),
       0
     )
   );
@@ -385,8 +389,7 @@ export function draftProblem(
   draft: NextDraft,
   equivalentMetadataAvailable = false
 ): string | null {
-  if (draftNodeCount(draft) > 500)
-    return "草稿内容已超出数量限制，请减少本批译词。";
+  if (draftNodeCount(draft) > 500) return "草稿内容已超出数量限制。";
   if (equivalentMetadataAvailable) {
     for (const sense of draft.senses) {
       const keys = new Set<string>();

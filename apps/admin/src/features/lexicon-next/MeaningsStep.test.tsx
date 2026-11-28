@@ -577,3 +577,35 @@ it("未指定词性的旧词义保留内容并锁定下方录入，指定词性�
     catalog.mockRestore();
   }
 });
+
+it("在新版短语的词义里提供成分用词入口", () => {
+  const draft: NextDraft = {
+    schema_version: 1,
+    headword: "give up",
+    forms: [],
+    senses: [
+      {
+        id: "phrase-sense",
+        part_of_speech: "verb",
+        definitions: [],
+        equivalents: []
+      }
+    ]
+  };
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <MeaningsStep
+        value={draft}
+        kind="phrase"
+        componentUsagesAvailable
+        formEditorAvailable={false}
+        target="en-GB"
+        medium="zh-Hans"
+        partOfSpeechCodes={["verb"]}
+        disabled={false}
+        onChange={vi.fn()}
+      />
+    </QueryClientProvider>
+  );
+  expect(screen.getByRole("region", { name: "成分用词" })).toBeVisible();
+});

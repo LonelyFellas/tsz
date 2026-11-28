@@ -1,15 +1,19 @@
 import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
-import { useEffect, useMemo, useState } from "react";
-import type { NextEntry } from "@tsz/types";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Alert,
   Button,
   Empty,
   Flex,
   Spin,
+  Tag,
   Typography
 } from "@tsz/ui/admin/display";
+import { useAuthStore } from "@/lib/auth";
 import type { LexiconNextRequests } from "@/pages/LexiconNext";
+import { useFormTypeLabel } from "@/features/dictionary/part-of-speech/FormTypeLabels";
+import { usePartOfSpeechLabel } from "@/features/dictionary/part-of-speech/PartOfSpeechLabels";
 import { nextTargetChoices, type NextTargetChoice } from "./nextTargetChoices";
 
 export function NextTargetPicker({
@@ -18,7 +22,9 @@ export function NextTargetPicker({
   mediumLocale,
   requests,
   onSelect,
-  onCancel
+  onCancel,
+  componentWords = false,
+  selfEntryId
 }: {
   literal: string;
   targetLocale: string;
@@ -26,98 +32,138 @@ export function NextTargetPicker({
   requests: LexiconNextRequests;
   onSelect: (choice: NextTargetChoice) => void;
   onCancel?: () => void;
+  componentWords?: boolean;
+  selfEntryId?: string;
 }) {
   const { t } = useLexiconEditorTranslation();
-  const [entries, setEntries] = useState<NextEntry[]>([]);
-  const [choices, setChoices] = useState<NextTargetChoice[]>();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string>();
-  const key = useMemo(
-    () => `${literal}:${targetLocale}:${mediumLocale}`,
-    [literal, targetLocale, mediumLocale]
-  );
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    setError(undefined);
-    setChoices(undefined);
-    void requests
-      .matchEntries({
-        target_language: "en",
-        medium_locale: mediumLocale,
-        surface: literal,
-        page: 1,
-        page_size: 20
-      })
-      .then(async (result) => {
-        const loaded = await Promise.all(
-          result.items.slice(0, 20).map((item) => requests.get(item.id))
-        );
-        if (!active) return;
-        setEntries(loaded);
-        if (loaded.length === 1) {
-          setChoices(
-            nextTargetChoices(loaded[0]!, literal, targetLocale, mediumLocale)
-          );
-        }
-      })
-      .catch((reason) => {
-        if (active)
-          setError(
-            reason instanceof Error ? reason.message : "无法读取新版词条"
-          );
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [key, literal, mediumLocale, requests, targetLocale]);
+  const actor = useAuthStore((state) => state.profile?.id);
+  const formTypeLabel = useFormTypeLabel();
+  const posLabel = usePartOfSpeechLabel();
+  const [page, setPage] = useState(1);
+  const [selectedId, setSelectedId] = useState<string>();
+  const matches = useQuery({
+    queryKey: [
+      "admin-lexicon-next",
+      "target-entries",
+      actor,
+      literal,
+      mediumLocale,
+      componentWords,
+      page
+    ],
+    queryFn: () =>
+      requests.matchEntries(
+        {
+          target_language: "en",
+          medium_locale: mediumLocale,
+          surface: literal,
+          page,
+          page_size: 20
+        },
+        undefined,
+        componentWords
+      ),
+    retry: false
+  });
+  const entries =
+    matches.data?.items.filter((item) => item.id !== selfEntryId) ?? [];
+  const selection =
+    entries.find((entry) => entry.id === selectedId) ??
+    (entries.length === 1 ? entries[0] : undefined);
+  const selectedEntry = useQuery({
+    queryKey: ["admin-lexicon-next", "target-entry", actor, selection?.id],
+    queryFn: () => requests.get(selection!.id),
+    enabled: !!selection,
+    retry: false
+  });
+  const choices = selectedEntry.data
+    ? nextTargetChoices(
+        selectedEntry.data,
+        literal,
+        targetLocale,
+        mediumLocale,
+        componentWords
+      )
+    : [];
+  const loading = matches.isPending || (!!selection && selectedEntry.isPending);
+  const error = matches.error ?? selectedEntry.error;
+  function movePage(next: number) {
+    setSelectedId(undefined);
+    setPage(next);
+  }
   return (
-    <Flex vertical gap="small" style={{ maxWidth: "min(760px, 85vw)" }}>
-      <Typography.Text className="tsz-words" strong>
-        {literal}
-      </Typography.Text>
-      {loading && <Spin aria-label="正在读取新版词条" />}
-      {error && <Alert type="error" title={error} />}
-      {!loading && !error && !choices?.length && entries.length > 1 && (
-        <Flex vertical gap="small">
+    <Flex vertical gap="small">
+      {!componentWords && (
+        <Typography.Text className="tsz-words" strong>
+          {literal}
+        </Typography.Text>
+      )}
+      {loading && <Spin aria-label={t("next_component_searching")} />}
+      {error && (
+        <Alert
+          type="error"
+          title={error.message}
+          action={
+            <Button
+              onClick={() =>
+                void (matches.isError
+                  ? matches.refetch()
+                  : selectedEntry.refetch())
+              }
+            >
+              {t("retry")}
+            </Button>
+          }
+        />
+      )}
+      {!loading && !error && !entries.length && (
+        <Empty description={t("target_no_matches")} />
+      )}
+      {entries.length > 1 && (
+        <Flex gap="small" wrap>
           {entries.map((entry) => (
             <Button
               key={entry.id}
-              onClick={() =>
-                setChoices(
-                  nextTargetChoices(entry, literal, targetLocale, mediumLocale)
-                )
-              }
+              aria-pressed={entry.id === selection?.id}
+              onClick={() => setSelectedId(entry.id)}
             >
-              {entry.draft.headword}
+              <span className="tsz-words">{entry.headword}</span>
+              {componentWords && entry.status === "draft" && (
+                <Tag>{t("panel_draft")}</Tag>
+              )}
             </Button>
           ))}
         </Flex>
       )}
-      {!loading &&
-        !error &&
-        !choices?.length &&
-        (choices !== undefined || entries.length === 0) && (
-          <Empty
-            description={t(
-              entries.length ? "target_entry_no_choices" : "target_no_matches"
-            )}
-          />
-        )}
-      {!!choices?.length && (
-        <Flex vertical gap="small">
-          {choices.map((choice, index) => (
-            <Button
-              key={`${choice.target_form_id}:${choice.target_sense_id}:${index}`}
-              onClick={() => onSelect(choice)}
-            >
-              <span className="tsz-words">{choice.headword}</span>
-              {choice.gloss ? ` · ${choice.gloss}` : ""}
-            </Button>
-          ))}
+      {!loading && !error && !!selection && !choices.length && (
+        <Empty description={t("target_entry_no_choices")} />
+      )}
+      {choices.map((choice) => (
+        <Button
+          key={`${choice.target_base_form_id}:${choice.target_form_id}:${choice.target_variant_id}:${choice.target_sense_id}`}
+          onClick={() => onSelect(choice)}
+        >
+          <span className="tsz-words">{choice.headword}</span>
+          {choice.form_type && choice.part_of_speech
+            ? ` · ${posLabel(choice.part_of_speech)} · ${formTypeLabel(choice.form_type)}`
+            : ""}
+          {choice.gloss ? ` · ${choice.gloss}` : ""}
+          {componentWords &&
+            entries.length === 1 &&
+            selection?.status === "draft" && <Tag>{t("panel_draft")}</Tag>}
+        </Button>
+      ))}
+      {componentWords && (matches.data?.pagination.total_pages ?? 0) > 1 && (
+        <Flex gap="small">
+          <Button disabled={page === 1} onClick={() => movePage(page - 1)}>
+            {t("next_component_previous_page")}
+          </Button>
+          <Button
+            disabled={page >= matches.data!.pagination.total_pages}
+            onClick={() => movePage(page + 1)}
+          >
+            {t("next_component_next_page")}
+          </Button>
         </Flex>
       )}
       {onCancel && <Button onClick={onCancel}>取消</Button>}

@@ -9,6 +9,17 @@ import { lexiconEditorPanelMessages } from "./editor-panel-messages";
 import { useAdminModuleTranslation } from "@/i18n";
 
 export const lexiconEditorMessages = {
+  next_component_searching: ["正在读取词条", "正在讀取詞條", "Loading entries"],
+  next_component_previous_page: ["上一页", "上一頁", "Previous page"],
+  next_component_next_page: ["下一页", "下一頁", "Next page"],
+  next_component_from_new: ["新版词库", "新版詞庫", "New lexicon"],
+  next_component_from_v1: ["V1 词库", "V1 詞庫", "V1 lexicon"],
+  next_component_count_unit: ["项", "項", "links"],
+  next_component_missing_literal: [
+    "当前拼写中没有该用词",
+    "目前拼寫中沒有該用詞",
+    "This word is absent from the current spelling"
+  ],
   target_entry_no_choices: [
     "该词条没有可选的关联目标",
     "該詞條沒有可選的關聯目標",
