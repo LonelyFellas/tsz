@@ -445,6 +445,9 @@ it("词形拼写同时有录音和合成资产时，播放同口音默认录音"
     ]
   };
   render(<Harness dialect="uk" spellingSpeech={spellingSpeech} />);
+  expect(sourceRadio("词形拼写", "英式")).toHaveAccessibleDescription(
+    "far spelling.mp3"
+  );
   fireEvent.click(
     screen.getByLabelText("第 1 条发音 英式 词形拼写 最终读音 播放语音")
   );
@@ -646,18 +649,47 @@ it("没有既有音标配置时默认使用词形拼写配音", () => {
   expect(sourceRadio("Azure IPA", "美式")).not.toBeChecked();
 });
 
-it("上传音频来源试听当前口音的默认录音", async () => {
-  renderWithUps(<Harness dialect="uk" recording />);
+it("上传音频来源的文件名和试听跟随当前口音的默认录音", async () => {
+  render(<Harness dialect="common" recording extraRecording />);
+  const uk = sourceRadio("上传音频", "英式");
+  expect(uk).toHaveAccessibleDescription("recording.mp3");
+  expect(sourceRadio("上传音频", "美式")).not.toHaveAccessibleDescription();
+  fireEvent.click(
+    screen.getByRole("button", { name: "第 1 条发音 英式上传音频" })
+  );
+  fireEvent.click(await screen.findByLabelText("设为默认播放 alternative.mp3"));
+  await waitFor(() =>
+    expect(uk).toHaveAccessibleDescription("alternative.mp3")
+  );
   const play = screen.getByLabelText(
     "第 1 条发音 英式 上传音频 最终读音 播放语音"
   );
   await waitFor(() => expect(play).toBeEnabled());
   fireEvent.click(play);
   await waitFor(() =>
-    expect(speech.resolveAudio).toHaveBeenCalledWith("old-recording", {
+    expect(speech.resolveAudio).toHaveBeenCalledWith("old-alternative", {
       signal: expect.any(AbortSignal)
     })
   );
+});
+
+it("来源候选显示同口音的拼写和音标，并跟随输入编辑", () => {
+  render(<Harness dialect="common" />);
+  const uk = sourceRadio("Azure IPA", "英式");
+  const us = sourceRadio("Azure IPA", "美式");
+  expect(sourceRadio("词形拼写", "英式")).toHaveAccessibleDescription("far");
+  expect(uk).toHaveAccessibleDescription("/fɑː/");
+  expect(us).toHaveAccessibleDescription("/fɑɹ/");
+
+  const input = screen.getByLabelText("第 1 条发音的英式 Azure IPA");
+  fireEvent.change(input, { target: { value: "kæt" } });
+  expect(uk).toHaveAccessibleDescription("/kæt/");
+  fireEvent.change(input, { target: { value: "/kæt/" } });
+  expect(uk).toHaveAccessibleDescription("/kæt/");
+  fireEvent.change(input, { target: { value: "" } });
+  expect(uk).not.toHaveAccessibleDescription();
+  expect(us).toHaveAccessibleDescription("/fɑɹ/");
+  expect(speech.synthesize).not.toHaveBeenCalled();
 });
 
 it.each(["ipa", "ups"] as const)(
@@ -1462,6 +1494,7 @@ describe("双口音真实试听控件", () => {
     expect(screen.queryByRole("radio", { name: "美式 Azure UPS" })).toBeNull();
     const source = within(screen.getByRole("region", { name: "美式配音来源" }));
     expect(source.getByText(/当前来源.*Azure UPS/)).toBeVisible();
+    expect(source.getByText("F AA R")).toBeVisible();
     expect(await source.findByText("Aria")).toBeVisible();
     expect(
       screen.getByLabelText("第 1 条发音的美式 Azure UPS")
@@ -1586,6 +1619,10 @@ describe("双口音真实试听控件", () => {
   });
   it("已标记英式的历史输入只显示在英式，美式留空且不可借用试听", async () => {
     renderWithUps(<Harness dialect="common" legacy />);
+    expect(sourceRadio("Azure IPA", "英式")).toHaveAccessibleDescription(
+      "/fɑː/"
+    );
+    expect(sourceRadio("Azure IPA", "美式")).not.toHaveAccessibleDescription();
     expect(screen.getByLabelText("第 1 条发音的英式 Azure IPA")).toHaveValue(
       "fɑː"
     );
@@ -2314,7 +2351,7 @@ it("面板取消和移除默认录音均保留显式选择，不把本口音旧�
   ).toBeUndefined();
 });
 
-it("在发音行直接显示选中的录音文件，切换后显示对应音色", async () => {
+it("切换到合成来源后仍可看见录音候选的文件名", async () => {
   render(<Harness dialect="uk" recording />);
   const row = within(screen.getByRole("region", { name: "英式配音来源" }));
   expect(row.getByText("recording.mp3")).toBeVisible();
@@ -2323,7 +2360,7 @@ it("在发音行直接显示选中的录音文件，切换后显示对应音色"
   fireEvent.click(sourceRadio("Azure IPA", "英式"));
 
   expect(await row.findByText("Sonia")).toBeVisible();
-  expect(row.queryByText("recording.mp3")).not.toBeInTheDocument();
+  expect(row.getByText("recording.mp3")).toBeVisible();
   expect(speech.synthesize).not.toHaveBeenCalled();
 });
 

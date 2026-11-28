@@ -208,6 +208,18 @@ it("转换失败保留全部原值并标明失败口音与字段", async () => {
   expect(screen.queryByRole("dialog")).toBeNull();
 });
 
+it("字典音标包含非法字符时提示纠正输入，保留转换目标", async () => {
+  onChange.mockClear();
+  const value = { ...initial, dict_phonetic: "ably" };
+  render(<Harness value={value} spelling="ably" />);
+  start();
+  expect(
+    await screen.findByText("请输入正确的音标文字；其他字符无法识别。")
+  ).toBeVisible();
+  expect(current()).toEqual(value);
+  expect(onChange).not.toHaveBeenCalled();
+});
+
 it("缺少字典音标或编辑权限不能转换，缺少拼写定位拼写字段", () => {
   onChange.mockClear();
   const missing = vi.fn();

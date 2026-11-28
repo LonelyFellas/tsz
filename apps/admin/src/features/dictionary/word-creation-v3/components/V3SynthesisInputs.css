@@ -418,12 +418,33 @@
     border-color var(--ui-motion-duration) var(--ui-motion-easing);
 }
 
-.word-synthesis-choice-recording {
+.word-synthesis-choice-values {
+  display: grid;
+  min-width: 0;
+}
+
+.word-synthesis-collapsed-values {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ui-space-2);
+  min-width: 0;
+}
+
+.word-synthesis-collapsed-values > :first-child {
+  flex-shrink: 0;
+}
+
+.word-synthesis-choice-value {
+  display: block;
   min-width: 0;
   color: var(--ui-color-text-secondary);
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+.word-synthesis-choice-value.tsz-words {
+  font-family: var(--tsz-font-words);
 }
 
 .word-synthesis-choice-details .v3-voice-inline-row,

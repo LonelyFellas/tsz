@@ -13,7 +13,10 @@ import {
   type ConversionField,
   type PronunciationConversionPlan
 } from "../pronunciationConversion";
-import { localPhoneticDiagnostic } from "./localPhoneticDiagnostic";
+import {
+  localPhoneticDiagnostic,
+  unsupportedDictionaryTranscriptionMessage
+} from "./localPhoneticDiagnostic";
 
 export function V3PronunciationConvertAll({
   pronunciation,
@@ -82,7 +85,8 @@ export function V3PronunciationConvertAll({
           );
           if (!result.ok) {
             void message.error(
-              `${fieldLabel(result.field)}：${localPhoneticDiagnostic(result.message, t)}`
+              unsupportedDictionaryTranscriptionMessage(result.message, t) ??
+                `${fieldLabel(result.field)}：${localPhoneticDiagnostic(result.message, t)}`
             );
             return;
           }
