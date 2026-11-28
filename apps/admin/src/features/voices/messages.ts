@@ -769,10 +769,10 @@ export const voiceMessages = {
     "已選音色超過剩餘名額，請取消部分勾選。",
     "Deselect voices to fit the remaining slots."
   ],
-  recommendation_catalog_changed: [
-    "部分音色已从目录移除，请关闭后重新选择。",
-    "部分音色已從目錄移除，請關閉後重新選擇。",
-    "Some selected voices were removed. Reopen the drawer to select again."
+  remove_unavailable_selection: [
+    "移除失效音色 {{name}}",
+    "移除失效音色 {{name}}",
+    "Remove unavailable voice {{name}}"
   ],
   use_recommendation: ["选用", "選用", "Use"],
   order: ["顺序", "順序", "Order"],

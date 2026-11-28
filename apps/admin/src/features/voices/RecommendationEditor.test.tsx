@@ -297,3 +297,40 @@ it.each(["", " \t "])(
     expect(onSave).toHaveBeenCalledWith({ ...initial, name: "未命名推荐" });
   }
 );
+
+it.each(["口音调整", "目录移除"])(
+  "批量选择后遇到%s可移除失效音色并保存其余勾选",
+  (reason) => {
+    const onSave = vi.fn();
+    const content = (voices: AdminSpeechVoice[]) => (
+      <InterfaceI18nProvider locale="zh-Hans">
+        <App>
+          <RecommendationEditor
+            voices={voices}
+            side="uk"
+            initial={{}}
+            disabled={false}
+            bulkAdd={{ remainingSlots: 2, onSave }}
+            onCancel={vi.fn()}
+          />
+        </App>
+      </InterfaceI18nProvider>
+    );
+    const view = render(content([sonia, libby]));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Sonia/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Libby/ }));
+    view.rerender(
+      content(
+        reason === "口音调整" ? [{ ...sonia, accent: "us" }, libby] : [libby]
+      )
+    );
+    const add = screen.getByRole("button", { name: "加入本组" });
+    expect(add).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: /移除.*sonia/i }));
+    expect(screen.getByRole("checkbox", { name: /Libby/ })).toBeChecked();
+    fireEvent.click(add);
+    expect(onSave).toHaveBeenCalledWith([
+      expect.objectContaining({ voice_alias: libby.alias })
+    ]);
+  }
+);

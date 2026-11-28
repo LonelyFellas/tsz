@@ -71,6 +71,15 @@ export function RecommendationEditor({
   const [ssmlDrafts, setSsmlDrafts] = useState<Record<string, SsmlDraft>>({});
   const voiceDrafts = useRef(new Map<string, RecommendationSeed>());
   const [selectedAliases, setSelectedAliases] = useState<string[]>([]);
+  const sideVoices = voices.filter(
+    (voice) => speechAccentGroup(voice.locale, voice.accent) === side
+  );
+  const voicesByAlias = new Map(
+    sideVoices.map((voice) => [voice.alias, voice])
+  );
+  const missingAliases = selectedAliases.filter(
+    (alias) => !voicesByAlias.has(alias)
+  );
   const atCapacity =
     !!bulkAdd && selectedAliases.length >= bulkAdd.remainingSlots;
   const selectionExceedsCapacity =
@@ -152,17 +161,17 @@ export function RecommendationEditor({
 
   const saveDisabled =
     disabled ||
-    (!!bulkAdd && (!selectedAliases.length || selectionExceedsCapacity));
+    (!!bulkAdd &&
+      (!selectedAliases.length ||
+        selectionExceedsCapacity ||
+        missingAliases.length > 0));
   function save() {
     if (saveDisabled) return;
     if (bulkAdd) {
       const recommendations: AdminDubbingRecommendation[] = [];
       for (const alias of selectedAliases) {
-        const candidate = voices.find((voice) => voice.alias === alias);
-        if (!candidate) {
-          setError(voiceMessage("recommendation_catalog_changed"));
-          return;
-        }
+        const candidate = voicesByAlias.get(alias);
+        if (!candidate) return;
         const recommendation = {
           ...newRecommendationVoice(candidate),
           name:
@@ -349,9 +358,8 @@ export function RecommendationEditor({
       >
         {(["female", "male"] as const).map((gender) => {
           const label = t(gender === "female" ? "female_voice" : "male_voice");
-          const candidates = voices.filter(
+          const candidates = sideVoices.filter(
             (voice) =>
-              speechAccentGroup(voice.locale, voice.accent) === side &&
               (gender === "female"
                 ? voice.gender.toLowerCase() === "female"
                 : voice.gender.toLowerCase() !== "female") &&
@@ -476,6 +484,20 @@ export function RecommendationEditor({
         <Typography.Text type="secondary">
           {t("editor_status_side")}
         </Typography.Text>
+        {missingAliases.map((alias) => (
+          <Button
+            key={alias}
+            size="small"
+            disabled={disabled}
+            onClick={() => toggleVoice(alias)}
+          >
+            {t("remove_unavailable_selection", {
+              name:
+                voices.find((voice) => voice.alias === alias)?.display_name ??
+                alias
+            })}
+          </Button>
+        ))}
         {(selectionExceedsCapacity || error) && (
           <Typography.Text type="danger" role="alert">
             {selectionExceedsCapacity
