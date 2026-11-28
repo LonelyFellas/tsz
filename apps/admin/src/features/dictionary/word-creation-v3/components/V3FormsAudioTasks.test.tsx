@@ -8,6 +8,7 @@ import {
 import { useState } from "react";
 import { beforeEach, expect, it, vi } from "vitest";
 import type {
+  AudioAssetV3,
   GenerateVoiceAudioRequest,
   RichTextV2,
   SharedFormsStepContentV3,
@@ -360,6 +361,171 @@ it.each([
   );
   if (unavailable) expect(screen.getByText("当前口音不可用")).toBeVisible();
   else expect(screen.queryByText("当前口音不可用")).toBeNull();
+});
+
+function legacyRecording(
+  locale: "en-GB" | "en-US",
+  isDefault = true
+): AudioAssetV3 {
+  return {
+    id: `recording-${locale}`,
+    locale,
+    gender: "female",
+    content_type: "audio/mpeg",
+    size_bytes: 10,
+    original_name: "recording.mp3",
+    created_at: "2026-11-28T00:00:00Z",
+    is_default: isDefault
+  };
+}
+
+it.each([
+  { rowOnly: false, isDefault: true },
+  { rowOnly: true, isDefault: true },
+  { rowOnly: false, isDefault: false }
+])(
+  "共享旧词形按录音默认状态限定配音口音（弹窗任务=$rowOnly，默认录音=$isDefault）",
+  async ({ rowOnly, isDefault }) => {
+    const forms = fixture();
+    const regions = forms.contents[0]!.regional_variants;
+    if (regions.mode !== "common") throw new Error("expected common fixture");
+    const row = regions.common.pronunciations[0]!;
+    delete row.synthesis;
+    const recording = legacyRecording("en-US", isDefault);
+    row.audio_assets = [recording];
+    const cachedUs = {
+      ...voices[1]!,
+      voice_id: "synthetic-delisted-voice",
+      accent: "us" as const,
+      audio_asset_id: "cached-us-tts"
+    };
+    row.voice_profile = {
+      dubbing: { area: "word", uk: { mode: "inherit" }, us: { mode: "local" } },
+      voices: [cachedUs]
+    };
+    const british = {
+      ...voices[0]!,
+      voice_id: "en-gb-sonianeural",
+      accent: "gb" as const
+    };
+    speech.resolve.mockImplementation(async ({ accent }) => {
+      if (accent === "us") throw new Error("当前口音没有合格音色");
+      return { voices: [british] };
+    });
+
+    render(<Host initial={forms} rowOnly={rowOnly} />);
+    const results: boolean[] = [];
+    await act(async () => {
+      for (const wait of [...tasks.values()]) results.push(await wait());
+    });
+
+    expect
+      .soft(speech.resolve.mock.calls.map(([{ accent }]) => accent))
+      .toEqual(isDefault ? ["gb"] : ["gb", "us"]);
+    expect.soft(results).toEqual([isDefault]);
+    if (isDefault) {
+      expect
+        .soft(speech.generate)
+        .toHaveBeenCalledExactlyOnceWith(
+          expect.objectContaining({ setting: british })
+        );
+      expect(
+        screen.queryByText("当前口音没有合格音色")
+      ).not.toBeInTheDocument();
+    } else {
+      expect(speech.generate).not.toHaveBeenCalled();
+      expect(screen.getByText("当前口音没有合格音色")).toBeVisible();
+    }
+    const saved = JSON.parse(screen.getByTestId("saved-forms").textContent!)
+      .contents[0].regional_variants.common.pronunciations[0];
+    expect(saved.audio_assets).toEqual([recording]);
+    expect(saved.voice_profile.dubbing.us).toEqual({ mode: "local" });
+    expect(saved.voice_profile.voices).toContainEqual(cachedUs);
+  }
+);
+
+it("双侧默认录音保留录音并在修改音标后移除过期的合成资产引用", async () => {
+  const initial = fixture();
+  const row = primaryRegionalVariant(
+    initial.contents[0]!.regional_variants,
+    "uk"
+  ).pronunciations[0]!;
+  delete row.synthesis;
+  const cachedUs = {
+    ...voices[1]!,
+    accent: "us" as const,
+    audio_asset_id: "old-us-tts"
+  };
+  const recordings = [legacyRecording("en-GB"), legacyRecording("en-US")];
+  row.audio_assets = recordings;
+  row.voice_profile = {
+    dubbing: { area: "word", uk: { mode: "inherit" }, us: { mode: "local" } },
+    voices: [cachedUs]
+  };
+  function Draft() {
+    const [forms, setForms] = useState(initial);
+    const updatePhonetic = () => {
+      const next = structuredClone(forms);
+      const variant = primaryRegionalVariant(
+        next.contents[0]!.regional_variants,
+        "uk"
+      );
+      variant.pronunciations[0]!.dict_phonetic = "hɛˈləʊ";
+      setForms(next);
+    };
+    return (
+      <VoiceSaveContext.Provider
+        value={{ save: async () => true, audioTasks: tasks }}
+      >
+        <V3FormsAudioTasks
+          forms={forms}
+          paused={false}
+          rowOnly
+          onChange={setForms}
+        />
+        <button onClick={updatePhonetic}>修改字典音标</button>
+        <output data-testid="saved-forms">{JSON.stringify(forms)}</output>
+      </VoiceSaveContext.Provider>
+    );
+  }
+  render(<Draft />);
+  fireEvent.click(screen.getByRole("button", { name: "修改字典音标" }));
+  await applyAudioTasks();
+  const saved = JSON.parse(screen.getByTestId("saved-forms").textContent!)
+    .contents[0].regional_variants.common.pronunciations[0];
+  expect(saved.audio_assets).toEqual(recordings);
+  expect(saved.voice_profile.voices[0]).toMatchObject({
+    voice_id: cachedUs.voice_id,
+    enabled: true
+  });
+  expect(saved.voice_profile.voices[0]).not.toHaveProperty("audio_asset_id");
+  expect(speech.resolve).not.toHaveBeenCalled();
+  expect(speech.generate).not.toHaveBeenCalled();
+});
+
+it("共享旧词形已有英美默认录音时仍生成已选的补充地区音色", async () => {
+  const forms = fixture();
+  const row = primaryRegionalVariant(forms.contents[0]!.regional_variants, "uk")
+    .pronunciations[0]!;
+  delete row.synthesis;
+  const other: VoiceSettingV3 = {
+    ...voices[0]!,
+    voice_id: "en-in-neerjaneural",
+    locale: "en-IN",
+    accent: "none"
+  };
+  row.voice_profile = { voices: [other] };
+  row.audio_assets = [legacyRecording("en-GB"), legacyRecording("en-US")];
+  render(<Host initial={forms} rowOnly />);
+  await applyAudioTasks();
+  expect(speech.resolve).not.toHaveBeenCalled();
+  expect(speech.generate).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({ setting: other })
+  );
+  const saved = JSON.parse(screen.getByTestId("saved-forms").textContent!)
+    .contents[0].regional_variants.common.pronunciations[0];
+  expect(saved.voice_profile.voices[0].audio_asset_id).toBe("formal-row-en-IN");
+  expect(saved.audio_assets).toEqual(row.audio_assets);
 });
 
 it.each([
