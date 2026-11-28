@@ -28,9 +28,13 @@ import {
 } from "../word-creation-v3/operations";
 import {
   applyFormsStructure,
+  contentEditorForms,
+  contentFromEditor,
+  createSharedContentDialectNormalizer,
   replaceSharedContent,
   createPronunciationReferenceIds
 } from "../word-creation-v3/sharedFormsModel";
+import { isEmptyTemplate } from "../word-creation-v3/defaultFormSharing";
 import { newWordNodeId } from "../word-model/primitives";
 import { editRichText } from "@tsz/voice-editor/core";
 
@@ -247,10 +251,6 @@ export function planFormCandidates(
         row.message = "candidate_ungrouped";
         continue;
       }
-      if (!compatible(proposal, group.dialect_rules)) {
-        row.message = "candidate_dialect_mismatch";
-        continue;
-      }
       const sameType = pos.forms.filter(
         (form) => form.form_type === proposal.form_type
       );
@@ -278,6 +278,10 @@ export function planFormCandidates(
         continue;
       }
       if (!target) {
+        if (!compatible(proposal, group.dialect_rules)) {
+          row.message = "candidate_dialect_mismatch";
+          continue;
+        }
         const added = addConcreteForm(
           inline,
           pos.pos_id,
@@ -308,10 +312,34 @@ export function planFormCandidates(
           row.message = "candidate_shared_kept";
           continue;
         }
-        const content = structuredClone(
+        let content = structuredClone(
           result.contents.find((value) => value.id === binding.content_id)!
         );
         const before = JSON.stringify(content);
+        if (!compatible(proposal, content.dialect_rules)) {
+          if (
+            proposal.uk.spelling !== proposal.us.spelling ||
+            content.regional_variants.mode !== "common" ||
+            content.regional_variants.common.spelling.trim() ||
+            content.pronunciation_slots?.length ||
+            binding.regional_bindings.mode !== "common" ||
+            binding.regional_bindings.common.component_usages?.length ||
+            !isEmptyTemplate(content)
+          ) {
+            row.message = "candidate_dialect_mismatch";
+            continue;
+          }
+          const regional = createSharedContentDialectNormalizer(content, [])(
+            contentEditorForms(content),
+            rulesFor([proposal]),
+            "uk"
+          );
+          if (!regional.ok) {
+            row.message = "candidate_dialect_mismatch";
+            continue;
+          }
+          content = contentFromEditor(regional.value);
+        }
         if (content.regional_variants.mode === "uk_us_many") {
           row.message = "candidate_many_spellings";
           continue;
