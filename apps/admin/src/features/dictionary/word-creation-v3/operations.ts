@@ -1524,6 +1524,32 @@ export function reorderFormGroups(
   return next;
 }
 
+export function reorderBaseFormMembers(
+  content: DraftFormsStepContentV3,
+  posId: string,
+  groupId: string,
+  orderedIds: readonly string[]
+): DraftFormsStepContentV3 {
+  const next = clone(content);
+  const pos = next.pos.find((item) => item.pos_id === posId);
+  if (!pos) throw new Error(`pos not found: ${posId}`);
+  const group = pos.form_groups.find((item) => item.id === groupId);
+  if (!group) throw new Error(`form group not found: ${groupId}`);
+  const baseFormIds = new Set(
+    pos.forms.filter((form) => form.form_type === "base").map((form) => form.id)
+  );
+  const ordered = reorderByIds(
+    group.members.filter((member) => baseFormIds.has(member.form_id)),
+    orderedIds,
+    "base form membership"
+  );
+  let index = 0;
+  group.members = group.members.map((member) =>
+    baseFormIds.has(member.form_id) ? ordered[index++]! : member
+  );
+  return next;
+}
+
 export function reorderPronunciations(
   content: DraftFormsStepContentV3,
   variantId: string,

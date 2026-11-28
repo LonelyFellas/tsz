@@ -4177,6 +4177,130 @@ it("共享编辑器新增词性只对本次新增标签应用 catalog 模板", a
   ).toBe(forms.pos[0]!.forms[0]!.content_id);
 });
 
+it("新版词库拖动同组原形只重排本组原形成员", async () => {
+  const first = commonFormFixture({
+    id: uuidFromInt(7601),
+    variant_id: uuidFromInt(7611),
+    spelling: "bicycle"
+  });
+  const second = commonFormFixture({
+    id: uuidFromInt(7602),
+    variant_id: uuidFromInt(7612),
+    spelling: "bike"
+  });
+  const plural = commonFormFixture({
+    id: uuidFromInt(7603),
+    variant_id: uuidFromInt(7613),
+    form_type: "plural",
+    spelling: "bicycles"
+  });
+  const otherBases = [
+    commonFormFixture({ id: uuidFromInt(7604), variant_id: uuidFromInt(7614) }),
+    commonFormFixture({ id: uuidFromInt(7605), variant_id: uuidFromInt(7615) })
+  ];
+  const firstGroup = group(
+    uuidFromInt(7621),
+    [first, plural, second].map((form, index) => ({
+      id: uuidFromInt(7631 + index),
+      form_id: form.id
+    }))
+  );
+  const secondGroup = group(
+    uuidFromInt(7622),
+    otherBases.map((form, index) => ({
+      id: uuidFromInt(7641 + index),
+      form_id: form.id
+    }))
+  );
+  const forms = applyFormsStructure(
+    { forms_format: "shared_v1", contents: [], pos: [] },
+    formsFixture({
+      forms: [first, plural, second, ...otherBases],
+      groups: [firstGroup, secondGroup]
+    })
+  ) as SharedFormsStepContentV3;
+  const client = new QueryClient();
+  client.setQueryData(
+    ["part-of-speech-config", "catalog"],
+    partOfSpeechCatalogFixture
+  );
+  const onChange = vi.fn<(next: SharedFormsStepContentV3) => void>();
+  const { container } = render(
+    <QueryClientProvider client={client}>
+      <FeedbackApp>
+        <FormsStep
+          value={forms}
+          saved={forms}
+          kind="word"
+          locale="en-GB"
+          issues={[]}
+          onChange={onChange}
+          registerLeaveGuard={vi.fn()}
+        />
+      </FeedbackApp>
+    </QueryClientProvider>
+  );
+
+  const card = (id: string) =>
+    within(
+      container.querySelector<HTMLElement>(
+        `.v3-form-group-card[data-group-id="${id}"]`
+      )!
+    );
+  const groupHandles = () =>
+    card(firstGroup.id).getAllByRole("button", { name: /^拖动原形/ });
+  const [start, end] = groupHandles();
+  const [other] = card(secondGroup.id).getAllByRole("button", {
+    name: /^拖动原形/
+  });
+  expect(groupHandles()).toHaveLength(2);
+  expect(
+    card(firstGroup.id).queryByRole("button", { name: /^拖动复数/ })
+  ).toBeNull();
+  const transferred = new Map<string, string>();
+  const dataTransfer = {
+    setData: (type: string, value: string) => transferred.set(type, value),
+    getData: (type: string) => transferred.get(type) ?? "",
+    get types() {
+      return [...transferred.keys()];
+    }
+  };
+
+  const endRow = end!.closest("tr")!;
+  fireEvent.dragStart(start!, { dataTransfer });
+  fireEvent.dragOver(endRow, { dataTransfer });
+  expect(endRow).not.toHaveClass("is-drag-over-after");
+  expect(endRow.nextElementSibling).toHaveClass("is-drag-over-after");
+  fireEvent.dragEnd(start!, { dataTransfer });
+  fireEvent.dragStart(end!, { dataTransfer });
+  fireEvent.drop(other!.closest("tr")!, { dataTransfer });
+  expect(onChange).not.toHaveBeenCalled();
+  fireEvent.dragEnd(end!, { dataTransfer });
+  fireEvent.dragStart(end!, { dataTransfer });
+  fireEvent.dragOver(start!.closest("tr")!, { dataTransfer });
+  fireEvent.drop(start!.closest("tr")!, { dataTransfer });
+  expect(onChange).toHaveBeenCalledTimes(1);
+  const next = onChange.mock.calls[0]![0];
+  expect(next.pos[0]!.form_groups[0]!.members).toEqual([
+    firstGroup.members[2],
+    firstGroup.members[1],
+    firstGroup.members[0]
+  ]);
+  expect(next.pos[0]!.form_groups[1]).toEqual(forms.pos[0]!.form_groups[1]);
+  expect(next.contents).toEqual(forms.contents);
+  expect(next.pos[0]!.forms).toEqual(forms.pos[0]!.forms);
+
+  fireEvent.keyDown(end!, { key: "ArrowUp" });
+  expect(onChange).toHaveBeenCalledTimes(2);
+  expect(onChange).toHaveBeenLastCalledWith(next);
+  fireEvent.click(within(endRow).getByRole("button", { name: "复制英美音标" }));
+  expect(start).toBeDisabled();
+  expect(end).toBeDisabled();
+  fireEvent.keyDown(end!, { key: "ArrowUp" });
+  expect(onChange).toHaveBeenCalledTimes(2);
+  client.clear();
+});
+
 it.each(["words", "lexicon-next"])(
   "%s 复用的共享词形弹窗不再提供独立编辑，仍可删除或新增标签",
   async (entry) => {

@@ -28,6 +28,7 @@ import type { ReactNode } from "react";
 import {
   addConcreteForm,
   deleteConcreteForm,
+  reorderBaseFormMembers,
   updateConcreteFormType,
   type V3IdFactory
 } from "../operations";
@@ -579,6 +580,16 @@ export function V3FormGroupCard({
               onEdit={onEditContent}
               onFormTypeChange={(id, type) =>
                 onChange(updateConcreteFormType(content, id, type))
+              }
+              onBaseFormOrderChange={(orderedIds) =>
+                onChange(
+                  reorderBaseFormMembers(
+                    content,
+                    pos.pos_id,
+                    group.id,
+                    orderedIds
+                  )
+                )
               }
               rows={orderedMembers.flatMap((member, index) => {
                 const form = pos.forms.find(

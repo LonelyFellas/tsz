@@ -18,7 +18,7 @@ export function SortableDragHandle({
   dragImageSelector
 }: {
   label: string;
-  singleItemTitle: string;
+  singleItemTitle?: string;
   sorting: SortableRowsController;
   index: number;
   dragImageSelector: string;
