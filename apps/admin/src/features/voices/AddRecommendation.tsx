@@ -15,6 +15,8 @@ import {
   dubbingGroupsKey,
   MAX_RECOMMENDATIONS_PER_SIDE,
   newRecommendationVoice,
+  recommendationVoiceCounts,
+  recommendationVoiceIdentity,
   type DubbingDraft
 } from "./dubbing-model";
 import {
@@ -60,6 +62,11 @@ export function AddRecommendation({
       (draft) => !groups.data?.groups.some((group) => group.id === draft.id)
     )
   ];
+  const group = options.find((group) => group.id === groupId);
+  const groupItems =
+    group && (locale === "uk" || locale === "us") ? group[locale] : [];
+  const occupiedVoices = recommendationVoiceCounts(groupItems, voices);
+  const groupIsFull = groupItems.length >= MAX_RECOMMENDATIONS_PER_SIDE;
   async function add() {
     if (
       !canEdit ||
@@ -69,16 +76,23 @@ export function AddRecommendation({
       (locale !== "uk" && locale !== "us")
     )
       return;
-    const group = options.find((g) => g.id === groupId);
     if (!group) {
       setError(voiceMessage("select_a_recommendation_group"));
       return;
     }
-    if (group[locale].length >= MAX_RECOMMENDATIONS_PER_SIDE) {
+    if (groupIsFull) {
       setError(
         voiceMessage(
           "this_group_already_has_20_recommendations_organise_them_in_group_"
         )
+      );
+      return;
+    }
+    if (occupiedVoices.has(recommendationVoiceIdentity(voice.alias, voice))) {
+      setError(
+        voiceMessage("recommendation_voice_conflict", {
+          voice: voice.display_name
+        })
       );
       return;
     }
@@ -137,7 +151,10 @@ export function AddRecommendation({
               label: group.name
             }))}
             disabled={pending || !!seed || !canEdit}
-            onChange={setGroupId}
+            onChange={(id) => {
+              setGroupId(id);
+              setError("");
+            }}
           />
         </Form.Item>
         <Space>
@@ -165,16 +182,29 @@ export function AddRecommendation({
           voices={voices}
           initial={seed}
           side={locale === "us" ? "us" : "uk"}
+          occupiedVoices={occupiedVoices}
+          submissionError={
+            !group
+              ? t("recommendation_group_removed")
+              : groupIsFull
+                ? t(
+                    "this_group_already_has_20_recommendations_organise_them_in_group_"
+                  )
+                : undefined
+          }
           disabled={!canEdit || pending}
           onCancel={() => setSeed(undefined)}
           onSave={(item) => {
-            if (!canEdit || useAuthStore.getState().profile?.id !== accountId)
+            if (
+              !canEdit ||
+              useAuthStore.getState().profile?.id !== accountId ||
+              !group ||
+              groupIsFull ||
+              (locale !== "uk" && locale !== "us")
+            )
               return;
-            const original = options.find((g) => g.id === groupId);
-            if (!original) return;
             setDrafts((current) => {
-              const target = current[original.id] ?? original;
-              if (locale !== "uk" && locale !== "us") return current;
+              const target = current[group.id] ?? group;
               return {
                 ...current,
                 [target.id]: { ...target, [locale]: [...target[locale], item] }

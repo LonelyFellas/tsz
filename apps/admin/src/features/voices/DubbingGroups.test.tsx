@@ -293,11 +293,16 @@ function dragRecommendation(
   }
   fireEvent.dragEnd(source, { dataTransfer });
 }
-function versions(item: AdminDubbingRecommendation, count: number) {
+function versions(
+  item: AdminDubbingRecommendation,
+  count: number,
+  catalog?: AdminSpeechVoice[]
+) {
   return Array.from({ length: count }, (_, index) => ({
     ...structuredClone(item),
     id: `${item.id}-${index}`,
     name: `${item.name}${index + 1}`,
+    voice_alias: catalog?.[index]?.alias ?? item.voice_alias,
     selected: index !== 1,
     parameters: { ...item.parameters, rate_percent: index * 5 }
   }));
@@ -486,9 +491,24 @@ describe("按口音独立推荐与逐组草稿", () => {
 
   it("英式2项美式5项独立展示，单侧美式增删重排保存刷新不改变英式", async () => {
     const initial = data();
-    initial.groups[0]!.uk = versions(initial.groups[0]!.uk[0]!, 2);
-    initial.groups[0]!.us = versions(initial.groups[0]!.us[0]!, 5);
-    const { client } = mount(initial);
+    const americanVoices = [
+      us,
+      ...Array.from({ length: 5 }, (_, index) => ({
+        ...us,
+        alias: `guy-${index}`,
+        display_name: `US voice ${index}`
+      }))
+    ];
+    initial.groups[0]!.uk = versions(initial.groups[0]!.uk[0]!, 2, [
+      uk,
+      ukMale
+    ]);
+    initial.groups[0]!.us = versions(
+      initial.groups[0]!.us[0]!,
+      5,
+      americanVoices
+    );
+    const { client } = mount(initial, [uk, ukMale, ...americanVoices]);
     const panel = groupPanel("A");
     expect(within(panel).queryByRole("button", { name: "完成" })).toBeNull();
     expect(within(panel).queryByRole("button", { name: "取消" })).toBeNull();
@@ -506,11 +526,9 @@ describe("按口音独立推荐与逐组草稿", () => {
       recommendationRow(american, "a-us-1")
     );
     fireEvent.click(within(american).getByLabelText("选用美式 A推荐2"));
-    fireEvent.click(button("复制美式 A推荐1", american));
-    fireEvent.change(screen.getByLabelText("推荐名称"), {
-      target: { value: "美式副本" }
-    });
-    fireEvent.click(button("保存到本组", screen.getByRole("dialog")));
+    fireEvent.click(button("新增推荐", within(panel).getByLabelText("A 美式")));
+    fireEvent.click(screen.getByRole("checkbox", { name: "男声 US voice 4" }));
+    fireEvent.click(button("加入本组", screen.getByRole("dialog")));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     await remove("删除美式 A推荐4", american);
     await complete(panel);
@@ -522,11 +540,11 @@ describe("按口音独立推荐与逐组草稿", () => {
       "A推荐3",
       "A推荐2",
       "A推荐5",
-      "美式副本"
+      "US voice 4"
     ]);
     expect(request.group.us.at(-1)).toMatchObject({
-      voice_alias: "guy",
-      parameters: initial.groups[0]!.us[0]!.parameters
+      voice_alias: "guy-4",
+      parameters: { rate_percent: 0, pitch_semitones: 0, style: null }
     });
     expect(request.group.us.at(-1)!.id).not.toBe(initial.groups[0]!.us[0]!.id);
     expect(request.group.us[2]!.selected).toBe(true);
@@ -648,8 +666,33 @@ describe("按口音独立推荐与逐组草稿", () => {
     ]);
     expect(saved.us).toEqual([]);
   });
+  it("当前侧已加入的音色从新增候选消失，移除后恢复，其他组可复用", async () => {
+    const initial = data();
+    initial.groups[0]!.uk[0]!.selected = false;
+    initial.groups[1]!.uk = [];
+    mount(initial, [uk, us, ukMale]);
+    const panel = groupPanel("A");
+    const british = within(panel).getByLabelText("A 英式");
+    fireEvent.click(button("新增推荐", british));
+    expect(screen.queryByRole("checkbox", { name: "女声 Sonia" })).toBeNull();
+    fireEvent.click(screen.getByRole("checkbox", { name: "男声 Ryan" }));
+    fireEvent.click(button("加入本组", screen.getByRole("dialog")));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    fireEvent.click(button("新增推荐", british));
+    expect(screen.queryByRole("checkbox", { name: "男声 Ryan" })).toBeNull();
+    closeDialog();
+    await remove("删除英式 A推荐", british);
+    fireEvent.click(button("新增推荐", british));
+    expect(screen.getByRole("checkbox", { name: "女声 Sonia" })).toBeEnabled();
+    closeDialog();
+    fireEvent.click(
+      button("新增推荐", within(groupPanel("B")).getByLabelText("B 英式"))
+    );
+    expect(screen.getByRole("checkbox", { name: "男声 Ryan" })).toBeEnabled();
+  });
   it("跨搜索结果批量加入当前侧，每条使用自己的默认参数并可独立编辑、保存和回读", async () => {
     const initial = data();
+    initial.groups[0]!.uk = [];
     const { client } = mount(initial, [uk, us, ukMale]);
     const panel = groupPanel("A");
     fireEvent.click(button("新增推荐", within(panel).getByLabelText("A 英式")));
@@ -683,7 +726,6 @@ describe("按口音独立推荐与逐组草稿", () => {
     const saved =
       client.getQueryData<AdminDubbingGroupsV3Response>(queryKey)!.groups[0]!;
     expect(saved.uk).toEqual([
-      initial.groups[0]!.uk[0],
       {
         id: expect.any(String),
         name: uk.display_name,
@@ -704,13 +746,61 @@ describe("按口音独立推荐与逐组草稿", () => {
         }
       }
     ]);
-    expect(new Set(saved.uk.map((item) => item.id)).size).toBe(3);
+    expect(new Set(saved.uk.map((item) => item.id)).size).toBe(2);
     expect(saved.us).toEqual(initial.groups[0]!.us);
+  });
+  it("历史同音色不同别名会标记冲突，完成前需移除或更换其中一条", async () => {
+    const initial = data();
+    const officialVoice = {
+      ...uk,
+      metadata: {
+        provider_voice_id: "en-GB-SoniaNeural",
+        model: "Neural",
+        age_group: null,
+        description: null,
+        personalities: null,
+        scenarios: null,
+        roles: null,
+        source_url: "",
+        checked_at: ""
+      }
+    };
+    const legacyVoice = { ...officialVoice, alias: "legacy-sonia" };
+    const group = initial.groups[0]!;
+    group.uk = versions(group.uk[0]!, 2, [officialVoice, legacyVoice]);
+    mount(initial, [officialVoice, legacyVoice, ukMale, us]);
+    const panel = groupPanel("A");
+    const british = side(panel, "英式");
+    expect(within(british).getAllByText("同侧音色重复")).toHaveLength(2);
+    fireEvent.click(within(british).getByLabelText("选用英式 A推荐2"));
+    fireEvent.click(button("完成", panel));
+    expect(api.speech.saveIndependentGroup).not.toHaveBeenCalled();
+    expect(within(panel).getByText(/本组同侧已使用「Sonia」/)).toBeVisible();
+    fireEvent.click(button("修改英式 A推荐2", british));
+    expect(
+      within(screen.getByRole("dialog")).getAllByRole("radio", {
+        name: "女声 Sonia"
+      })
+    ).toHaveLength(1);
+    fireEvent.click(screen.getByRole("radio", { name: "男声 Ryan" }));
+    fireEvent.click(button("保存到本组", screen.getByRole("dialog")));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(within(british).queryByText("同侧音色重复")).toBeNull();
+    await complete(panel);
+    expect(
+      stored.groups[0]!.uk.map(({ id, voice_alias }) => [id, voice_alias])
+    ).toEqual([
+      [group.uk[0]!.id, uk.alias],
+      [group.uk[1]!.id, ukMale.alias]
+    ]);
   });
   it("抽屉打开时剩余名额减少会保留勾选，超限需取消勾选才能加入", async () => {
     const initial = data();
     const seed = initial.groups[0]!.uk[0]!;
-    initial.groups[0]!.uk = versions(seed, 18);
+    initial.groups[0]!.uk = versions(seed, 18).map((item) => ({
+      ...item,
+      voice_alias: item.id
+    }));
     const { client } = mount(initial, [uk, us, ukMale]);
     const panel = groupPanel("A");
     fireEvent.click(button("新增推荐", within(panel).getByLabelText("A 英式")));
@@ -721,7 +811,11 @@ describe("按口音独立推荐与逐组草稿", () => {
     fireEvent.click(ryan);
 
     const updated = structuredClone(initial);
-    updated.groups[0]!.uk.push({ ...seed, id: "another-recommendation" });
+    updated.groups[0]!.uk.push({
+      ...seed,
+      id: "another-recommendation",
+      voice_alias: "another-voice"
+    });
     await act(async () => client.setQueryData(queryKey, updated));
     const add = editor.getByRole("button", { name: "加入本组" });
     await waitFor(() => expect(add).toBeDisabled());
@@ -762,10 +856,15 @@ describe("按口音独立推荐与逐组草稿", () => {
   });
   it("单条修改和取消只处理当前推荐，保持身份、同侧其他参数和另一侧", async () => {
     const initial = data();
-    initial.groups[0]!.uk = versions(initial.groups[0]!.uk[0]!, 2);
-    mount(initial);
+    initial.groups[0]!.uk = versions(initial.groups[0]!.uk[0]!, 2, [
+      uk,
+      ukMale
+    ]);
+    mount(initial, [uk, ukMale, us]);
     const panel = groupPanel("A");
     fireEvent.click(button("修改英式 A推荐1", panel));
+    expect(screen.queryByRole("radio", { name: "男声 Ryan" })).toBeNull();
+    expect(screen.getByRole("radio", { name: "女声 Sonia" })).toBeChecked();
     fireEvent.change(screen.getByLabelText("合成语速"), {
       target: { value: "0.73" }
     });
@@ -795,6 +894,28 @@ describe("按口音独立推荐与逐组草稿", () => {
       initial.groups[0]!.uk[1]!
     ]);
     expect(stored.groups[0]!.us).toEqual(initial.groups[0]!.us);
+  });
+  it("编辑期间回读发现推荐已被移除时保留抽屉输入", async () => {
+    const initial = data();
+    const { client } = mount(initial);
+    const panel = groupPanel("A");
+    fireEvent.click(button("修改英式 A推荐", panel));
+    const dialog = within(screen.getByRole("dialog"));
+    fireEvent.change(dialog.getByLabelText("推荐名称"), {
+      target: { value: "尚未应用的名称" }
+    });
+    const updated = structuredClone(initial);
+    updated.revision++;
+    updated.groups[0]!.revision++;
+    updated.groups[0]!.uk = [];
+    await act(async () => client.setQueryData(queryKey, updated));
+
+    expect(dialog.getByRole("alert")).toHaveTextContent("已被移除");
+    expect(button("保存到本组", screen.getByRole("dialog"))).toBeDisabled();
+    expect(dialog.getByLabelText("推荐名称")).toHaveValue("尚未应用的名称");
+    closeDialog();
+    expect(within(panel).queryByRole("button", { name: "完成" })).toBeNull();
+    expect(api.speech.saveIndependentGroup).not.toHaveBeenCalled();
   });
   it("删除二次确认取消保留，单侧删空可保存；全局固定末位", async () => {
     mount();
