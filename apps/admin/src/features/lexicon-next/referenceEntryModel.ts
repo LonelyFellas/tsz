@@ -1,6 +1,7 @@
 import type { NextAgentSource } from "@tsz/types";
 
 type ReferenceForm = { type?: string; text: string; indexed?: boolean };
+type ReferenceExample = { english: string; translation?: string };
 type ReferenceFormGroup =
   | { kind: "pos"; pos: string; forms: ReferenceForm[] }
   | { kind: "spellings" | "unassigned"; forms: ReferenceForm[] };
@@ -12,7 +13,7 @@ type ReferenceEntry = {
   forms?: ReferenceForm[];
   formsByPos?: { pos: string; forms: ReferenceForm[] }[];
   definitions?: string[];
-  examples?: string[];
+  examples?: ReferenceExample[];
   grammarPatterns?: string[];
   grammarExamples?: string[];
   summary?: string;
@@ -148,6 +149,24 @@ function referenceForms(text: string): ReferenceForm[] {
     .filter((form) => form.text);
 }
 
+function readLegacyExample(text: string): ReferenceExample {
+  const parts = text.split(" — ");
+  // The old format used the same dash in the sentence and between languages.
+  const possibleBoundaries = parts.flatMap((part, index) =>
+    index > 0 && /\p{Script=Han}/u.test(part) ? [index] : []
+  );
+  // Prefer the boundary after a complete sentence when the English quotes Han text.
+  const boundary =
+    possibleBoundaries.find((index) =>
+      /[.!?…]["'\p{Pe}\p{Pf}]*$/u.test(parts[index - 1]!)
+    ) ?? possibleBoundaries[0];
+  if (boundary === undefined) return { english: text };
+  return {
+    english: parts.slice(0, boundary).join(" — "),
+    translation: parts.slice(boundary).join(" — ")
+  };
+}
+
 function readStructured(
   excerpt: string,
   headword: string
@@ -161,7 +180,8 @@ function readStructured(
   const formsByPos = new Map<string, ReferenceForm[]>();
   const unknown: string[] = [];
   let hasFacts = false;
-  for (const field of fields) {
+  for (let index = 0; index < fields.length; index++) {
+    const field = fields[index]!;
     const phonetics = field.match(
       /^(?:英 (\[[^\]]+\]))?(?:\s*\/\s*)?(?:美 (\[[^\]]+\]))?$/
     );
@@ -207,9 +227,22 @@ function readStructured(
     } else if (field.startsWith("释义 ")) {
       hasFacts = true;
       (entry.definitions ??= []).push(field.slice("释义 ".length));
+    } else if (field.startsWith("例句原文 ")) {
+      hasFacts = true;
+      const example: ReferenceExample = {
+        english: field.slice("例句原文 ".length)
+      };
+      const next = fields[index + 1];
+      if (next?.startsWith("例句译文 ")) {
+        example.translation = next.slice("例句译文 ".length);
+        index++;
+      }
+      (entry.examples ??= []).push(example);
     } else if (field.startsWith("例句 ")) {
       hasFacts = true;
-      (entry.examples ??= []).push(field.slice("例句 ".length));
+      (entry.examples ??= []).push(
+        readLegacyExample(field.slice("例句 ".length))
+      );
     } else if (
       field.startsWith("句型 ") &&
       field.slice("句型 ".length).trim()

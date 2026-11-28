@@ -222,7 +222,21 @@ export function ReferenceEntryContent({
           <h4>{editor("entry_ai_examples")}</h4>
           <ol>
             {examples.map((example, index) => (
-              <li key={index}>{example}</li>
+              <li key={index}>
+                {typeof example === "string" ? (
+                  example
+                ) : (
+                  <>
+                    <span lang="en">{example.english}</span>
+                    {example.translation && (
+                      <>
+                        {" — "}
+                        <span lang="zh-Hans">{example.translation}</span>
+                      </>
+                    )}
+                  </>
+                )}
+              </li>
             ))}
           </ol>
         </div>

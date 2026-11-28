@@ -19,6 +19,7 @@ import type {
   WordPronunciationV3
 } from "@tsz/types";
 import { PronunciationPreviewProvider } from "../../word-creation/PronunciationPreview";
+import { deferred } from "../../word-creation/wordCreation.test.helper";
 import { adminVoicePreviewAdapter } from "../../voice-editor/dataSource";
 import { V3PhonemeSpeechSettings } from "./V3PhonemeSpeechSettings";
 import { V3SynthesisInputs } from "./V3SynthesisInputs";
@@ -469,7 +470,7 @@ it("真实音素设置保存先回写最新配音资产再触发业务保存", a
     });
     return true;
   });
-  speech.recommendations.mockResolvedValue([
+  const defaultRecommendations = [
     {
       id: "first",
       name: "自然",
@@ -484,7 +485,9 @@ it("真实音素设置保存先回写最新配音资产再触发业务保存", a
         rate_percent: 0
       }
     }
-  ]);
+  ];
+  const recommendations = deferred<typeof defaultRecommendations>();
+  speech.recommendations.mockReturnValue(recommendations.promise);
   renderWithUps(
     <VoiceSaveContext.Provider value={{ save }}>
       <Harness
@@ -503,13 +506,43 @@ it("真实音素设置保存先回写最新配音资产再触发业务保存", a
   fireEvent.click(screen.getByLabelText(`打开${label} TTS 设置器`));
   await screen.findByLabelText(`${label}音标编辑`);
   const complete = screen.getByLabelText(`保存${label}修改`);
+  expect(complete).toBeDisabled();
+  await act(async () => recommendations.resolve(defaultRecommendations));
   await waitFor(() => expect(complete).toBeEnabled());
   fireEvent.click(complete);
   await waitFor(() =>
-    expect(save).toHaveBeenCalledWith("azure", {
+    expect(save).toHaveBeenCalledExactlyOnceWith("azure", {
       skipAudioTasks: true
     })
   );
+});
+
+it("音色目录为空时仍可保存未选中来源的音素设置", async () => {
+  const listVoices = vi
+    .spyOn(adminVoicePreviewAdapter, "listVoices")
+    .mockResolvedValue([]);
+  onTestFinished(() => {
+    listVoices.mockRestore();
+  });
+  const save = vi.fn().mockResolvedValue(true);
+  renderWithUps(
+    <VoiceSaveContext.Provider value={{ save }}>
+      <Harness dialect="uk" />
+    </VoiceSaveContext.Provider>
+  );
+  expect(sourceRadio("词形拼写", "英式")).toBeChecked();
+  const label = "第 1 条发音 英式 Azure IPA";
+  fireEvent.click(screen.getByLabelText(`打开${label} TTS 设置器`));
+  await screen.findByLabelText(`${label}音标编辑`);
+  const complete = screen.getByLabelText(`保存${label}修改`);
+  await waitFor(() => expect(complete).toBeEnabled());
+  fireEvent.click(complete);
+  await waitFor(() =>
+    expect(save).toHaveBeenCalledExactlyOnceWith("azure", {
+      skipAudioTasks: true
+    })
+  );
+  expect(speech.generateAudio).not.toHaveBeenCalled();
 });
 
 it("音素设置弹窗不提前生成，点击完成才生成并应用最新配音", async () => {

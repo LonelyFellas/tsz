@@ -903,40 +903,63 @@ it("用参考轮播和紧凑词形表展示同一批生成结果", async () => {
   expect(generate.mock.calls[0]?.[1].senses).toEqual([]);
 });
 
-it("有道刷新后显示短语释义和例句，缺失的词形资料留空", async () => {
-  const locator = "https://dict.youdao.com/w/eng/warm%20welcome/";
-  const refreshReference = vi.fn().mockResolvedValue({
-    source: "有道",
-    locator,
-    status: "found",
-    excerpt:
-      "warm welcome · 释义 热烈欢迎 · 例句 They gave us a warm welcome. — 他们热情地欢迎了我们。"
-  });
-  render(
-    <GenerationResult
-      section="forms"
-      headword="warm welcome"
-      sources={[
-        { source: "有道", locator, status: "unavailable", excerpt: "" }
-      ]}
-      forms={[]}
-      refreshReference={refreshReference}
-    />
-  );
-
-  const youdao = within(screen.getByRole("group", { name: "有道" }));
-  expect(youdao.getByText("未能取得资料")).toBeVisible();
-  fireEvent.click(screen.getByRole("button", { name: "刷新有道资料" }));
-  expect(await youdao.findByText("热烈欢迎")).toBeVisible();
-  expect(
-    youdao.getByText("They gave us a warm welcome. — 他们热情地欢迎了我们。")
-  ).toBeVisible();
-  expect(youdao.getByText("已取得参考")).toBeVisible();
-  expect(youdao.queryByText("未能取得资料")).not.toBeInTheDocument();
-  for (const label of ["词性", "发音", "词形"]) {
-    expect(youdao.getByText(label).nextElementSibling).toBeEmptyDOMElement();
+it.each([
+  {
+    format: "旧摘录",
+    english: "They wrote — “欢迎” — and smiled.",
+    chinese: "AI 记录到他们写了“欢迎” — 然后笑了。",
+    examples:
+      "例句 They wrote — “欢迎” — and smiled. — AI 记录到他们写了“欢迎” — 然后笑了。"
+  },
+  {
+    format: "新版摘录",
+    english: "They wrote — “欢迎” — and smiled.",
+    chinese: "AI 记录到他们写了“欢迎”。",
+    examples:
+      "例句原文 They wrote — “欢迎” — and smiled. · 例句译文 AI 记录到他们写了“欢迎”。"
   }
-});
+])(
+  "有道刷新后分别标记$format里的例句语言",
+  async ({ english, chinese, examples }) => {
+    const locator = "https://dict.youdao.com/w/eng/warm%20welcome/";
+    const refreshReference = vi.fn().mockResolvedValue({
+      source: "有道",
+      locator,
+      status: "found",
+      excerpt: `warm welcome · 释义 热烈欢迎 · ${examples} · 例句原文 They waved.`
+    });
+    render(
+      <GenerationResult
+        section="forms"
+        headword="warm welcome"
+        sources={[
+          { source: "有道", locator, status: "unavailable", excerpt: "" }
+        ]}
+        forms={[]}
+        refreshReference={refreshReference}
+      />
+    );
+
+    const youdao = within(screen.getByRole("group", { name: "有道" }));
+    expect(youdao.getByText("未能取得资料")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "刷新有道资料" }));
+    expect(await youdao.findByText("热烈欢迎")).toBeVisible();
+    const original = youdao.getByText(english);
+    const translation = youdao.getByText(chinese);
+    expect(original).toBeVisible();
+    expect(original).toHaveAttribute("lang", "en");
+    expect(translation).toBeVisible();
+    expect(translation).toHaveAttribute("lang", "zh-Hans");
+    expect(original.closest("li")).toHaveTextContent(`${english} — ${chinese}`);
+    expect(youdao.getAllByRole("listitem")).toHaveLength(2);
+    expect(youdao.getByText("They waved.")).toHaveAttribute("lang", "en");
+    expect(youdao.getByText("已取得参考")).toBeVisible();
+    expect(youdao.queryByText("未能取得资料")).not.toBeInTheDocument();
+    for (const label of ["词性", "发音", "词形"]) {
+      expect(youdao.getByText(label).nextElementSibling).toBeEmptyDOMElement();
+    }
+  }
+);
 
 it("已加载旧文案的页面仍按词性显示韦氏变形和候选词形计数", () => {
   const row = (

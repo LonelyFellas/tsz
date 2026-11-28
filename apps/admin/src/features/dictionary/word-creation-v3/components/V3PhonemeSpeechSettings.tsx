@@ -114,6 +114,7 @@ export function V3PhonemeSpeechSettings({
   currentT.current = t;
   const businessSave = useVoiceSave();
   const businessSaveRef = useRef(businessSave);
+  const validateVoiceOnSave = Boolean(businessSave && active);
   useLayoutEffect(() => {
     businessSaveRef.current = businessSave;
   });
@@ -778,6 +779,7 @@ export function V3PhonemeSpeechSettings({
               mode="phoneme-settings"
               textReadOnly
               autoRecommend={defaultProfile !== storedProfile}
+              waitForInitialVoiceProfileOnSave={validateVoiceOnSave}
               loadRecommendations={loadAdminVoiceRecommendations}
               recommendationArea="azure"
               locale={locale}
@@ -861,9 +863,7 @@ export function V3PhonemeSpeechSettings({
                       setSaveError("");
                       setBusinessSaveFailed(false);
                       try {
-                        const result = captureResult?.(
-                          !!businessSave && active
-                        );
+                        const result = captureResult?.(validateVoiceOnSave);
                         const content = toRichTextV2(
                           result?.value ?? draft.content
                         );
