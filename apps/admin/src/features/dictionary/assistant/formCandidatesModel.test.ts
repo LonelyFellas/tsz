@@ -8,7 +8,11 @@ import {
   applyFormsStructure,
   assignSharedFormContent
 } from "../word-creation-v3/sharedFormsModel";
-import { createStableVariantIdFactory } from "../word-creation-v3/operations";
+import {
+  addPartOfSpeech,
+  createStableVariantIdFactory,
+  fillFormTypeTemplate
+} from "../word-creation-v3/operations";
 import {
   commonFormFixture,
   formsFixture,
@@ -271,6 +275,77 @@ describe("AI 候选本地导入", () => {
     expect(() => planFormCandidates(empty(), regional, catalog.items)).toThrow(
       "目录"
     );
+  });
+
+  it("为已有空白短语词形回填不同的英美字典音标", () => {
+    const pastType = "phrase_past_ten_4b4e1cb9f726aa3d";
+    const phrase = {
+      ...catalog.items.find((item) => item.code === "verb")!,
+      kind: "phrase" as const,
+      code: "phrase_verbal_constituent",
+      allowed_form_types: [pastType],
+      default_form_types: [pastType]
+    };
+    const initial = addPartOfSpeech({ pos: [] }, phrase);
+    if (!initial.ok) throw new Error(initial.reason);
+    const original = applyFormsStructure(
+      empty(),
+      fillFormTypeTemplate(initial.value, [phrase])
+    ) as SharedFormsStepContentV3;
+    const proposals: AssistantCandidatePos[] = [
+      {
+        pos: phrase.code,
+        forms: [
+          {
+            form_type: "base",
+            is_regular: true,
+            uk: { spelling: "wake up", dict_phonetic: "ˈweɪk ˌʌp" },
+            us: { spelling: "wake up", dict_phonetic: "ˈweɪk ˌʌp" }
+          },
+          {
+            form_type: pastType,
+            is_regular: false,
+            uk: { spelling: "woke up", dict_phonetic: "ˈwəʊk ˌʌp" },
+            us: { spelling: "woke up", dict_phonetic: "ˈwoʊk ˌʌp" }
+          }
+        ]
+      }
+    ];
+    const plan = planFormCandidates(original, proposals, [phrase]);
+    expect(plan.changed).toBe(2);
+    const filled = plan.forms as SharedFormsStepContentV3;
+    expect(filled.pos[0]!.form_groups).toEqual(original.pos[0]!.form_groups);
+    const past = filled.pos[0]!.forms[1]!;
+    expect(past.id).toBe(original.pos[0]!.forms[1]!.id);
+    expect(past.content_id).toBe(original.pos[0]!.forms[1]!.content_id);
+    const regions = filled.contents.find(
+      (content) => content.id === past.content_id
+    )!.regional_variants;
+    if (regions.mode !== "uk_us") throw new Error("expected regional form");
+    expect(regions.uk.spelling).toBe("woke up");
+    expect(regions.us.spelling).toBe("woke up");
+    expect(regions.uk.pronunciations[0]!.dict_phonetic).toBe("ˈwəʊk ˌʌp");
+    expect(regions.us.pronunciations[0]!.dict_phonetic).toBe("ˈwoʊk ˌʌp");
+    expect(planFormCandidates(filled, proposals, [phrase]).changed).toBe(0);
+
+    const manualDraft = structuredClone(original);
+    const manual = manualDraft.contents.find(
+      (content) => content.id === past.content_id
+    )!;
+    if (manual.regional_variants.mode !== "common")
+      throw new Error("expected common form");
+    manual.regional_variants.common.spelling = "woke up";
+    manual.regional_variants.common.pronunciations[0]!.dict_phonetic =
+      "ˌwəʊk ˈʌp";
+    const protectedResult = planFormCandidates(manualDraft, proposals, [
+      phrase
+    ]);
+    expect(protectedResult.changed).toBe(1);
+    expect(
+      (protectedResult.forms as SharedFormsStepContentV3).contents.find(
+        (content) => content.id === past.content_id
+      )
+    ).toEqual(manual);
   });
 
   it("不改写多处共用的内容", () => {

@@ -45,7 +45,7 @@ function canonical(value: unknown): string {
 }
 
 /** A generated row can receive existing content; a dictionary/user row cannot be overwritten. */
-function isEmptyTemplate(content: FormContentV3): boolean {
+export function isEmptyTemplate(content: FormContentV3): boolean {
   return regionalVariants(content.regional_variants).every(
     (variant) =>
       variant.origin === "manual" &&
