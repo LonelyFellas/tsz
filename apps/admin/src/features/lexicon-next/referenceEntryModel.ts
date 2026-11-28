@@ -152,13 +152,18 @@ function referenceForms(text: string): ReferenceForm[] {
 function readLegacyExample(text: string): ReferenceExample {
   const parts = text.split(" — ");
   // The old format used the same dash in the sentence and between languages.
-  const translation = parts.findIndex(
-    (part, index) => index > 0 && /\p{Script=Han}/u.test(part)
+  const possibleBoundaries = parts.flatMap((part, index) =>
+    index > 0 && /\p{Script=Han}/u.test(part) ? [index] : []
   );
-  if (translation < 0) return { english: text };
+  // Prefer the boundary after a complete sentence when the English quotes Han text.
+  const boundary =
+    possibleBoundaries.find((index) =>
+      /[.!?…]["'\p{Pe}\p{Pf}]*$/u.test(parts[index - 1]!)
+    ) ?? possibleBoundaries[0];
+  if (boundary === undefined) return { english: text };
   return {
-    english: parts.slice(0, translation).join(" — "),
-    translation: parts.slice(translation).join(" — ")
+    english: parts.slice(0, boundary).join(" — "),
+    translation: parts.slice(boundary).join(" — ")
   };
 }
 

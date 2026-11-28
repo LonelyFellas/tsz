@@ -906,10 +906,10 @@ it("用参考轮播和紧凑词形表展示同一批生成结果", async () => {
 it.each([
   {
     format: "旧摘录",
-    english: "They paused — then gave us a warm welcome.",
-    chinese: "他们停了一下 — 然后热情地欢迎了我们。",
+    english: "They wrote — “欢迎” — and smiled.",
+    chinese: "AI 记录到他们写了“欢迎” — 然后笑了。",
     examples:
-      "例句 They paused — then gave us a warm welcome. — 他们停了一下 — 然后热情地欢迎了我们。"
+      "例句 They wrote — “欢迎” — and smiled. — AI 记录到他们写了“欢迎” — 然后笑了。"
   },
   {
     format: "新版摘录",
