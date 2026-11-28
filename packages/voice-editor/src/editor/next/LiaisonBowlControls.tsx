@@ -1,4 +1,4 @@
-import { useRef, useState, type ComponentRef, type Ref } from "react";
+import { useRef, useState, type ComponentRef, type RefObject } from "react";
 import type { LiaisonBowl } from "@tsz/types";
 import { Button } from "@tsz/ui/admin/display";
 import { Input, Segmented, Slider } from "@tsz/ui/admin/forms";
@@ -8,24 +8,49 @@ import type { BowlTarget } from "../../marks/liaisonBowl";
 
 const ADJUSTMENT_LIMIT = 100;
 
-function LiaisonCurveInput({
+function displayPixels(value: number, min: number, max: number) {
+  const rounded = Number(value.toFixed(1));
+  if (rounded !== 0 && rounded >= min && rounded <= max) return rounded;
+  // Preserve small adjustments and avoid displaying a number outside the range.
+  const precise = Number(value.toFixed(4));
+  return precise >= min && precise <= max
+    ? precise
+    : Math.trunc(value * 10_000) / 10_000;
+}
+
+type AdjustmentInputRef = RefObject<ComponentRef<typeof Input> | null>;
+
+function LiaisonAdjustmentInput({
   value,
+  unit,
+  min,
+  max,
+  label,
   disabled,
   inputRef,
   onCommit
 }: {
   value: number;
+  unit: "%" | "px";
+  min: number;
+  max: number;
+  label: string;
   disabled: boolean;
-  inputRef?: Ref<ComponentRef<typeof Input>>;
+  inputRef?: AdjustmentInputRef;
   onCommit: (value: number) => void;
 }) {
   const { t } = useVoiceEditorTranslation();
   const [draft, setDraft] = useState<string>();
   const text = draft?.trim() ?? "";
-  const next = /^[+-]?\d+$/u.test(text) ? Number(text) : NaN;
-  const valid = next >= -ADJUSTMENT_LIMIT && next <= ADJUSTMENT_LIMIT;
-  const invalid = !/^[+-]?$/u.test(text) && !valid;
-  const range = t("bowl_curve_range");
+  const pixels = unit === "px";
+  const pattern = pixels ? /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/u : /^[+-]?\d+$/u;
+  const next = pattern.test(text) ? Number(text) : NaN;
+  const valid = next >= min && next <= max;
+  const incomplete = (pixels ? /^[+-]?\.?$/u : /^[+-]?$/u).test(text);
+  const invalid = !incomplete && !valid;
+  const range = pixels
+    ? t("bowl_tip_range", { min, max })
+    : t("bowl_curve_range");
 
   function commit() {
     setDraft(undefined);
@@ -35,16 +60,16 @@ function LiaisonCurveInput({
   return (
     <Input
       ref={inputRef}
-      className="tsz-ve-bowl-percent"
+      className="tsz-ve-bowl-input"
       size="small"
-      aria-label={t("bowl_curve_percent")}
+      aria-label={label}
       aria-description={range}
       aria-invalid={invalid || undefined}
       title={range}
       status={invalid ? "error" : undefined}
       disabled={disabled}
       value={draft ?? String(value)}
-      suffix={<span aria-hidden="true">%</span>}
+      suffix={<span aria-hidden="true">{unit}</span>}
       onChange={(event) => setDraft(event.target.value)}
       onBlur={commit}
       onKeyDown={(event) => {
@@ -68,7 +93,7 @@ interface Props {
   arc?: LiaisonArc;
   target: BowlTarget;
   disabled: boolean;
-  curveInputRef?: Ref<ComponentRef<typeof Input>>;
+  inputRef?: AdjustmentInputRef;
   onTarget: (target: BowlTarget) => void;
   onPreview: (bowl: LiaisonBowl | undefined) => void;
   onCommit: (bowl: LiaisonBowl) => void;
@@ -79,7 +104,7 @@ export function LiaisonBowlControls({
   arc,
   target,
   disabled,
-  curveInputRef,
+  inputRef,
   onTarget,
   onPreview,
   onCommit
@@ -89,9 +114,11 @@ export function LiaisonBowlControls({
   const n = value[target] ?? 0;
   const curve = target === "curve_pct";
   const view = arc?.pose?.(value).view;
-  const tip = view?.[target === "left_tip_pct" ? "left" : "right"];
-  const min = !curve && tip && tip.down < 0.02 ? 0 : -ADJUSTMENT_LIMIT;
-  const max = !curve && tip && tip.up < 0.02 ? 0 : ADJUSTMENT_LIMIT;
+  const tip = curve
+    ? undefined
+    : view?.[target === "left_tip_pct" ? "left" : "right"];
+  const min = tip && tip.down < 0.02 ? 0 : -ADJUSTMENT_LIMIT;
+  const max = tip && tip.up < 0.02 ? 0 : ADJUSTMENT_LIMIT;
   const blocked = disabled || !view || (curve ? view.blocked : min === max);
   const targets = [
     { value: "curve_pct", label: t("bowl_curve") },
@@ -99,14 +126,22 @@ export function LiaisonBowlControls({
     { value: "right_tip_pct", label: t("bowl_right") }
   ] as const;
   const label = targets.find((x) => x.value === target)!.label;
-  const number =
-    n === 0
-      ? t("bowl_recommended")
-      : curve || !tip
-        ? `${n > 0 ? "+" : ""}${n}%`
-        : n === -100 && tip.touchesInk
-          ? t("bowl_touch")
-          : `${tip.delta > 0 ? "+" : ""}${tip.delta.toFixed(1)} px`;
+  const retainedValue =
+    n === 0 ? t("bowl_recommended") : `${n > 0 ? "+" : ""}${n}%`;
+  // Keep the measured range, discarding only floating-point noise.
+  const inputMin = tip && min < 0 ? Number((-tip.down).toFixed(8)) : min;
+  const inputMax = tip && max > 0 ? Number(tip.up.toFixed(8)) : max;
+  function commitInput(next: number) {
+    if (slide.current) return;
+    let percent = next;
+    if (tip && next !== 0) {
+      const travel = next < 0 ? tip.down : tip.up;
+      const steps = Math.round((Math.abs(next) / travel) * ADJUSTMENT_LIMIT);
+      percent = Math.sign(next) * Math.min(ADJUSTMENT_LIMIT, steps);
+    }
+    if (percent !== (bowl?.[target] ?? 0))
+      onCommit({ ...bowl, [target]: percent });
+  }
   const slide = useRef<
     { id: number; latest?: LiaisonBowl; cancelled?: boolean } | undefined
   >(undefined);
@@ -138,6 +173,7 @@ export function LiaisonBowlControls({
             e.stopPropagation();
             return;
           }
+          inputRef?.current?.blur();
           slide.current = { id: e.pointerId };
         }}
         onPointerMoveCapture={(e) => {
@@ -160,18 +196,27 @@ export function LiaisonBowlControls({
       >
         <div className="tsz-ve-bowl-value">
           <span>{label}</span>
-          {curve && !arc?.split ? (
-            <LiaisonCurveInput
-              value={n}
+          {!arc?.split && (curve || tip) ? (
+            <LiaisonAdjustmentInput
+              key={target}
+              value={tip ? displayPixels(tip.delta, inputMin, inputMax) : n}
+              unit={tip ? "px" : "%"}
+              min={inputMin}
+              max={inputMax}
+              label={
+                tip
+                  ? t("bowl_tip_pixels", { target: label })
+                  : t("bowl_curve_percent")
+              }
               disabled={blocked}
-              inputRef={curveInputRef}
-              onCommit={(next) => {
-                if (!slide.current) onCommit({ ...bowl, curve_pct: next });
-              }}
+              inputRef={inputRef}
+              onCommit={commitInput}
             />
           ) : (
             <output>
-              {arc?.split ? t("bowl_retained", { value: number }) : number}
+              {arc?.split
+                ? t("bowl_retained", { value: retainedValue })
+                : retainedValue}
             </output>
           )}
         </div>

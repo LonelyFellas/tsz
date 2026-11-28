@@ -1096,6 +1096,16 @@ export const voiceEditorMessages = {
   ],
   bowl_left: ["左端点", "左端點", "Left tip"],
   bowl_right: ["右端点", "右端點", "Right tip"],
+  bowl_tip_pixels: [
+    "{{target}}位移（像素）",
+    "{{target}}位移（像素）",
+    "{{target}} offset (pixels)"
+  ],
+  bowl_tip_range: [
+    "请输入 {{min}} 到 {{max}} px。",
+    "請輸入 {{min}} 到 {{max}} px。",
+    "Enter a value from {{min}} to {{max}} px."
+  ],
   bowl_flatter: ["更平", "更平", "Flatter"],
   bowl_rounder: ["更拱", "更拱", "Rounder"],
   bowl_lower: ["下移", "下移", "Lower"],
