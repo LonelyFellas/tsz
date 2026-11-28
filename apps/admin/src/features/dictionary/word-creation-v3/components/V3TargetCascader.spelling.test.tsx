@@ -1,6 +1,9 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import type { PublishedSentenceTargetCandidateV3 } from "@tsz/types";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { PhraseComponentWords } from "@/features/lexicon-next/PhraseComponentWords";
+import type { LexiconNextRequests } from "@/pages/LexiconNext";
 import { V3TargetCascader, type ResolvedTarget } from "./V3TargetCascader";
 
 const search = vi.fn();
@@ -390,4 +393,37 @@ it("分页追加同词形另一侧不增加显示行或丢失选中态", async (
   );
   fireEvent.click(sense);
   expect(onReplace).toHaveBeenLastCalledWith([target("us")], undefined);
+});
+
+it("新版美式短语选择同拼写的 V1 成分时提交美式坐标", async () => {
+  const onSelect = vi.fn();
+  const requests = {
+    matchEntries: vi.fn().mockResolvedValue({
+      items: [],
+      pagination: { page: 1, page_size: 20, total: 0, total_pages: 0 }
+    })
+  } as unknown as LexiconNextRequests;
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <PhraseComponentWords
+        spelling="job offer"
+        rows={[]}
+        requests={requests}
+        entryId="phrase"
+        target="en-US"
+        medium="zh-Hans"
+        disabled={false}
+        onSelect={onSelect}
+      />
+    </QueryClientProvider>
+  );
+  fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 job" }));
+  fireEvent.click(await screen.findByRole("button", { name: "V1 词库" }));
+  await expandJob();
+  fireEvent.click(screen.getByText("原形 job"));
+  fireEvent.click(await screen.findByText("工作"));
+  expect(onSelect).toHaveBeenCalledExactlyOnceWith("job", {
+    source: "v3",
+    target: target("us")
+  });
 });

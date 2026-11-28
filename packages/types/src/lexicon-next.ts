@@ -5,6 +5,7 @@ import type {
   VoiceProfileV3,
   RichTextV3,
   GrammarFormLinkV3,
+  PhraseComponentUsageV3,
   WordRelationWritableV3,
   SharedFormsStepContentV3
 } from "./admin-word-v3";
@@ -54,7 +55,13 @@ export interface NextSenseGroup {
   name_zh: string;
   name_en: string;
 }
+export interface NextPhraseComponentUsage {
+  target_source: "v3" | "lexicon_next";
+  usage: PhraseComponentUsageV3;
+}
 export interface NextSense {
+  /** 缺省保留原关联，空数组清除。 */
+  component_usages?: NextPhraseComponentUsage[];
   relations?: WordRelationWritableV3[];
   sentence_ids?: string[];
   no_equivalents?: string[];
@@ -228,6 +235,7 @@ export interface NextLanguageCapability {
   part_of_speech_codes: string[];
 }
 export interface NextCapabilities {
+  sense_component_usages?: boolean;
   creation_snapshot?: boolean;
   dialect_pairs?: boolean;
   sentence_drafts?: boolean;
@@ -264,6 +272,7 @@ export interface NextViewQuery {
   medium_locale: string;
 }
 export interface NextSenseView {
+  component_usages?: NextPhraseComponentUsage[];
   relations?: WordRelationWritableV3[];
   sentence_ids?: string[];
   no_equivalents?: boolean;

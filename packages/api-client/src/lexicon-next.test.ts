@@ -1427,3 +1427,74 @@ it("新版发布走独立契约，保留幂等身份和冻结内容；拒绝损�
     snapshot.paths[`/admin/lexicon-next/entries/{id}/publications`]
   ).toEqual(["post"]);
 });
+
+it("按能力协商短语成分用词，并接受后端保存回执", async () => {
+  const capabilities = {
+    schema_version: 1,
+    language_rules_version: "lexicon-next-en-zh-1",
+    languages: [],
+    manual_drafts: true,
+    generation: false,
+    publishing: true,
+    sense_component_usages: true
+  };
+  const phrase: NextEntry = {
+    ...entry,
+    kind: "phrase",
+    draft: structuredClone(draft)
+  };
+  phrase.draft.senses[0]!.component_usages = [
+    {
+      target_source: "lexicon_next",
+      usage: {
+        id: uuid(11),
+        literal: "centre",
+        state: "resolved",
+        target_word_id: uuid(12),
+        target_pos_id: uuid(13),
+        target_base_form_id: uuid(14),
+        target_form_id: uuid(14),
+        target_variant_id: uuid(15),
+        target_sense_id: uuid(16),
+        target_dialect: "uk",
+        target_form_type: "base",
+        target_headword: "centre",
+        target_gloss: "中心"
+      }
+    }
+  ];
+  const { api, fetch } = client(capabilities);
+  const input = { expected_revision: 2, draft: phrase.draft };
+  await expect(api.save(phrase.id, input)).rejects.toThrow(
+    "成分用词能力尚未确认"
+  );
+  expect(fetch).not.toHaveBeenCalled();
+  await api.capabilities();
+  expect(
+    new Headers(fetch.mock.calls[0]![1]?.headers).get(
+      "x-tsz-next-component-usages"
+    )
+  ).toBe("v1");
+
+  fetch.mockResolvedValueOnce(new Response(JSON.stringify(phrase)));
+  await expect(api.save(phrase.id, input)).resolves.toEqual(phrase);
+  expect(JSON.parse(fetch.mock.calls[1]![1]!.body as string)).toEqual(input);
+
+  fetch.mockResolvedValueOnce(
+    new Response(
+      JSON.stringify({
+        surface: "centre",
+        items: [],
+        pagination: { page: 1, page_size: 20, total: 0, total_pages: 0 }
+      })
+    )
+  );
+  await api.matchEntries(
+    { target_language: "en", medium_locale: "zh-Hans", surface: "centre" },
+    undefined,
+    true
+  );
+  const headers = new Headers(fetch.mock.calls[2]![1]?.headers);
+  expect(headers.get("x-tsz-next-component-match")).toBe("v1");
+  expect(headers.get("x-tsz-next-annotation-rule")).toBeNull();
+});

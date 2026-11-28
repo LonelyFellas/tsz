@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/zentao-281-recommendation-uniqueness/docs/openapi.json",
-  "_source_sha256": "ba0148d5380e5404ff03c9e05e37308aec52f48456d2fdfd57da273eae9df27d",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/restore-phrase-component-words/docs/openapi.json",
+  "_source_sha256": "d7983d39d0b4357159026605a478d131e61b655035b555d9d79faf435c571845",
   "roots": [
     "LexiconTaxonomy",
     "LexiconTaxonomyKind",
@@ -3941,6 +3941,7 @@
         "relations": { "type": "boolean" },
         "schema_version": { "type": "integer", "maximum": 1, "minimum": 1 },
         "section_generation_candidates": { "type": "boolean" },
+        "sense_component_usages": { "type": "boolean" },
         "sense_groups": { "type": "boolean" },
         "sense_metadata": { "type": "boolean" },
         "sentence_associations": { "type": "boolean" },
@@ -4538,6 +4539,15 @@
       },
       "additionalProperties": false
     },
+    "NextPhraseComponentUsage": {
+      "type": "object",
+      "required": ["target_source", "usage"],
+      "properties": {
+        "target_source": { "$ref": "#/$defs/AssociationTargetSource" },
+        "usage": { "$ref": "#/$defs/PhraseComponentUsageV3" }
+      },
+      "additionalProperties": false
+    },
     "NextPublication": {
       "type": "object",
       "required": [
@@ -4687,6 +4697,11 @@
       "type": "object",
       "required": ["id", "part_of_speech", "definitions", "equivalents"],
       "properties": {
+        "component_usages": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextPhraseComponentUsage" },
+          "maxItems": 100
+        },
         "definitions": {
           "type": "array",
           "items": { "$ref": "#/$defs/NextDefinition" }
@@ -4736,6 +4751,11 @@
         "missing_equivalents"
       ],
       "properties": {
+        "component_usages": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NextPhraseComponentUsage" },
+          "maxItems": 100
+        },
         "depends_on_context": { "type": "boolean" },
         "equivalents": {
           "type": "array",

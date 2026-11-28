@@ -1,8 +1,14 @@
 import { GenerationSenseScope, SectionAI } from "./GenerationActions";
 import { Relations } from "./Relations";
+import { PhraseComponentWords } from "./PhraseComponentWords";
 import { SenseSentenceExamples } from "./SenseSentenceExamples";
 import { EquivalentRows } from "./EquivalentRows";
-import { draftNodeCount, ensureMeaningTemplates, newSense } from "./model";
+import {
+  dialectHeadword,
+  draftNodeCount,
+  ensureMeaningTemplates,
+  newSense
+} from "./model";
 import type { LexiconNextRequests } from "@/pages/LexiconNext";
 import {
   useEffect,
@@ -26,6 +32,7 @@ import { Plus } from "lucide-react";
 import type {
   DraftFormsStepContentV3,
   NextDefinition,
+  NextPhraseComponentUsage,
   NextDraft,
   NextSense,
   PartOfSpeechCatalogItem
@@ -60,6 +67,7 @@ export function MeaningsStep({
   focusIssue,
   entryId,
   relationsAvailable = false,
+  componentUsagesAvailable = false,
   kind,
   formEditorAvailable,
   formQuestionsAvailable = false,
@@ -89,6 +97,7 @@ export function MeaningsStep({
   focusIssue?: { senseId?: string };
   entryId?: string;
   relationsAvailable?: boolean;
+  componentUsagesAvailable?: boolean;
   kind: "word" | "phrase";
   formEditorAvailable: boolean;
   formQuestionsAvailable?: boolean;
@@ -817,6 +826,66 @@ export function MeaningsStep({
                                     />
                                   </>
                                 )}
+                                {kind === "phrase" &&
+                                  componentUsagesAvailable && (
+                                    <PhraseComponentWords
+                                      spelling={dialectHeadword(
+                                        value,
+                                        sense.id,
+                                        target
+                                      )}
+                                      rows={sense.component_usages ?? []}
+                                      entryId={entryId}
+                                      target={target}
+                                      medium={medium}
+                                      requests={requests}
+                                      disabled={contentDisabled || !isExpanded}
+                                      onSelect={(literal, choice) => {
+                                        const newId = crypto.randomUUID();
+                                        onChange((current) => ({
+                                          ...current,
+                                          senses: current.senses.map((row) => {
+                                            if (row.id !== sense.id) return row;
+                                            const component_usages = [
+                                              ...(row.component_usages ?? [])
+                                            ];
+                                            const index =
+                                              component_usages.findIndex(
+                                                ({ usage }) =>
+                                                  usage.literal === literal
+                                              );
+                                            if (!choice && index < 0)
+                                              return row;
+                                            const next: NextPhraseComponentUsage[] =
+                                              choice
+                                                ? [
+                                                    {
+                                                      target_source:
+                                                        choice.source,
+                                                      usage: {
+                                                        ...choice.target,
+                                                        id:
+                                                          component_usages[
+                                                            index
+                                                          ]?.usage.id ?? newId,
+                                                        literal
+                                                      }
+                                                    }
+                                                  ]
+                                                : [];
+                                            component_usages.splice(
+                                              index < 0
+                                                ? component_usages.length
+                                                : index,
+                                              index < 0 ? 0 : 1,
+                                              ...next
+                                            );
+                                            return { ...row, component_usages };
+                                          })
+                                        }));
+                                      }}
+                                    />
+                                  )}
                                 {sentencesAvailable && requests && (
                                   <SenseSentenceExamples
                                     detailsAvailable={sentenceDetailsAvailable}

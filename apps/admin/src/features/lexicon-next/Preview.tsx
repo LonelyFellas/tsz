@@ -2,6 +2,7 @@ import { DialectPreview } from "./DialectPairs";
 import type { NextDialectSense } from "@tsz/types";
 import { useEffect, useId, useRef, type ReactNode } from "react";
 import { RelationsPreview } from "./Relations";
+import { PhraseComponentSummary } from "./PhraseComponentWords";
 import { SentenceExamplesPreview } from "./SenseSentenceExamples";
 import type { LexiconNextRequests } from "@/pages/LexiconNext";
 import { EquivalentPreview } from "./EquivalentPreview";
@@ -456,6 +457,9 @@ export function Preview({
                         {t("panel_no_definitions_yet")} · {t("eq_empty")}
                       </p>
                     )}
+                    <PhraseComponentSummary
+                      rows={sense.component_usages ?? []}
+                    />
                     {requests && !!sense.sentence_ids?.length && (
                       <div>
                         <h3>{t("panel_examples_2")}</h3>
@@ -577,6 +581,7 @@ export function DraftSummary({
             />
             <Definitions rows={sense.definitions} missing="释义" />
             <DraftEquivalentSummary sense={sense} />
+            <PhraseComponentSummary rows={sense.component_usages ?? []} />
             {sense.sentence_ids?.flatMap(
               (id) =>
                 sentenceResources?.[id]?.draft.variants.map((variant) => (

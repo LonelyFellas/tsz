@@ -222,6 +222,9 @@ function LexiconNextWorkspace({ requests }: { requests: LexiconNextRequests }) {
               }
               publishingAvailable={capability.data?.publishing === true}
               relationsAvailable={capability.data?.relations === true}
+              componentUsagesAvailable={
+                capability.data?.sense_component_usages === true
+              }
               formQuestionsAvailable={
                 capability.data?.form_question_eligibility === true
               }
@@ -284,6 +287,7 @@ function EntryLoader({
   sentenceDetailsAvailable,
   sentenceDraftsAvailable,
   relationsAvailable,
+  componentUsagesAvailable,
   publishingAvailable
 }: {
   formQuestionsAvailable: boolean;
@@ -300,6 +304,7 @@ function EntryLoader({
   sentenceDetailsAvailable: boolean;
   sentenceDraftsAvailable: boolean;
   relationsAvailable: boolean;
+  componentUsagesAvailable: boolean;
   publishingAvailable: boolean;
   generationAvailable: boolean;
   generationCandidatesAvailable: boolean;
@@ -426,6 +431,7 @@ function EntryLoader({
       archived={metadata.data.status === "archived"}
       publishingAvailable={publishingAvailable}
       relationsAvailable={relationsAvailable}
+      componentUsagesAvailable={componentUsagesAvailable}
       formEditorAvailable={formEditorAvailable}
       formQuestionsAvailable={formQuestionsAvailable}
       senseGroupsAvailable={senseGroupsAvailable}
@@ -467,6 +473,7 @@ function EntryEditor({
   sentenceDetailsAvailable,
   sentenceDraftsAvailable,
   relationsAvailable,
+  componentUsagesAvailable,
   publishingAvailable
 }: {
   formQuestionsAvailable: boolean;
@@ -483,6 +490,7 @@ function EntryEditor({
   sentenceDetailsAvailable: boolean;
   sentenceDraftsAvailable: boolean;
   relationsAvailable: boolean;
+  componentUsagesAvailable: boolean;
   publishingAvailable: boolean;
   generationAvailable: boolean;
   generationCandidatesAvailable: boolean;
@@ -1542,6 +1550,7 @@ function EntryEditor({
             focusIssue={issueFocus}
             entryId={saved.id}
             relationsAvailable={relationsAvailable}
+            componentUsagesAvailable={componentUsagesAvailable}
             selectedPos={activePos}
             onSelectedPosChange={setSelectedPos}
             value={draft}

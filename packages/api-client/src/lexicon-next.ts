@@ -81,6 +81,8 @@ export function createLexiconNextEndpoints(http: HttpClient) {
   let definitionDetails = false;
   let sentenceDrafts = false;
   let relations = false;
+  let senseComponentUsages = false;
+  const componentUsagesHeader = { "x-tsz-next-component-usages": "v1" };
   let dialectPairs = false;
   let grammarFormLinks = false;
   let sentenceAssociations = false;
@@ -92,6 +94,7 @@ export function createLexiconNextEndpoints(http: HttpClient) {
       "x-tsz-next-publications": "v1",
       "x-tsz-next-dialect-pairs": "v1",
       "x-tsz-next-relations": "v1",
+      ...componentUsagesHeader,
       "x-tsz-next-definitions": "v1",
       "x-tsz-next-forms": "v1",
       "x-tsz-next-form-questions": "v1",
@@ -193,7 +196,8 @@ export function createLexiconNextEndpoints(http: HttpClient) {
         .get<unknown>(`${entry(id)}/publication`, {
           headers: {
             "x-tsz-next-dialect-pairs": "v1",
-            "x-tsz-next-form-questions": "v1"
+            "x-tsz-next-form-questions": "v1",
+            ...componentUsagesHeader
           }
         })
         .then((value) =>
@@ -208,7 +212,10 @@ export function createLexiconNextEndpoints(http: HttpClient) {
     publish: (id: string, input: NextPublishInput) =>
       http
         .post<unknown>(`${entry(id)}/publications`, input, {
-          headers: { "x-tsz-next-form-questions": "v1" }
+          headers: {
+            "x-tsz-next-form-questions": "v1",
+            ...componentUsagesHeader
+          }
         })
         .then((value) => decode<NextPublication>("NextPublication", value)),
     sentences: (query: NextSentenceQuery) =>
@@ -322,6 +329,7 @@ export function createLexiconNextEndpoints(http: HttpClient) {
         sentenceDrafts = capabilities.sentence_drafts === true;
         dialectPairs = capabilities.dialect_pairs === true;
         relations = capabilities.relations === true;
+        senseComponentUsages = capabilities.sense_component_usages === true;
         grammarFormLinks = capabilities.grammar_form_links === true;
         sentenceAssociations = capabilities.sentence_associations === true;
         return capabilities;
@@ -350,13 +358,16 @@ export function createLexiconNextEndpoints(http: HttpClient) {
         ),
     matchEntries: (
       input: NextEntryMatchInput,
-      annotationKind?: "word" | "phrase"
+      annotationKind?: "word" | "phrase",
+      componentWords = false
     ) =>
       http
         .post<unknown>(`${root}/entry-matches`, input, {
           headers: {
             ...editorOptions.headers,
-            "x-tsz-next-annotation-rule": "v1",
+            ...(componentWords
+              ? { "x-tsz-next-component-match": "v1" }
+              : { "x-tsz-next-annotation-rule": "v1" }),
             ...(annotationKind
               ? { "x-tsz-next-annotation-kind": annotationKind }
               : {})
@@ -366,6 +377,14 @@ export function createLexiconNextEndpoints(http: HttpClient) {
     get: (id: string) =>
       http.get<unknown>(entry(id), editorOptions).then(decodeNextEntry),
     save: (id: string, input: SaveNextDraft) => {
+      if (
+        !senseComponentUsages &&
+        input.draft.senses.some((sense) => sense.component_usages !== undefined)
+      ) {
+        return Promise.reject(
+          new ClientResponseError("成分用词能力尚未确认，请重新打开词条")
+        );
+      }
       if (!formQuestions && input.draft.form_question_eligibility?.length)
         return Promise.reject(
           new ClientResponseError("当前服务尚未支持词形出题设置，请更新后保存")

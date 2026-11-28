@@ -1,0 +1,5 @@
+.lexicon-next-component-word[aria-pressed="true"] {
+  border-color: var(--ui-color-primary-border);
+  color: var(--ui-color-primary);
+  background: var(--ui-color-primary-bg);
+}
