@@ -115,12 +115,11 @@ export const creationResidualMessages = {
     "字典音標最多 200 個字元",
     "Dictionary transcriptions must be at most 200 characters"
   ],
-  creation_phonetic_word_index_contains_an_unsupported_transcription_enter_one_reading_at_a_time:
-    [
-      "第 {{index}} 段音标包含未支持的符号，请每次只输入一个读音版本",
-      "第 {{index}} 段音標包含未支援的符號，請每次只輸入一個讀音版本",
-      "Transcription segment {{index}} contains an unsupported symbol. Enter one reading at a time"
-    ],
+  creation_phonetic_unsupported_dictionary_transcription: [
+    "请输入正确的音标文字；其他字符无法识别。",
+    "請輸入正確的音標文字；其他字元無法辨識。",
+    "Enter a valid phonetic transcription. Other characters are not recognized."
+  ],
   creation_phonetic_word_index_has_incomplete_phonemes_stress_or_syllable_markers:
     [
       "第 {{index}} 段音标的音素、重音或音节标记不完整",
