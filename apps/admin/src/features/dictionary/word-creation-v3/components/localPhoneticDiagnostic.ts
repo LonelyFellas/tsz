@@ -47,6 +47,14 @@ const LOCAL_DIAGNOSTICS: Readonly<Record<string, LexiconEditorKey>> = {
     "creation_phonetic_the_ups_conversion_exceeds_1600_characters"
 };
 
+export function unsupportedDictionaryTranscriptionMessage(
+  message: string,
+  t: LexiconEditorTranslation
+): string | undefined {
+  if (/^第 \d+ 段音标包含未支持的符号，请每次只输入一个读音版本$/.test(message))
+    return t("creation_phonetic_unsupported_dictionary_transcription");
+}
+
 /** Only pass diagnostics from local phonetic helpers, never server errors or dictionary content. */
 export function localPhoneticDiagnostic(
   message: string | undefined,
@@ -55,6 +63,8 @@ export function localPhoneticDiagnostic(
   if (!message) return message;
   const key = LOCAL_DIAGNOSTICS[message];
   if (key) return t(key);
+  const unsupported = unsupportedDictionaryTranscriptionMessage(message, t);
+  if (unsupported) return unsupported;
   let match: RegExpMatchArray | null;
   if ((match = message.match(/^请填写 Azure (IPA|UPS)$/)))
     return t("creation_phonetic_enter_azure_alphabet", { alphabet: match[1]! });
@@ -93,15 +103,6 @@ export function localPhoneticDiagnostic(
         recorded: t(match[2] === "英式" ? "dialect_uk" : "dialect_us"),
         current: t(match[3] === "英式" ? "dialect_uk" : "dialect_us")
       }
-    );
-  if (
-    (match = message.match(
-      /^第 (\d+) 段音标包含未支持的符号，请每次只输入一个读音版本$/
-    ))
-  )
-    return t(
-      "creation_phonetic_word_index_contains_an_unsupported_transcription_enter_one_reading_at_a_time",
-      { index: match[1]! }
     );
   if ((match = message.match(/^第 (\d+) 段音标的音素、重音或音节标记不完整$/)))
     return t(
