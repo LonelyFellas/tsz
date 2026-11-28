@@ -1,4 +1,5 @@
-import { useContext } from "react";
+import { useContext, type DragEvent } from "react";
+import { useAdminDisabled } from "@tsz/ui/admin/context";
 import { Switch } from "@tsz/ui/admin/forms";
 import { FormQuestionContext } from "./formQuestionContext";
 import { useLexiconEditorTranslation } from "@/features/dictionary/i18n/editor";
@@ -28,6 +29,8 @@ import { useFormTypeLabel } from "../../part-of-speech/FormTypeLabels";
 import { PronunciationPreviewVoiceList } from "../../word-creation/PronunciationPreview";
 import type { V3DialectSeparatedFormRow } from "./V3ConcreteFormRow";
 import { v3FormIssueMessages } from "../presentationErrors";
+import { sortableRowClass, useSortableRows } from "../sortableRows";
+import { SortableDragHandle } from "./SortableDragHandle";
 
 export const formOverviewTableId = "form-content-overview";
 const DEFAULT_OVERVIEW_COLUMN_LABELS = {
@@ -62,11 +65,13 @@ export const formOverviewColumnSettings = Object.entries(
 
 type OverviewReading = V3DialectSeparatedFormRow & {
   key: string;
+  baseSortIndex: number | undefined;
   dialect: "uk" | "us";
   variant: WordCommonFormVariantV3 | WordUkFormVariantV3 | WordUsFormVariantV3;
   pronunciation?: WordPronunciationV3;
   pronunciationIndex: number;
   formRowSpan: number;
+  lastFormRow: boolean;
   spellingRowSpan: number;
   spellingDialect: "common" | "uk" | "us";
 };
@@ -170,6 +175,7 @@ export function V3FormContentOverview({
   sharedCounts,
   onEdit,
   onFormTypeChange,
+  onBaseFormOrderChange,
   issues,
   showColumnSettings = true,
   onFixedOverflowChange
@@ -182,11 +188,29 @@ export function V3FormContentOverview({
     formId: string,
     type: WordConcreteFormV3["form_type"]
   ) => void;
+  onBaseFormOrderChange?: (orderedIds: readonly string[]) => void;
   issues: readonly V3DraftValidationIssue[];
   showColumnSettings?: boolean;
   onFixedOverflowChange?: (overflow: boolean) => void;
 }) {
   const { t } = useLexiconEditorTranslation();
+  const disabled = useAdminDisabled();
+  const copy = useV3FormCopy();
+  const baseRows = rows.filter((row) => row.form.form_type === "base");
+  const showBaseSorting = !!onBaseFormOrderChange && baseRows.length > 1;
+  const baseIndexes = new Map(
+    baseRows.map((row, index) => [row.membershipId, index])
+  );
+  const sorting = useSortableRows({
+    items:
+      !disabled && !copy?.source && !copy?.busy && showBaseSorting
+        ? baseRows
+        : [],
+    scopeId: group.id,
+    dragType: "application/x-tsz-v3-base-form",
+    onChange: (next) =>
+      onBaseFormOrderChange?.(next.map((row) => row.membershipId))
+  });
   const questions = useContext(FormQuestionContext);
   const overviewColumnLabels = {
     edit: t("actions"),
@@ -199,7 +223,6 @@ export function V3FormContentOverview({
     volume: t("volume")
   };
   const label = useFormTypeLabel();
-  const copy = useV3FormCopy();
   const { columns } = useColumnSettings(
     formOverviewTableId,
     formOverviewColumnSettings
@@ -208,6 +231,7 @@ export function V3FormContentOverview({
     ({ key, visible }) => key === "style" && visible
   );
   const readings = rows.flatMap((row): OverviewReading[] => {
+    const baseSortIndex = baseIndexes.get(row.membershipId);
     const regions = row.form.regional_variants;
     const uk = regionalVariants(regions, "uk");
     const us = regionalVariants(regions, "us");
@@ -232,11 +256,13 @@ export function V3FormContentOverview({
           return {
             ...row,
             key: `${row.membershipId}:${dialect}:${variant.id}:${pronunciation?.id ?? "empty"}`,
+            baseSortIndex,
             dialect,
             variant,
             pronunciation,
             pronunciationIndex,
             formRowSpan: first ? total : 0,
+            lastFormRow: emitted === total,
             spellingRowSpan: sameSpelling
               ? first
                 ? total
@@ -264,21 +290,56 @@ export function V3FormContentOverview({
         scroll={{ x: 1080 }}
         rowHoverable={false}
         dataSource={readings}
-        onRow={(row) => ({
-          className: row.formRowSpan ? "v3-overview-form-start" : "",
-          "data-overview-form-id": row.form.id,
-          "data-overview-dialect": row.dialect
-        })}
+        onRow={(row) => {
+          const index = row.baseSortIndex;
+          const startClass = row.formRowSpan ? "v3-overview-form-start" : "";
+          const droppingAfter =
+            sorting.draggingIndex !== undefined &&
+            index !== undefined &&
+            sorting.dragOverIndex === index &&
+            sorting.draggingIndex < index;
+          const onSortableEdge = droppingAfter
+            ? row.lastFormRow
+            : row.formRowSpan > 0;
+          const sortingClass =
+            onSortableEdge && sorting.canReorder && index !== undefined
+              ? sortableRowClass("word-sortable-row", sorting, index)
+              : "";
+          return {
+            className: [startClass, sortingClass].filter(Boolean).join(" "),
+            "data-overview-form-id": row.form.id,
+            "data-overview-dialect": row.dialect,
+            ...(sorting.canReorder &&
+            sorting.draggingIndex !== undefined &&
+            index !== undefined
+              ? {
+                  onDragOver: (event: DragEvent<HTMLElement>) =>
+                    sorting.handleDragOver(event, index),
+                  onDragLeave: sorting.handleDragLeave,
+                  onDrop: (event: DragEvent<HTMLElement>) =>
+                    sorting.handleDrop(event, index)
+                }
+              : {})
+          };
+        }}
         columns={[
           {
             title: overviewColumnLabels.edit,
             key: "edit",
             className: "v3-overview-action-cell",
-            width: 80,
+            width: showBaseSorting ? 108 : 80,
             fixed: "left",
             onCell: (row) => ({ rowSpan: row.formRowSpan }),
             render: (_, row) => (
-              <div className="v3-overview-actions">
+              <div className="v3-overview-actions word-sort-leading">
+                {showBaseSorting && row.baseSortIndex !== undefined && (
+                  <SortableDragHandle
+                    index={row.baseSortIndex}
+                    label={t("drag_item", { label: row.formLabel })}
+                    sorting={sorting}
+                    dragImageSelector=".ui-table-row"
+                  />
+                )}
                 {row.actions}
                 <Tooltip title={t("edit_content")}>
                   <Button
